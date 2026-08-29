@@ -1,0 +1,41 @@
+<?php
+
+use Swoolefy\Worker\Cron\CronProcess;
+
+return [
+    // 定时请求远程url触发远程url的任务处理
+    [
+        'process_name' => 'test-url-task-cron', // 进程名称
+        'handler' => \Swoolefy\Worker\Cron\CronUrlProcess::class,
+        'worker_num' => 1, // 默认动态进程数量
+        'max_handle' => 100, //消费达到10000后reboot进程
+        'life_time'  => 3600, // 每隔3600s重启进程
+        'limit_run_coroutine_num' => 10, // 当前进程的实时协程数量，如果协程数量超过此设置的数量，则禁止继续消费队列处理业务，而是在等待
+        'extend_data' => [],
+        'args' => [
+            // CronManager 唯一调度：配置轮询间隔（秒）。
+            'cron_poll_interval' => env('CRON_POLL_INTERVAL', 20),
+            'node_id' => env('CRON_NODE_ID'),
+            // 跨进程 Manual Run：Admin 入队后由本 Polling 执行 runOnceNow，再 ack 清队列
+            'run_once_ack' => static function (string $jobId, int $cronTaskId, $result = null, int $requestId = 0): void {
+                unset($jobId, $cronTaskId, $result);
+                (new \App\Module\Cron\Service\CronTaskService())->ackRunOnce($requestId);
+            },
+            'heartbeat_interval' => env('CRON_HEARTBEAT_INTERVAL', 15),
+            'node_heartbeat_ack' => static function (string $nodeId, int $heartbeatInterval = 15): void {
+                (new \App\Module\Cron\Service\CronTaskService())->ackNodeHeartbeat($nodeId, $heartbeatInterval);
+            },
+
+            // 动态定时任务列表
+            'task_list' => function () {
+                $taskList = (new \App\Module\Cron\Service\CronTaskService())
+                    ->fetchCronTask(CronProcess::EXEC_URL_TYPE, env('CRON_NODE_ID'));
+                if (!empty($taskList)) {
+                    return $taskList;
+                } else {
+                    return [];
+                }
+            }
+        ],
+    ]
+];

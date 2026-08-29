@@ -6,6 +6,6 @@ use Swoolefy\Core\Controller\BController;
 
 class IndexController extends BController {
     public function index() {
-        Application::getApp()->swooleResponse->write('<h1>Hello, Welcome to Swoolefy Framework! <h1>');
+        Application::getApp()->swooleResponse->write('<h1>Hello, Welcome to Schedule Job Task System! <h1>');
     }
 }

@@ -3,7 +3,7 @@ namespace App\Module\Cron\Entity;
 
 use Swoolefy\Library\Db\Concern\SoftDelete;
 use Swoolefy\Library\Db\Query;
-use Test\Model\ClientModel;
+use App\Model\ClientModel;
 
 // 生成的表【cron_task_log】的属性
 /**

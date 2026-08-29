@@ -16,7 +16,6 @@ use Swoolefy\Library\Redis\Redis;
 $dc = \Swoolefy\Core\SystemEnv::loadDcEnv();
 
 return [
-    // redis cache
     // mysql db
     'db' => function() use($dc) {
         $db = new Mysql($dc['mysql_db']);

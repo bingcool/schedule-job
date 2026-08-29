@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Entity;
 
-use Test\Model\ClientModel;
+use App\Model\ClientModel;
 
 /**
  * 手动执行请求表。独立于 cron_task，避免改 flag 触发 updated_at / fingerprint UPDATE。

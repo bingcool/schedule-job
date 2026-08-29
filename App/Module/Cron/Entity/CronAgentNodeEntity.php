@@ -3,7 +3,7 @@ namespace App\Module\Cron\Entity;
 
 use Swoolefy\Library\Db\Concern\SoftDelete;
 use Swoolefy\Library\Db\Query;
-use Test\Model\ClientModel;
+use App\Model\ClientModel;
 
 /**
  * @property int id

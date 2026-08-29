@@ -1,7 +1,7 @@
 <?php
 namespace App\Module\Cron\Entity;
 
-use Test\Model\ClientModel;
+use App\Model\ClientModel;
 
 /**
  * 主键是 id。group_id 只存在于 cron_agent_node（节点所属分组），本表没有该列。
