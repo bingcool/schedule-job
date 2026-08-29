@@ -1,0 +1,66 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Module\Cron\Request\CronTaskManager;
+
+use Swoolefy\Annotation\ApiProperty;
+use Swoolefy\Annotation\StringToInt;
+use Swoolefy\Annotation\Validation\ValidationRule;
+use Swoolefy\Http\BaseRequest;
+
+/**
+ * 单次执行详情查询。路由无 {id} 占位，用 query：id + execBatchId。
+ */
+class ExecutionDetailRequest extends BaseRequest
+{
+    #[ApiProperty(description: '日志行 ID（优先定位单条执行记录）')]
+    #[ValidationRule(rule: 'nullable|int', message: 'logId 必须是整数')]
+    #[StringToInt]
+    protected ?int $logId = null;
+
+    #[ApiProperty(description: '任务 ID')]
+    #[ValidationRule(rule: 'required|int', message: 'id 不能为空')]
+    #[StringToInt]
+    protected int $id = 0;
+
+    #[ApiProperty(description: '执行批次 ID；register/unregister 等无批次行可空，此时需传 logId')]
+    #[ValidationRule(rule: 'nullable|string', message: 'execBatchId 必须是字符串')]
+    protected string $execBatchId = '';
+
+    public function getLogId(): ?int
+    {
+        return $this->logId;
+    }
+
+    public function setLogId(?int $logId): static
+    {
+        $this->logId = $logId;
+
+        return $this;
+    }
+
+    public function getId(): int
+    {
+        return $this->id;
+    }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function getExecBatchId(): string
+    {
+        return trim($this->execBatchId);
+    }
+
+    public function setExecBatchId(string $execBatchId): static
+    {
+        $this->execBatchId = $execBatchId;
+
+        return $this;
+    }
+}

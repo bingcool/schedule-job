@@ -1,0 +1,23 @@
+{
+  "name": "bingcool/schudule-job",
+  "description": "schudule-job is cron task admin manager platform and agent",
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "license": "proprietary",
+  "require": {
+    "bingcool/swoolefy": "dev-swoolefy-6.2-x",
+    "bingcool/library": "dev-library-6.x"
+  },
+  "require-dev": {
+    "kwn/php-rdkafka-stubs": "dev-master",
+    "swoole/ide-helper": "dev-master",
+    "viest/php-ext-xlswriter-ide-helper": "dev-master",
+    "phpunit/phpunit": "^11.5"
+  },
+  "config": {
+    "allow-plugins": {
+      "php-http/discovery": false,
+      "tbachert/spi": false
+    }
+  }
+}

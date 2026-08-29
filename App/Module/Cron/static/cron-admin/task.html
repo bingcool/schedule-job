@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Redirecting...</title>
+  <script>
+    (function () {
+      var id = (new URLSearchParams(window.location.search)).get('id');
+      window.location.replace('/cron-admin' + (id ? '#/tasks/edit/' + id : '#/tasks/create'));
+    })();
+  </script>
+</head>
+<body></body>
+</html>

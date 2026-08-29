@@ -1,0 +1,28 @@
+<?php
+use App\Scripts\Kernel;
+
+// 定时fork进程处理任务
+return [
+     [
+          'process_name' => 'system-schedule-task', // 进程名称
+          'handler' => \Swoolefy\Worker\Cron\CronForkProcess::class,
+          'description' => '系统fork模式任务调度',
+          'worker_num' => 1, // 默认动态进程数量
+          'max_handle' => 100, //消费达到10000后reboot进程
+          'life_time' => 3600, // 每隔3600s重启进程
+          'limit_run_coroutine_num' => 10, // 当前进程的实时协程数量，如果协程数量超过此设置的数量，则禁止继续消费队列处理业务，而是在等待
+          'extend_data' => [],
+          'args' => [
+              'cron_poll_interval' => 20,
+              'heartbeat_interval' => 15,
+              // 定时任务列表
+              'task_list' => Kernel::buildScheduleTaskList(Kernel::schedule())
+              // 'node_heartbeat_ack' => static function (string $nodeId): void { /* upsert last_heartbeat_at */ },
+        
+              // 动态定时任务列表，可以存在数据库中
+              // 'task_list' => function () {
+              // return include __DIR__ . '/schedule_task.php';
+              // }
+        ],
+    ],
+];

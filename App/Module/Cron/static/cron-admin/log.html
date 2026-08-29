@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Redirecting...</title>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      window.location.replace('/cron-admin#/executions/log?taskId=' + encodeURIComponent(params.get('taskId') || '')
+        + '&execBatchId=' + encodeURIComponent(params.get('execBatchId') || '')
+        + '&logId=' + encodeURIComponent(params.get('logId') || ''));
+    })();
+  </script>
+</head>
+<body></body>
+</html>
