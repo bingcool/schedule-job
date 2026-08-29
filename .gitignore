@@ -4,9 +4,7 @@ sftp-config.json
 *.idea
 *.log
 *.restart.log
-cli.php
 daemon.php
-cron.php
 script.php
 swag.php
 /vendor

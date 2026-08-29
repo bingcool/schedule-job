@@ -1,0 +1,68 @@
+<?php
+// workerService 模式下要关闭opcache.enable_cli，开启后主要影响是include不会再从磁盘加载，可能会影响某些功能
+
+include __DIR__.'/vendor/autoload.php';
+date_default_timezone_set('Asia/Shanghai');
+
+$appName = ucfirst($_SERVER['argv'][2]);
+// 定义app name
+define('APP_NAME', $appName);
+// 启动目录
+defined('START_DIR_ROOT') or define('START_DIR_ROOT', __DIR__);
+
+// 直接下载使用时，定义成如下路径
+// defined('SRC_DIR_ROOT') or define('SRC_DIR_ROOT', __DIR__.'/src');
+// composer安装时，必须定义成如下路径
+defined('SRC_DIR_ROOT') or define('SRC_DIR_ROOT', __DIR__."/vendor/bingcool/swoolefy/src");
+// 应用父目录
+defined('ROOT_PATH') or define('ROOT_PATH',__DIR__);
+// 应用目录
+defined('APP_PATH') or define('APP_PATH',__DIR__.'/'.$appName);
+
+registerNamespace(APP_PATH);
+
+define('APP_META_ARR', [
+    'App' => [
+        'protocol' => 'http',
+        'worker_port' => 9506,
+    ]
+    // todo
+]);
+
+define('PROCESS_CLASS', [
+    // 应用crom worker
+    'App' => \App\WorkerCron\MainCronProcess::class,
+    // todo
+]);
+// 定义服务端口
+define('WORKER_PORT', APP_META_ARR[$appName]['worker_port']);
+define('IS_DAEMON_SERVICE', 0);
+define('IS_CRON_SERVICE', 1);
+define('IS_SCRIPT_SERVICE', 0);
+define('PHP_BIN_FILE','/usr/bin/php');
+
+define('WORKER_SERVICE_NAME', makeServerName($_SERVER['argv'][2]));
+
+define('WORKER_START_SCRIPT_FILE', str_contains($_SERVER['SCRIPT_FILENAME'], $_SERVER['PWD']) ? $_SERVER['SCRIPT_FILENAME'] : $_SERVER['PWD'].'/'.$_SERVER['SCRIPT_FILENAME']);
+define('WORKER_PID_FILE_ROOT', '/tmp/workerfy/log/'.WORKER_SERVICE_NAME);
+define('WORKER_PID_FILE', WORKER_PID_FILE_ROOT.'/worker.pid');
+define('WORKER_STATUS_FILE',WORKER_PID_FILE_ROOT.'/status.log');
+define('WORKER_CTL_LOG_FILE',WORKER_PID_FILE_ROOT.'/ctl.log');
+define('CLI_TO_WORKER_PIPE',WORKER_PID_FILE_ROOT.'/cli.pipe');
+define('WORKER_TO_CLI_PIPE',WORKER_PID_FILE_ROOT.'/ctl.pipe');
+define('WORKER_CTL_CONF_FILE',WORKER_PID_FILE_ROOT.'/confctl.json');
+define('SERVER_START_LOG_JSON_FILE', WORKER_PID_FILE_ROOT.'/start.json');
+
+// 定义配置文件
+define('WORKER_CONF_FILE', APP_PATH.'/WorkerCron/worker_cron_conf.php');
+
+// nacos.yaml 完整路径（环境变量 NacosConst::ENV_FILE_PATH 可覆盖，默认 APP_PATH/nacos.yaml）
+$nacosFilePath = getenv('NACOS_FILE_PATH');
+define('NACOS_FILE_PATH', (false !== $nacosFilePath && '' !== $nacosFilePath) ? $nacosFilePath : APP_PATH . '/nacos.yaml');
+
+// 当使用nacos管理配置时，启动获取最新配置保存到.env
+// $beforeFunc = function () {
+//   \Swoolefy\Support\Nacos\NacosFactory::fetchConfigToEnv();
+//};
+
+include dirname(SRC_DIR_ROOT).'/swoolefy';
