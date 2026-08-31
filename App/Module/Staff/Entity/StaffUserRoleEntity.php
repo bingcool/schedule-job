@@ -7,6 +7,7 @@ namespace App\Module\Staff\Entity;
 use App\Model\ClientModel;
 
 /**
+ * @property int $id
  * @property int $app_id
  * @property int $user_id
  * @property int $role_id
@@ -16,4 +17,6 @@ use App\Model\ClientModel;
 class StaffUserRoleEntity extends ClientModel
 {
     protected static $table = 'staff_user_role';
+
+    protected $pk = 'id';
 }

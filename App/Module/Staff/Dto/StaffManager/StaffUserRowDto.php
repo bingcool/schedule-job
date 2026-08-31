@@ -57,8 +57,7 @@ class StaffUserRowDto extends AbstractDto
         $dto->id = (int) ($row['id'] ?? 0);
         $dto->account = (string) ($row['account'] ?? '');
         $dto->userName = (string) ($row['user_name'] ?? $row['userName'] ?? '');
-        $deleteAt = $row['delete_at'] ?? $row['deleteAt'] ?? null;
-        $dto->status = ($deleteAt === null || $deleteAt === '') ? 1 : 0;
+        $dto->status = (int) ($row['status'] ?? 1) === 0 ? 0 : 1;
         $dto->roles = is_array($row['roles'] ?? null) ? $row['roles'] : [];
         $dto->roleIds = array_values(array_map('intval', $row['role_ids'] ?? $row['roleIds'] ?? []));
         $dto->nodeGroupIds = array_values(array_map('intval', $row['node_group_ids'] ?? $row['nodeGroupIds'] ?? []));

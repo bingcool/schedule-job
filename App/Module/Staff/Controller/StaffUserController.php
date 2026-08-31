@@ -104,7 +104,7 @@ class StaffUserController extends BController
     /**
      * Route: DELETE /api/v1/users
      */
-    #[ApiOperation('禁用用户')]
+    #[ApiOperation('删除用户')]
     public function deleteUser(StaffUserIdRequest $request): StaffDeleteAckResponse
     {
         $id = $this->staffUserService->deleteUser(UserIdDto::of($request->getId()));
@@ -113,7 +113,16 @@ class StaffUserController extends BController
     }
 
     /**
+     * 启用或禁用用户（status：1=启用，0=禁用）。
+     *
      * Route: PUT /api/v1/users/status
+     *
+     ```bash
+     curl -X PUT 'http://127.0.0.1:9501/api/v1/users/status' \
+       -H 'Authorization: Bearer <jwt>' \
+       -H 'Content-Type: application/json' \
+       -d '{"id": 2, "status": 0}'
+     ```
      */
     #[ApiOperation('启用或禁用用户')]
     public function switchStatus(StaffUserStatusRequest $request): StaffUserStatusAckResponse

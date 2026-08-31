@@ -112,6 +112,74 @@
     return confirmDialog(vm, message, 'danger');
   }
 
+  function confirmUserDisable(vm, name) {
+    var label = '「' + String(name == null ? '' : name) + '」';
+    return confirmDialog(
+      vm,
+      '确认禁用用户' + label + '？禁用后该账号将无法登录。',
+      'warning',
+      '禁用用户'
+    ).then(function () {
+      return confirmDialog(
+        vm,
+        '再次确认要禁用用户' + label + '？',
+        'danger',
+        '再次确认'
+      );
+    });
+  }
+
+  function confirmUserDelete(vm, name) {
+    var label = '「' + String(name == null ? '' : name) + '」';
+    return confirmDialog(
+      vm,
+      '确认删除用户' + label + '？删除后不可恢复。',
+      'warning',
+      '删除用户'
+    ).then(function () {
+      return confirmDialog(
+        vm,
+        '再次确认要删除用户' + label + '？',
+        'danger',
+        '再次确认'
+      );
+    });
+  }
+
+  function confirmRoleDisable(vm, name) {
+    var label = '「' + String(name == null ? '' : name) + '」';
+    return confirmDialog(
+      vm,
+      '确认禁用角色' + label + '？禁用后该角色权限将不再生效。',
+      'warning',
+      '禁用角色'
+    ).then(function () {
+      return confirmDialog(
+        vm,
+        '再次确认要禁用角色' + label + '？',
+        'danger',
+        '再次确认'
+      );
+    });
+  }
+
+  function confirmRoleDelete(vm, name) {
+    var label = '「' + String(name == null ? '' : name) + '」';
+    return confirmDialog(
+      vm,
+      '确认删除角色' + label + '？删除后不可恢复。',
+      'warning',
+      '删除角色'
+    ).then(function () {
+      return confirmDialog(
+        vm,
+        '再次确认要删除角色' + label + '？',
+        'danger',
+        '再次确认'
+      );
+    });
+  }
+
   function confirmRunOnce(vm, names) {
     var label = formatTaskNames(names);
     return confirmDialog(
@@ -249,6 +317,10 @@
     confirmDialog: confirmDialog,
     confirmTaskStatusChange: confirmTaskStatusChange,
     confirmDelete: confirmDelete,
+    confirmUserDisable: confirmUserDisable,
+    confirmUserDelete: confirmUserDelete,
+    confirmRoleDisable: confirmRoleDisable,
+    confirmRoleDelete: confirmRoleDelete,
     confirmRunOnce: confirmRunOnce,
     toastTaskStatus: toastTaskStatus,
     formatDurationMs: formatDurationMs,

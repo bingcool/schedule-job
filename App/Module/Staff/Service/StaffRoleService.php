@@ -11,6 +11,7 @@ use App\Module\Staff\Dto\StaffManager\MenuIdDto;
 use App\Module\Staff\Dto\StaffManager\RoleIdDto;
 use App\Module\Staff\Dto\StaffManager\StaffMenuRowDto;
 use App\Module\Staff\Dto\StaffManager\StaffRoleRowDto;
+use App\Module\Staff\Dto\StaffManager\SwitchRoleStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateMenuDto;
 use App\Module\Staff\Dto\StaffManager\UpdateRoleDto;
 use App\Module\Staff\Entity\StaffMenuPageEntity;
@@ -231,7 +232,7 @@ class StaffRoleService
         }
         $userCount = $this->countUsersByRoleIds([(int) $role->id])[(int) $role->id] ?? 0;
         if ($userCount > 0) {
-            throw StaffException::throw('角色仍有关联用户，无法删除', -1);
+            throw StaffException::throw('角色已被 ' . $userCount . ' 个用户关联使用，无法删除', -1);
         }
 
         StaffRolePageEntity::query()->where('role_id', (int) $role->id)->delete();
@@ -239,6 +240,20 @@ class StaffRoleService
         $role->delete();
 
         return (int) $role->id;
+    }
+
+    public function switchStatus(SwitchRoleStatusDto $dto): SwitchRoleStatusDto
+    {
+        $role = $this->requireRole($dto->getId());
+        $status = $dto->getStatus();
+        if ($status === 0 && $role->isSuperRole()) {
+            throw StaffException::throw('超级管理员角色不能禁用', -1);
+        }
+
+        $role->setData(['status' => $status]);
+        $role->save();
+
+        return SwitchRoleStatusDto::of((int) $role->id, $status);
     }
 
     /**
@@ -441,6 +456,7 @@ class StaffRoleService
             static fn (array $row): int => (int) $row['role_id'],
             StaffUserRoleEntity::query()->where('app_id', StaffApp::appId())->where('user_id', $userId)->select()->toArray()
         );
+        $roleIds = $this->enabledRoleIds($roleIds);
         if ($roleIds === []) {
             return [];
         }
@@ -663,6 +679,25 @@ class StaffRoleService
             ->toArray();
 
         return array_values(array_map(static fn (array $row): int => (int) $row['per_id'], $rows));
+    }
+
+    /**
+     * @param array<int, int> $roleIds
+     * @return array<int, int>
+     */
+    private function enabledRoleIds(array $roleIds): array
+    {
+        if ($roleIds === []) {
+            return [];
+        }
+        $rows = StaffRoleEntity::query()
+            ->where('app_id', StaffApp::appId())
+            ->whereIn('id', $roleIds)
+            ->where('status', 1)
+            ->select()
+            ->toArray();
+
+        return array_values(array_map(static fn (array $row): int => (int) $row['id'], $rows));
     }
 
     /**

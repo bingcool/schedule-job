@@ -60,6 +60,8 @@ class StaffAuthService
             'account' => $account,
             'user_name' => $userName,
             'password' => StaffUserService::hashPassword($dto->getPassword()),
+            'status' => 1,
+            'enabled_at' => date('Y-m-d H:i:s'),
         ]);
         $user->save();
 
@@ -79,7 +81,7 @@ class StaffAuthService
         }
 
         $user = (new StaffUserEntity())->loadByAccount($account);
-        if (!$user || !password_verify($dto->getPassword(), (string) $user->password)) {
+        if (!$user || $user->isDeleted() || !password_verify($dto->getPassword(), (string) $user->password)) {
             throw StaffException::throw('账号或密码错误', -1);
         }
         if ($user->isDisabled()) {

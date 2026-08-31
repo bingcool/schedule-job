@@ -9,6 +9,7 @@ use App\Module\Staff\Dto\StaffManager\CreateRoleDto;
 use App\Module\Staff\Dto\StaffManager\ListRolesQueryDto;
 use App\Module\Staff\Dto\StaffManager\MenuIdDto;
 use App\Module\Staff\Dto\StaffManager\RoleIdDto;
+use App\Module\Staff\Dto\StaffManager\SwitchRoleStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateMenuDto;
 use App\Module\Staff\Dto\StaffManager\UpdateRoleDto;
 use App\Module\Staff\Request\StaffManager\ListRolesRequest;
@@ -17,6 +18,7 @@ use App\Module\Staff\Request\StaffManager\StaffMenuIdRequest;
 use App\Module\Staff\Request\StaffManager\StaffMenuUpdateRequest;
 use App\Module\Staff\Request\StaffManager\StaffRoleCreateRequest;
 use App\Module\Staff\Request\StaffManager\StaffRoleIdRequest;
+use App\Module\Staff\Request\StaffManager\StaffRoleStatusRequest;
 use App\Module\Staff\Request\StaffManager\StaffRoleUpdateRequest;
 use App\Module\Staff\Response\StaffManager\ListRolesResponse;
 use App\Module\Staff\Response\StaffManager\RoleOptionsResponse;
@@ -25,6 +27,7 @@ use App\Module\Staff\Response\StaffManager\StaffDeleteAckResponse;
 use App\Module\Staff\Response\StaffManager\StaffMenuRowResponse;
 use App\Module\Staff\Response\StaffManager\StaffMenuTreeResponse;
 use App\Module\Staff\Response\StaffManager\StaffRoleRowResponse;
+use App\Module\Staff\Response\StaffManager\StaffRoleStatusAckResponse;
 use App\Module\Staff\Service\StaffRoleService;
 use Swoolefy\Annotation\ApiOperation;
 use Swoolefy\Core\Controller\BController;
@@ -126,6 +129,28 @@ class StaffRoleController extends BController
     public function deleteRole(StaffRoleIdRequest $request): StaffDeleteAckResponse
     {
         return new StaffDeleteAckResponse($this->staffRoleService->deleteRole(RoleIdDto::of($request->getId())));
+    }
+
+    /**
+     * 启用或禁用角色（status：1=启用，0=禁用）。
+     *
+     * Route: PUT /api/v1/roles/status
+     *
+     ```bash
+     curl -X PUT 'http://127.0.0.1:9501/api/v1/roles/status' \
+       -H 'Authorization: Bearer <jwt>' \
+       -H 'Content-Type: application/json' \
+       -d '{"id": 2, "status": 0}'
+     ```
+     */
+    #[ApiOperation('启用或禁用角色')]
+    public function switchStatus(StaffRoleStatusRequest $request): StaffRoleStatusAckResponse
+    {
+        $ack = $this->staffRoleService->switchStatus(
+            SwitchRoleStatusDto::of($request->getId(), $request->getStatus())
+        );
+
+        return new StaffRoleStatusAckResponse($ack->getId(), $ack->getStatus());
     }
 
     /**

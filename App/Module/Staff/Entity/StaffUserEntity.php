@@ -12,10 +12,12 @@ use Swoolefy\Library\Db\Query;
  * @property string $account
  * @property string $password
  * @property string $user_name
+ * @property int $status
  * @property string $created_at
  * @property string $updated_at
  * @property string|null $delete_at
  * @property string|null $enabled_at
+ * @property string|null $disabled_at
  */
 class StaffUserEntity extends ClientModel
 {
@@ -38,8 +40,13 @@ class StaffUserEntity extends ClientModel
         return $this->loadOne(['account' => $account]);
     }
 
-    public function isDisabled(): bool
+    public function isDeleted(): bool
     {
         return $this->delete_at !== null && $this->delete_at !== '';
+    }
+
+    public function isDisabled(): bool
+    {
+        return (int) $this->status === 0;
     }
 }

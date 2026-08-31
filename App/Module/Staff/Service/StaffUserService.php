@@ -39,17 +39,15 @@ class StaffUserService
         $userName = trim((string) ($query->getUserName() ?? ''));
         $status = $query->getStatus();
 
-        $qb = StaffUserEntity::query();
+        $qb = StaffUserEntity::queryActive();
         if ($account !== '') {
             $qb->where('account', 'like', '%' . $account . '%');
         }
         if ($userName !== '') {
             $qb->where('user_name', 'like', '%' . $userName . '%');
         }
-        if ($status === 1) {
-            $qb->whereNull('delete_at');
-        } elseif ($status === 0) {
-            $qb->whereNotNull('delete_at');
+        if ($status === 1 || $status === 0) {
+            $qb->where('status', $status);
         }
 
         $pageResult = new ListUsersPageResult();
@@ -93,6 +91,8 @@ class StaffUserService
             'account' => $dto->getAccount(),
             'user_name' => $dto->getUserName(),
             'password' => self::hashPassword($dto->getPassword()),
+            'status' => 1,
+            'enabled_at' => date('Y-m-d H:i:s'),
         ]);
         $user->save();
 
@@ -152,27 +152,41 @@ class StaffUserService
 
     public function deleteUser(UserIdDto $dto): int
     {
-        return $this->switchStatus(SwitchUserStatusDto::of($dto->getId(), 0))->getId();
+        $user = $this->requireUser($dto->getId());
+        $this->assertNotSelf((int) $user->id, '不能删除当前登录账号');
+
+        $userId = (int) $user->id;
+        $user->setData([
+            'status' => 0,
+            'disabled_at' => date('Y-m-d H:i:s'),
+        ]);
+        $user->save();
+        StaffUserRoleEntity::query()->where('user_id', $userId)->delete();
+        StaffUserRelateNodeGroupEntity::query()->where('user_id', $userId)->delete();
+        $user->delete();
+
+        return $userId;
     }
 
     public function switchStatus(SwitchUserStatusDto $dto): SwitchUserStatusDto
     {
         $user = $this->requireUser($dto->getId());
-        $this->assertNotSelf((int) $user->id, '不能禁用当前登录账号');
-
-        if ($dto->getStatus() === 1) {
-            $user->setData([
-                'delete_at' => null,
-                'enabled_at' => date('Y-m-d H:i:s'),
-            ]);
-        } else {
-            $user->setData([
-                'delete_at' => date('Y-m-d H:i:s'),
-            ]);
+        $status = $dto->getStatus();
+        if ($status === 0) {
+            $this->assertNotSelf((int) $user->id, '不能禁用当前登录账号');
         }
+
+        $now = date('Y-m-d H:i:s');
+        $data = ['status' => $status];
+        if ($status === 1) {
+            $data['enabled_at'] = $now;
+        } else {
+            $data['disabled_at'] = $now;
+        }
+        $user->setData($data);
         $user->save();
 
-        return SwitchUserStatusDto::of((int) $user->id, $dto->getStatus());
+        return SwitchUserStatusDto::of((int) $user->id, $status);
     }
 
     public static function hashPassword(string $password): string
@@ -193,7 +207,7 @@ class StaffUserService
             throw StaffException::throw('id不能为空', -1);
         }
         $user = (new StaffUserEntity())->loadById($id);
-        if (!$user) {
+        if (!$user || $user->isDeleted()) {
             throw StaffException::throw('用户不存在', -1);
         }
 

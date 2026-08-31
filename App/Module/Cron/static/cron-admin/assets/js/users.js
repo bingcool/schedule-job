@@ -42,13 +42,30 @@
         this.query = { page: 1, pageSize: 20, account: '', userName: '', status: '' };
         this.load();
       },
-      switchStatus: async function (row) {
-        var next = row.status ? 0 : 1;
-        var action = next ? '启用' : '禁用';
+      onStatusChange: async function (row, next) {
+        var prev = next === 1 ? 0 : 1;
+        var name = row.userName || row.account;
         try {
-          await common.confirmDialog(this, '确认' + action + '用户「' + (row.userName || row.account) + '」？', next ? 'success' : 'warning');
-          await common.api('/users/status', { method: 'PUT', body: { id: Number(row.id), status: next } });
-          this.$message.success('已' + action);
+          if (next === 0) {
+            await common.confirmUserDisable(this, name);
+          }
+          await common.api('/users/status', { method: 'PUT', body: { id: Number(row.id), status: Number(next) } });
+          row.status = next;
+          this.$message.success(next === 1 ? '已启用' : '已禁用');
+        } catch (e) {
+          row.status = prev;
+          this.$forceUpdate();
+          if (e !== 'cancel') common.toastErr(this, e);
+        }
+      },
+      remove: async function (row) {
+        try {
+          await common.confirmUserDelete(this, row.userName || row.account);
+          await common.api('/users?id=' + encodeURIComponent(row.id), {
+            method: 'DELETE',
+            body: { id: Number(row.id) }
+          });
+          this.$message.success('已删除');
           this.load();
         } catch (e) {
           if (e !== 'cancel') common.toastErr(this, e);

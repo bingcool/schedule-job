@@ -752,8 +752,8 @@
         <el-form-item label="用户名称"><el-input v-model="query.userName" clearable placeholder="用户名称" style="width:160px"></el-input></el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" clearable placeholder="全部" style="width:110px">
-            <el-option :value="1" label="正常"></el-option>
-            <el-option :value="0" label="已禁用"></el-option>
+            <el-option :value="1" label="启用"></el-option>
+            <el-option :value="0" label="禁用"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -770,16 +770,25 @@
             <el-tag v-for="r in (s.row.roles || [])" :key="r.id || r" size="mini" class="role-tag" type="info">{{ r.name || r }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column label="状态" width="140">
           <template slot-scope="s">
-            <span :class="['status-mark', s.row.status ? 'status-success' : 'status-disabled']">{{ s.row.status ? '正常' : '已禁用' }}</span>
+            <div class="task-status-switch">
+              <el-switch
+                :key="'user-st-'+s.row.id+'-'+s.row.status"
+                :value="s.row.status"
+                :active-value="1"
+                :inactive-value="0"
+                @change="value => onStatusChange(s.row, value)">
+              </el-switch>
+              <span>{{ s.row.status === 1 ? '启用' : '禁用' }}</span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right">
           <template slot-scope="s">
             <el-button type="text" size="small" @click="$router.push('/users/edit/' + s.row.id)">编辑</el-button>
-            <el-button type="text" size="small" :style="{color: s.row.status ? '#f56c6c' : '#67c23a'}" @click="switchStatus(s.row)">{{ s.row.status ? '禁用' : '启用' }}</el-button>
+            <el-button type="text" size="small" style="color:#f56c6c" @click="remove(s.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -874,14 +883,26 @@
         <el-table-column prop="desc" label="描述" min-width="180" show-overflow-tooltip></el-table-column>
         <el-table-column prop="userCount" label="用户数" width="80" align="center"></el-table-column>
         <el-table-column prop="menuCount" label="菜单权限" width="90" align="center"></el-table-column>
-        <el-table-column label="状态" width="90">
-          <template slot-scope="s"><span :class="['status-mark', s.row.status ? 'status-success' : 'status-disabled']">{{ s.row.status ? '启用' : '禁用' }}</span></template>
+        <el-table-column label="状态" width="140">
+          <template slot-scope="s">
+            <div class="task-status-switch">
+              <el-switch
+                :key="'role-st-'+s.row.id+'-'+s.row.status"
+                :value="s.row.status"
+                :active-value="1"
+                :inactive-value="0"
+                :disabled="!!s.row.isSuperRole"
+                @change="value => onStatusChange(s.row, value)">
+              </el-switch>
+              <span>{{ s.row.status === 1 ? '启用' : '禁用' }}</span>
+            </div>
+          </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
           <template slot-scope="s">
             <el-button type="text" size="small" @click="$router.push('/roles/edit/' + s.row.id)">编辑</el-button>
-            <el-button type="text" size="small" :disabled="s.row.isSuperRole" @click="remove(s.row)">删除</el-button>
+            <el-button type="text" size="small" style="color:#f56c6c" :disabled="s.row.isSuperRole || s.row.userCount > 0" @click="remove(s.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -1030,7 +1051,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@2.7.16/dist/vue.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/vue-router@3.6.5/dist/vue-router.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue-router@3.6.5/dist/vue-router.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-ui@2.15.14/lib/index.js'"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=rbac-1"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=rbac-4"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-list-6"></script>
 <script defer src="/cron-admin/assets/js/editor.js"></script>
@@ -1040,9 +1061,9 @@
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js"></script>
 <script defer src="/cron-admin/assets/js/register.js"></script>
-<script defer src="/cron-admin/assets/js/users.js"></script>
+<script defer src="/cron-admin/assets/js/users.js?v=status-2"></script>
 <script defer src="/cron-admin/assets/js/user-editor.js"></script>
-<script defer src="/cron-admin/assets/js/roles.js"></script>
+<script defer src="/cron-admin/assets/js/roles.js?v=status-1"></script>
 <script defer src="/cron-admin/assets/js/role-editor.js"></script>
 <script defer src="/cron-admin/assets/js/menus.js"></script>
 <script defer src="/cron-admin/assets/js/app.js?v=rbac-1"></script>

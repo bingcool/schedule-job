@@ -74,6 +74,9 @@ Route::group([
     Route::delete('/roles', [
         'dispatch_route' => [StaffRoleController::class, 'deleteRole'],
     ]);
+    Route::match(['POST', 'PUT'], '/roles/status', [
+        'dispatch_route' => [StaffRoleController::class, 'switchStatus'],
+    ]);
 
     Route::get('/menus', [
         'dispatch_route' => [StaffRoleController::class, 'listMenus'],
