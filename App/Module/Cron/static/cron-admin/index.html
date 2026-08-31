@@ -3,37 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Swoolefy Cron Admin</title>
+  <title>Schedule Job Admin</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=task-list-6">
+  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=rbac-1">
 </head>
 <body>
 <div id="app" v-cloak>
-  <div class="app">
+  <div class="auth-page" v-if="isAuthPage">
+    <router-view></router-view>
+  </div>
+  <div class="app" v-else>
     <aside class="sidebar">
-      <div class="brand">Swoolefy Cron<small>Production Admin</small></div>
+      <div class="brand">Schedule Job<small>Production Admin</small></div>
       <nav class="nav">
+        <div class="nav-section">Cron 管理</div>
         <router-link to="/dashboard"><i class="el-icon-data-line"></i> Dashboard</router-link>
         <router-link to="/tasks"><i class="el-icon-s-order"></i> 计划任务</router-link>
         <router-link to="/executions"><i class="el-icon-time"></i> 执行记录</router-link>
         <router-link to="/nodes"><i class="el-icon-monitor"></i> Cron Nodes</router-link>
         <router-link to="/runtime"><i class="el-icon-odometer"></i> Runtime</router-link>
+        <div class="nav-section">权限管理</div>
+        <router-link to="/users"><i class="el-icon-user"></i> 用户管理</router-link>
+        <router-link to="/roles"><i class="el-icon-s-custom"></i> 角色管理</router-link>
+        <router-link to="/menus"><i class="el-icon-menu"></i> 菜单管理</router-link>
       </nav>
     </aside>
     <main class="main">
       <div class="top">
-        <div class="top-inner">
-          <div class="breadcrumb">{{ breadcrumbPath }}</div>
-          <h1 class="title">{{ pageTitle }}</h1>
-          <p class="subtitle" v-if="pageSubtitle">{{ pageSubtitle }}</p>
-        </div>
-        <div class="top-skeleton" aria-hidden="true">
-          <span class="top-skeleton-line"></span>
-          <span class="top-skeleton-line lg"></span>
-          <span class="top-skeleton-line sm"></span>
+        <div class="top-bar">
+          <div>
+            <div class="top-inner">
+              <div class="breadcrumb">{{ breadcrumbPath }}</div>
+              <h1 class="title">{{ pageTitle }}</h1>
+              <p class="subtitle" v-if="pageSubtitle">{{ pageSubtitle }}</p>
+            </div>
+            <div class="top-skeleton" aria-hidden="true">
+              <span class="top-skeleton-line"></span>
+              <span class="top-skeleton-line lg"></span>
+              <span class="top-skeleton-line sm"></span>
+            </div>
+          </div>
+          <div class="user-bar" v-if="currentUser">
+            <div class="avatar">{{ userInitial }}</div>
+            <span class="name">{{ currentUser.userName || currentUser.account }}</span>
+            <el-button size="mini" plain @click="logout">退出</el-button>
+          </div>
         </div>
       </div>
       <div class="content-area"><router-view></router-view></div>
@@ -678,10 +696,341 @@
   </div>
 </script>
 
+<script type="text/x-template" id="tpl-login">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <h1>Schedule Job</h1>
+      <p>定时任务调度管理平台</p>
+    </div>
+    <el-form class="auth-form" label-position="top" @submit.native.prevent="submit">
+      <el-form-item label="账号">
+        <el-input v-model="form.account" placeholder="请输入邮箱或账号" prefix-icon="el-icon-user"></el-input>
+      </el-form-item>
+      <el-form-item label="密码">
+        <el-input v-model="form.password" type="password" placeholder="请输入密码" prefix-icon="el-icon-lock" show-password @keyup.enter.native="submit"></el-input>
+      </el-form-item>
+      <el-button type="primary" class="auth-submit" :loading="loading" @click="submit">登 录</el-button>
+    </el-form>
+    <div class="auth-footer">还没有账号？<router-link to="/register">立即注册</router-link></div>
+  </div>
+</script>
+
+<script type="text/x-template" id="tpl-register">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <h1>创建账号</h1>
+      <p>注册后即可使用 Schedule Job 管理平台</p>
+    </div>
+    <el-form class="auth-form" label-position="top" @submit.native.prevent="submit">
+      <el-form-item label="账号">
+        <el-input v-model="form.account" placeholder="建议使用邮箱作为账号" prefix-icon="el-icon-message"></el-input>
+      </el-form-item>
+      <el-form-item label="用户名称">
+        <el-input v-model="form.userName" placeholder="请输入显示名称" prefix-icon="el-icon-user"></el-input>
+      </el-form-item>
+      <el-form-item label="密码">
+        <el-input v-model="form.password" type="password" placeholder="至少 8 位" prefix-icon="el-icon-lock" show-password></el-input>
+      </el-form-item>
+      <el-form-item label="确认密码">
+        <el-input v-model="form.passwordConfirm" type="password" placeholder="请再次输入密码" prefix-icon="el-icon-lock" show-password @keyup.enter.native="submit"></el-input>
+      </el-form-item>
+      <el-button type="primary" class="auth-submit" :loading="loading" @click="submit">注 册</el-button>
+    </el-form>
+    <div class="auth-footer">已有账号？<router-link to="/login">返回登录</router-link></div>
+  </div>
+</script>
+
+<script type="text/x-template" id="tpl-users">
+  <div>
+    <div class="page-head">
+      <div></div>
+      <div class="actions"><el-button type="primary" icon="el-icon-plus" @click="$router.push('/users/create')">新增用户</el-button></div>
+    </div>
+    <div class="panel">
+      <el-form :inline="true" size="small" @submit.native.prevent="search">
+        <el-form-item label="账号"><el-input v-model="query.account" clearable placeholder="账号/邮箱" style="width:180px"></el-input></el-form-item>
+        <el-form-item label="用户名称"><el-input v-model="query.userName" clearable placeholder="用户名称" style="width:160px"></el-input></el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="query.status" clearable placeholder="全部" style="width:110px">
+            <el-option :value="1" label="正常"></el-option>
+            <el-option :value="0" label="已禁用"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="search">查询</el-button>
+          <el-button @click="reset">重置</el-button>
+        </el-form-item>
+      </el-form>
+      <el-table :data="items" v-loading="loading" size="small">
+        <el-table-column prop="id" label="ID" width="70"></el-table-column>
+        <el-table-column prop="account" label="账号" min-width="180"></el-table-column>
+        <el-table-column prop="userName" label="用户名称" min-width="120"></el-table-column>
+        <el-table-column label="角色" min-width="200">
+          <template slot-scope="s">
+            <el-tag v-for="r in (s.row.roles || [])" :key="r.id || r" size="mini" class="role-tag" type="info">{{ r.name || r }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template slot-scope="s">
+            <span :class="['status-mark', s.row.status ? 'status-success' : 'status-disabled']">{{ s.row.status ? '正常' : '已禁用' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
+        <el-table-column label="操作" width="160" fixed="right">
+          <template slot-scope="s">
+            <el-button type="text" size="small" @click="$router.push('/users/edit/' + s.row.id)">编辑</el-button>
+            <el-button type="text" size="small" :style="{color: s.row.status ? '#f56c6c' : '#67c23a'}" @click="switchStatus(s.row)">{{ s.row.status ? '禁用' : '启用' }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:16px;text-align:right">
+        <el-pagination background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
+      </div>
+    </div>
+  </div>
+</script>
+
+<script type="text/x-template" id="tpl-user-editor">
+  <div>
+    <div class="page-head">
+      <div><el-button size="small" icon="el-icon-arrow-left" @click="$router.push('/users')">返回列表</el-button></div>
+      <div class="actions">
+        <el-button @click="$router.push('/users')">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+      </div>
+    </div>
+    <div class="editor-layout">
+      <div class="panel task-editor-page">
+        <div class="section">
+          <h3 class="section-title">基本信息</h3>
+          <p class="section-desc">对应 staff_user 表字段</p>
+          <div class="grid">
+            <div class="field"><label>账号 <span class="req">*</span></label><input class="form-control" v-model="form.account" placeholder="建议使用邮箱"></div>
+            <div class="field"><label>用户名称 <span class="req">*</span></label><input class="form-control" v-model="form.userName" placeholder="显示名称"></div>
+            <div class="field"><label>{{ isEdit ? '新密码' : '密码' }} <span class="req" v-if="!isEdit">*</span></label><input class="form-control" type="password" v-model="form.password" :placeholder="isEdit ? '留空则不修改' : '至少 8 位'"></div>
+            <div class="field"><label>确认密码</label><input class="form-control" type="password" v-model="form.passwordConfirm" placeholder="再次输入密码"></div>
+          </div>
+        </div>
+        <div class="section">
+          <h3 class="section-title">角色分配</h3>
+          <p class="section-desc">对应 staff_user_role，一个用户可拥有多个角色</p>
+          <el-checkbox-group v-model="form.roleIds">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <el-checkbox v-for="r in roleOptions" :key="r.id" :label="r.id">
+                {{ r.name }}
+                <span v-if="r.isSuper" class="tag-super" style="margin-left:6px">超管</span>
+              </el-checkbox>
+            </div>
+          </el-checkbox-group>
+        </div>
+        <div class="section">
+          <h3 class="section-title">节点组授权</h3>
+          <p class="section-desc">对应 staff_user_relate_node_group，空表示不限制</p>
+          <el-select v-model="form.nodeGroupIds" multiple placeholder="选择节点组" style="width:100%">
+            <el-option v-for="g in nodeGroups" :key="g.id" :value="g.id" :label="g.groupName || g.name"></el-option>
+          </el-select>
+        </div>
+      </div>
+      <div class="panel preview-card">
+        <div class="preview-head"><span class="preview-title">用户预览</span></div>
+        <div class="task-name">{{ form.userName || '未命名用户' }}</div>
+        <div class="task-desc mono">{{ form.account || '—' }}</div>
+        <div class="kv"><span>已选角色</span><span>{{ selectedRoleNames.length }} 个</span></div>
+        <div class="kv"><span>节点组</span><span>{{ form.nodeGroupIds.length || '不限制' }}</span></div>
+        <div class="callout info">超级管理员角色拥有所有菜单和 API 权限。</div>
+      </div>
+    </div>
+  </div>
+</script>
+
+<script type="text/x-template" id="tpl-roles">
+  <div>
+    <div class="page-head">
+      <div></div>
+      <div class="actions"><el-button type="primary" icon="el-icon-plus" @click="$router.push('/roles/create')">新增角色</el-button></div>
+    </div>
+    <div class="stat-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="panel stat-card"><div>角色总数</div><h2>{{ stats.total }}</h2><div class="meta"><span class="status-mark status-enabled">启用 {{ stats.enabled }}</span> / <span class="status-mark status-disabled">禁用 {{ stats.disabled }}</span></div></div>
+      <div class="panel stat-card"><div>超级管理员</div><h2>{{ stats.super }}</h2><div class="meta"><span class="status-mark status-success">拥有全部权限</span></div></div>
+      <div class="panel stat-card"><div>关联用户</div><h2>{{ stats.userCount }}</h2><div class="meta"><span class="status-mark status-enabled">已分配角色</span></div></div>
+    </div>
+    <div class="panel">
+      <el-form :inline="true" size="small" @submit.native.prevent="search">
+        <el-form-item label="角色名称"><el-input v-model="query.name" clearable placeholder="角色名称" style="width:160px"></el-input></el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="query.status" clearable placeholder="全部" style="width:110px">
+            <el-option :value="1" label="启用"></el-option>
+            <el-option :value="0" label="禁用"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item><el-button type="primary" @click="search">查询</el-button></el-form-item>
+      </el-form>
+      <el-table :data="items" v-loading="loading" size="small">
+        <el-table-column prop="id" label="ID" width="70"></el-table-column>
+        <el-table-column label="角色名称" min-width="140">
+          <template slot-scope="s">{{ s.row.name }}<span v-if="s.row.isSuperRole" class="tag-super" style="margin-left:6px">超管</span></template>
+        </el-table-column>
+        <el-table-column prop="code" label="唯一标识" min-width="140"><template slot-scope="s"><span class="mono">{{ s.row.code }}</span></template></el-table-column>
+        <el-table-column prop="desc" label="描述" min-width="180" show-overflow-tooltip></el-table-column>
+        <el-table-column prop="userCount" label="用户数" width="80" align="center"></el-table-column>
+        <el-table-column prop="menuCount" label="菜单权限" width="90" align="center"></el-table-column>
+        <el-table-column label="状态" width="90">
+          <template slot-scope="s"><span :class="['status-mark', s.row.status ? 'status-success' : 'status-disabled']">{{ s.row.status ? '启用' : '禁用' }}</span></template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
+        <el-table-column label="操作" width="140" fixed="right">
+          <template slot-scope="s">
+            <el-button type="text" size="small" @click="$router.push('/roles/edit/' + s.row.id)">编辑</el-button>
+            <el-button type="text" size="small" :disabled="s.row.isSuperRole" @click="remove(s.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:16px;text-align:right">
+        <el-pagination background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
+      </div>
+    </div>
+  </div>
+</script>
+
+<script type="text/x-template" id="tpl-role-editor">
+  <div>
+    <div class="page-head">
+      <div><el-button size="small" icon="el-icon-arrow-left" @click="$router.push('/roles')">返回列表</el-button></div>
+      <div class="actions">
+        <el-button @click="$router.push('/roles')">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+      </div>
+    </div>
+    <div class="panel task-editor-page" style="margin-bottom:18px">
+      <div class="section" style="border-bottom:0;margin-bottom:0;padding-bottom:0">
+        <h3 class="section-title">基本信息</h3>
+        <p class="section-desc">对应 staff_roles 表字段</p>
+        <div class="grid">
+          <div class="field"><label>角色名称 <span class="req">*</span></label><input class="form-control" v-model="form.name" placeholder="如：运维人员"></div>
+          <div class="field"><label>唯一标识 <span class="req">*</span></label><input class="form-control mono" v-model="form.code" placeholder="如：ops"></div>
+          <div class="field full"><label>角色描述</label><input class="form-control" v-model="form.desc" placeholder="简要描述该角色的职责"></div>
+          <div class="field">
+            <label>状态</label>
+            <el-radio-group v-model="form.status">
+              <el-radio :label="1">启用</el-radio>
+              <el-radio :label="0">禁用</el-radio>
+            </el-radio-group>
+          </div>
+          <div class="field">
+            <label>超级管理员</label>
+            <el-switch v-model="form.isSuperRole" active-text="是" inactive-text="否"></el-switch>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">开启后拥有全部菜单和 API 权限</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <el-tabs v-model="activeTab" type="border-card" v-if="!form.isSuperRole">
+      <el-tab-pane label="菜单页面权限" name="menu">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px">对应 staff_role_page，勾选该角色可访问的菜单</p>
+        <div style="margin-bottom:12px">
+          <el-button size="mini" @click="checkAllMenu">全选</el-button>
+          <el-button size="mini" @click="uncheckAllMenu">取消全选</el-button>
+        </div>
+        <div class="perm-tree-panel">
+          <el-tree ref="menuTree" :data="menuTree" show-checkbox node-key="id" :default-checked-keys="form.pageIds" :props="{ label: 'name', children: 'children' }" :default-expand-all="true">
+            <span slot-scope="{ data }" style="display:flex;align-items:center;gap:8px">
+              <i v-if="data.parentId" :class="data.icon || 'el-icon-document'" class="menu-icon"></i>
+              <span :style="data.parentId ? '' : 'font-size:12px;color:#64748b;font-weight:600;letter-spacing:.04em'">{{ data.name }}</span>
+              <span v-if="data.parentId" class="mono" style="font-size:11px;color:var(--muted)">{{ data.uri }}</span>
+            </span>
+          </el-tree>
+        </div>
+      </el-tab-pane>
+      <el-tab-pane label="API 权限" name="api">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px">对应 staff_role_permission（type=1）</p>
+        <el-table :data="apiPermissions" size="small" @selection-change="onApiSelect">
+          <el-table-column type="selection" width="50"></el-table-column>
+          <el-table-column prop="name" label="接口名称" min-width="160"></el-table-column>
+          <el-table-column prop="method" label="方法" width="80">
+            <template slot-scope="s"><el-tag :type="methodType(s.row.method)" size="mini">{{ s.row.method }}</el-tag></template>
+          </el-table-column>
+          <el-table-column prop="path" label="路径" min-width="240"><template slot-scope="s"><span class="mono">{{ s.row.path }}</span></template></el-table-column>
+          <el-table-column prop="group" label="分组" width="120"></el-table-column>
+        </el-table>
+      </el-tab-pane>
+      <el-tab-pane label="任务接口权限" name="task">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 14px">对应 staff_role_permission（type=2）</p>
+        <el-table :data="taskPermissions" size="small" @selection-change="onTaskSelect">
+          <el-table-column type="selection" width="50"></el-table-column>
+          <el-table-column prop="name" label="操作" min-width="160"></el-table-column>
+          <el-table-column prop="code" label="权限标识" min-width="200"><template slot-scope="s"><span class="mono">{{ s.row.code }}</span></template></el-table-column>
+          <el-table-column prop="desc" label="说明" min-width="240"></el-table-column>
+        </el-table>
+      </el-tab-pane>
+    </el-tabs>
+    <div class="panel" v-else style="text-align:center;padding:40px">
+      <i class="el-icon-success" style="font-size:48px;color:var(--green)"></i>
+      <p style="font-size:16px;font-weight:600;margin:16px 0 6px">超级管理员角色</p>
+      <p style="color:var(--muted);font-size:13px">该角色自动拥有所有菜单页面权限和 API 权限，无需单独配置。</p>
+    </div>
+  </div>
+</script>
+
+<script type="text/x-template" id="tpl-menus">
+  <div>
+    <div class="page-head">
+      <div></div>
+      <div class="actions"><el-button type="primary" icon="el-icon-plus" @click="openDialog(null)">新增分组</el-button></div>
+    </div>
+    <div class="panel" v-loading="loading">
+      <p class="section-desc" style="margin-top:0">按侧栏结构展示：分组标题 + 菜单项，不含创建任务等页面节点</p>
+      <div class="menu-nav-board">
+        <div v-if="!items.length" class="menu-nav-empty">暂无菜单，请先新增分组</div>
+        <div v-for="group in items" :key="group.id" class="menu-nav-group">
+          <div class="menu-nav-section-row">
+            <span class="name">{{ group.name }}</span>
+            <div>
+              <el-button type="text" size="mini" @click="openDialog(group, true)">新增菜单</el-button>
+              <el-button type="text" size="mini" @click="openDialog(group)">编辑</el-button>
+              <el-button type="text" size="mini" style="color:#f87171" @click="remove(group)">删除</el-button>
+            </div>
+          </div>
+          <div v-for="item in (group.children || [])" :key="item.id" class="menu-nav-item-row">
+            <i :class="item.icon || 'el-icon-document'"></i>
+            <span class="label">{{ item.name }}</span>
+            <span class="mono uri">{{ item.uri }}</span>
+            <el-button type="text" size="mini" @click="openDialog(item)">编辑</el-button>
+            <el-button type="text" size="mini" style="color:#f87171" @click="remove(item)">删除</el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="560px">
+      <el-form label-width="100px" size="small">
+        <el-form-item label="所属分组" v-if="!isGroupForm">
+          <el-select v-model="menuForm.parentId" placeholder="选择分组" style="width:100%">
+            <el-option v-for="g in groupOptions" :key="g.id" :value="g.id" :label="g.name"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="isGroupForm ? '分组名称' : '菜单名称'" required><el-input v-model="menuForm.name" :placeholder="isGroupForm ? '如：Cron 管理' : '显示名称'"></el-input></el-form-item>
+        <el-form-item label="唯一标识" required><el-input v-model="menuForm.code" :placeholder="isGroupForm ? '如 cron' : '如 cron:tasks'"></el-input></el-form-item>
+        <el-form-item :label="isGroupForm ? '占位 URI' : 'URI'" :required="!isGroupForm"><el-input v-model="menuForm.uri" :placeholder="isGroupForm ? '/cron（分组占位，不进路由）' : '/tasks'"></el-input></el-form-item>
+        <el-form-item label="图标" v-if="!isGroupForm"><el-input v-model="menuForm.icon" placeholder="el-icon-s-order"><template slot="prepend"><i :class="menuForm.icon || 'el-icon-picture'"></i></template></el-input></el-form-item>
+        <el-form-item label="排序"><el-input-number v-model="menuForm.sort" :min="0" :max="9999" style="width:160px"></el-input-number></el-form-item>
+        <el-form-item label="状态">
+          <el-radio-group v-model="menuForm.status">
+            <el-radio :label="1">启用</el-radio>
+            <el-radio :label="0">禁用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="save">确定</el-button>
+      </div>
+    </el-dialog>
+  </div>
+</script>
+
 <script defer src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@2.7.16/dist/vue.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/vue-router@3.6.5/dist/vue-router.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue-router@3.6.5/dist/vue-router.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-ui@2.15.14/lib/index.js'"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=task-list-4"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=rbac-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-list-6"></script>
 <script defer src="/cron-admin/assets/js/editor.js"></script>
@@ -689,6 +1038,13 @@
 <script defer src="/cron-admin/assets/js/executions.js"></script>
 <script defer src="/cron-admin/assets/js/nodes.js"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
-<script defer src="/cron-admin/assets/js/app.js"></script>
+<script defer src="/cron-admin/assets/js/login.js"></script>
+<script defer src="/cron-admin/assets/js/register.js"></script>
+<script defer src="/cron-admin/assets/js/users.js"></script>
+<script defer src="/cron-admin/assets/js/user-editor.js"></script>
+<script defer src="/cron-admin/assets/js/roles.js"></script>
+<script defer src="/cron-admin/assets/js/role-editor.js"></script>
+<script defer src="/cron-admin/assets/js/menus.js"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=rbac-1"></script>
 </body>
 </html>

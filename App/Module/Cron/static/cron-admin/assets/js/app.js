@@ -1,9 +1,13 @@
 (function (window) {
   'use strict';
 
+  var common = window.CronAdminCommon;
+
   var router = new VueRouter({
     routes: [
       { path: '/', redirect: '/dashboard' },
+      { path: '/login', component: window.CronAdminLogin, meta: { title: '登录', public: true } },
+      { path: '/register', component: window.CronAdminRegister, meta: { title: '注册', public: true } },
       { path: '/dashboard', component: window.CronAdminDashboard, meta: { title: 'Dashboard', subtitle: '任务、今日执行与节点心跳聚合', breadcrumb: 'Dashboard' } },
       { path: '/tasks', component: window.CronAdminTasks, meta: { title: '计划任务', subtitle: '配置写入 cron_task，Worker Polling 后生效', breadcrumb: '计划任务' } },
       { path: '/tasks/create', component: window.CronAdminEditor, meta: { title: '创建计划任务', subtitle: '配置任务调度规则、执行方式以及运行策略', breadcrumb: '计划任务 / 创建任务' } },
@@ -12,8 +16,30 @@
       { path: '/executions', component: window.CronAdminExecutions, meta: { title: '执行记录', subtitle: '按任务、流水状态、批次过滤', breadcrumb: '执行记录' } },
       { path: '/executions/log', component: window.CronAdminExecutionLog, meta: { title: '执行日志', subtitle: '单次执行详情、stdout/stderr 与下载', breadcrumb: '执行记录 / 执行日志' } },
       { path: '/nodes', component: window.CronAdminNodes, meta: { title: 'Cron Nodes', subtitle: 'Agent 节点管理与心跳状态', breadcrumb: 'Cron Nodes' } },
-      { path: '/runtime', component: window.CronAdminRuntime, meta: { title: 'Runtime', subtitle: 'Cron Worker 运行时聚合概览', breadcrumb: 'Runtime' } }
+      { path: '/runtime', component: window.CronAdminRuntime, meta: { title: 'Runtime', subtitle: 'Cron Worker 运行时聚合概览', breadcrumb: 'Runtime' } },
+      { path: '/users', component: window.CronAdminUsers, meta: { title: '用户管理', subtitle: '管理系统登录用户及其角色分配', breadcrumb: '权限管理 / 用户管理' } },
+      { path: '/users/create', component: window.CronAdminUserEditor, meta: { title: '新增用户', subtitle: '配置用户基本信息、密码及角色权限', breadcrumb: '权限管理 / 用户管理 / 新增用户' } },
+      { path: '/users/edit/:id', component: window.CronAdminUserEditor, meta: { title: '编辑用户', subtitle: '配置用户基本信息、密码及角色权限', breadcrumb: '权限管理 / 用户管理 / 编辑用户' } },
+      { path: '/roles', component: window.CronAdminRoles, meta: { title: '角色管理', subtitle: '定义角色并配置菜单页面权限与 API 权限', breadcrumb: '权限管理 / 角色管理' } },
+      { path: '/roles/create', component: window.CronAdminRoleEditor, meta: { title: '新增角色', subtitle: '配置角色基本信息、菜单页面权限及 API 权限', breadcrumb: '权限管理 / 角色管理 / 新增角色' } },
+      { path: '/roles/edit/:id', component: window.CronAdminRoleEditor, meta: { title: '编辑角色', subtitle: '配置角色基本信息、菜单页面权限及 API 权限', breadcrumb: '权限管理 / 角色管理 / 编辑角色' } },
+      { path: '/menus', component: window.CronAdminMenus, meta: { title: '菜单管理', subtitle: '管理侧边栏菜单页面节点，对应 staff_menu_pages 表', breadcrumb: '权限管理 / 菜单管理' } }
     ]
+  });
+
+  router.beforeEach(function (to, from, next) {
+    var isPublic = !!(to.meta && to.meta.public);
+    var token = common.getToken();
+    if (isPublic) {
+      if (token && (to.path === '/login' || to.path === '/register')) {
+        return next('/dashboard');
+      }
+      return next();
+    }
+    if (!token) {
+      return next('/login');
+    }
+    next();
   });
 
   function redirectLegacyUrls() {
@@ -51,7 +77,15 @@
   new Vue({
     el: '#app',
     router: router,
+    data: function () {
+      return {
+        currentUser: common.getUser()
+      };
+    },
     computed: {
+      isAuthPage: function () {
+        return !!(this.$route.meta && this.$route.meta.public);
+      },
       breadcrumbPath: function () {
         return (this.$route.meta && this.$route.meta.breadcrumb) || '';
       },
@@ -60,6 +94,34 @@
       },
       pageSubtitle: function () {
         return (this.$route.meta && this.$route.meta.subtitle) || '';
+      },
+      userInitial: function () {
+        var user = this.currentUser || {};
+        var name = user.userName || user.account || 'U';
+        return String(name).charAt(0).toUpperCase();
+      }
+    },
+    created: function () {
+      this.refreshUser();
+    },
+    methods: {
+      refreshUser: async function () {
+        if (!common.getToken()) {
+          this.currentUser = null;
+          return;
+        }
+        try {
+          var user = await common.api('/auth/me');
+          common.setUser(user);
+          this.currentUser = user;
+        } catch (e) {
+          this.currentUser = common.getUser();
+        }
+      },
+      logout: function () {
+        common.clearAuth();
+        this.currentUser = null;
+        this.$router.replace('/login');
       }
     }
   });

@@ -2,16 +2,69 @@
   'use strict';
 
   var API = '/api/v1';
+  var TOKEN_KEY = 'schedule_job_token';
+  var USER_KEY = 'schedule_job_user';
+  var AUTH_PUBLIC_PATHS = ['/login', '/register'];
+
+  function getToken() {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  }
+
+  function setToken(token) {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  }
+
+  function getUser() {
+    try {
+      return JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setUser(user) {
+    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+    else localStorage.removeItem(USER_KEY);
+  }
+
+  function clearAuth() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  }
+
+  function isAuthPublicPath(path) {
+    return AUTH_PUBLIC_PATHS.indexOf(path) !== -1;
+  }
+
+  function saveSession(data) {
+    if (!data) return;
+    if (data.token) setToken(data.token);
+    if (data.user) setUser(data.user);
+  }
 
   async function api(path, options) {
     options = options || {};
     var headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
+    var token = getToken();
+    if (token) headers.Authorization = 'Bearer ' + token;
     if (options.body && typeof options.body !== 'string') {
       headers['Content-Type'] = 'application/json';
       options.body = JSON.stringify(options.body);
     }
     var res = await fetch(API + path, Object.assign({}, options, { headers: headers }));
-    var json = await res.json();
+    var json = {};
+    try {
+      json = await res.json();
+    } catch (e) {
+      json = {};
+    }
+    if (res.status === 401 && path.indexOf('/auth/login') === -1 && path.indexOf('/auth/register') === -1) {
+      clearAuth();
+      if (window.location.hash.indexOf('#/login') === -1) {
+        window.location.hash = '#/login';
+      }
+    }
     if (!res.ok || (json.code !== undefined && json.code !== 0)) {
       throw new Error(json.msg || json.message || ('HTTP ' + res.status));
     }
@@ -185,6 +238,13 @@
   window.CronAdminCommon = {
     API: API,
     api: api,
+    getToken: getToken,
+    setToken: setToken,
+    getUser: getUser,
+    setUser: setUser,
+    clearAuth: clearAuth,
+    saveSession: saveSession,
+    isAuthPublicPath: isAuthPublicPath,
     toastErr: toastErr,
     confirmDialog: confirmDialog,
     confirmTaskStatusChange: confirmTaskStatusChange,

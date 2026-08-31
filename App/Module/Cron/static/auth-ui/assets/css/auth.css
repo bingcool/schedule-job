@@ -1,0 +1,158 @@
+/* Auth pages: login / register */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  padding: 40px 36px 32px;
+}
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.auth-brand h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.auth-brand p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.auth-form .el-form-item__label {
+  font-weight: 600;
+  color: #303133;
+}
+
+.auth-form .el-input__inner {
+  height: 42px;
+  border-radius: 8px;
+}
+
+.auth-submit {
+  width: 100%;
+  height: 42px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.auth-footer a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+/* RBAC admin sidebar extras */
+.nav-section {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+  padding: 18px 12px 6px;
+  font-weight: 600;
+}
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.user-bar .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.user-bar .name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* Menu tree in role edit */
+.perm-tree-panel {
+  max-height: 480px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.perm-tree-panel .el-tree-node__content {
+  height: 34px;
+}
+
+/* Menu table indent */
+.menu-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menu-name-cell .indent {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.menu-icon {
+  color: var(--primary);
+  font-size: 15px;
+}
+
+.tag-super {
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.role-tag {
+  margin: 2px 4px 2px 0;
+}

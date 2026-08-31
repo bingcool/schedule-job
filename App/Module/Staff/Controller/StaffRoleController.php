@@ -1,0 +1,194 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Module\Staff\Controller;
+
+use App\Module\Staff\Dto\StaffManager\CreateMenuDto;
+use App\Module\Staff\Dto\StaffManager\CreateRoleDto;
+use App\Module\Staff\Dto\StaffManager\ListRolesQueryDto;
+use App\Module\Staff\Dto\StaffManager\MenuIdDto;
+use App\Module\Staff\Dto\StaffManager\RoleIdDto;
+use App\Module\Staff\Dto\StaffManager\UpdateMenuDto;
+use App\Module\Staff\Dto\StaffManager\UpdateRoleDto;
+use App\Module\Staff\Request\StaffManager\ListRolesRequest;
+use App\Module\Staff\Request\StaffManager\StaffMenuCreateRequest;
+use App\Module\Staff\Request\StaffManager\StaffMenuIdRequest;
+use App\Module\Staff\Request\StaffManager\StaffMenuUpdateRequest;
+use App\Module\Staff\Request\StaffManager\StaffRoleCreateRequest;
+use App\Module\Staff\Request\StaffManager\StaffRoleIdRequest;
+use App\Module\Staff\Request\StaffManager\StaffRoleUpdateRequest;
+use App\Module\Staff\Response\StaffManager\ListRolesResponse;
+use App\Module\Staff\Response\StaffManager\RoleOptionsResponse;
+use App\Module\Staff\Response\StaffManager\RoleStatsResponse;
+use App\Module\Staff\Response\StaffManager\StaffDeleteAckResponse;
+use App\Module\Staff\Response\StaffManager\StaffMenuRowResponse;
+use App\Module\Staff\Response\StaffManager\StaffMenuTreeResponse;
+use App\Module\Staff\Response\StaffManager\StaffRoleRowResponse;
+use App\Module\Staff\Service\StaffRoleService;
+use Swoolefy\Annotation\ApiOperation;
+use Swoolefy\Core\Controller\BController;
+
+/**
+ * 权限组（角色）与菜单管理。
+ */
+class StaffRoleController extends BController
+{
+    private StaffRoleService $staffRoleService {
+        get => $this->staffRoleService ??= new StaffRoleService();
+    }
+
+    /**
+     * Route: GET /api/v1/roles
+     */
+    #[ApiOperation('分页查询角色')]
+    public function listRoles(ListRolesRequest $request): ListRolesResponse
+    {
+        $query = (new ListRolesQueryDto())
+            ->setPage($request->getPage())
+            ->setPageSize($request->getPageSize())
+            ->setName($request->getName())
+            ->setStatus($request->getStatus());
+
+        return new ListRolesResponse($this->staffRoleService->listRoles($query));
+    }
+
+    /**
+     * Route: GET /api/v1/roles/stats
+     */
+    #[ApiOperation('角色统计')]
+    public function roleStats(): RoleStatsResponse
+    {
+        return new RoleStatsResponse($this->staffRoleService->roleStats());
+    }
+
+    /**
+     * Route: GET /api/v1/roles/options
+     */
+    #[ApiOperation('角色下拉选项')]
+    public function listRoleOptions(): RoleOptionsResponse
+    {
+        return new RoleOptionsResponse($this->staffRoleService->listRoleOptions());
+    }
+
+    /**
+     * Route: POST /api/v1/roles
+     */
+    #[ApiOperation('创建角色')]
+    public function createRole(StaffRoleCreateRequest $request): StaffRoleRowResponse
+    {
+        $dto = (new CreateRoleDto())
+            ->setName($request->getName())
+            ->setCode($request->getCode())
+            ->setDesc($request->getDesc())
+            ->setStatus($request->getStatus())
+            ->setIsSuperRole($request->getIsSuperRole())
+            ->setPageIds($request->getPageIds())
+            ->setApiPerIds($request->getApiPerIds())
+            ->setTaskPerIds($request->getTaskPerIds());
+
+        return new StaffRoleRowResponse($this->staffRoleService->createRole($dto));
+    }
+
+    /**
+     * Route: PUT /api/v1/roles
+     */
+    #[ApiOperation('更新角色')]
+    public function updateRole(StaffRoleUpdateRequest $request): StaffRoleRowResponse
+    {
+        $dto = (new UpdateRoleDto())
+            ->setId($request->getId())
+            ->setName($request->getName())
+            ->setCode($request->getCode())
+            ->setDesc($request->getDesc())
+            ->setStatus($request->getStatus())
+            ->setIsSuperRole($request->getIsSuperRole())
+            ->setPageIds($request->getPageIds())
+            ->setApiPerIds($request->getApiPerIds())
+            ->setTaskPerIds($request->getTaskPerIds());
+
+        return new StaffRoleRowResponse($this->staffRoleService->updateRole($dto));
+    }
+
+    /**
+     * Route: GET /api/v1/roles/detail?id=
+     */
+    #[ApiOperation('角色详情')]
+    public function getRole(StaffRoleIdRequest $request): StaffRoleRowResponse
+    {
+        return new StaffRoleRowResponse($this->staffRoleService->getRole(RoleIdDto::of($request->getId())));
+    }
+
+    /**
+     * Route: DELETE /api/v1/roles
+     */
+    #[ApiOperation('删除角色')]
+    public function deleteRole(StaffRoleIdRequest $request): StaffDeleteAckResponse
+    {
+        return new StaffDeleteAckResponse($this->staffRoleService->deleteRole(RoleIdDto::of($request->getId())));
+    }
+
+    /**
+     * Route: GET /api/v1/menus
+     */
+    #[ApiOperation('菜单树')]
+    public function listMenus(): StaffMenuTreeResponse
+    {
+        return new StaffMenuTreeResponse($this->staffRoleService->listMenus());
+    }
+
+    /**
+     * Route: POST /api/v1/menus
+     */
+    #[ApiOperation('创建菜单')]
+    public function createMenu(StaffMenuCreateRequest $request): StaffMenuRowResponse
+    {
+        $dto = (new CreateMenuDto())
+            ->setName($request->getName())
+            ->setCode($request->getCode())
+            ->setUri($request->getUri())
+            ->setIcon($request->getIcon())
+            ->setParentId($request->getParentId())
+            ->setSort($request->getSort())
+            ->setStatus($request->getStatus());
+
+        return new StaffMenuRowResponse($this->staffRoleService->createMenu($dto));
+    }
+
+    /**
+     * Route: PUT /api/v1/menus
+     */
+    #[ApiOperation('更新菜单')]
+    public function updateMenu(StaffMenuUpdateRequest $request): StaffMenuRowResponse
+    {
+        $dto = (new UpdateMenuDto())
+            ->setId($request->getId())
+            ->setName($request->getName())
+            ->setCode($request->getCode())
+            ->setUri($request->getUri())
+            ->setIcon($request->getIcon())
+            ->setParentId($request->getParentId())
+            ->setSort($request->getSort())
+            ->setStatus($request->getStatus());
+
+        return new StaffMenuRowResponse($this->staffRoleService->updateMenu($dto));
+    }
+
+    /**
+     * Route: GET /api/v1/menus/detail?id=
+     */
+    #[ApiOperation('菜单详情')]
+    public function getMenu(StaffMenuIdRequest $request): StaffMenuRowResponse
+    {
+        return new StaffMenuRowResponse($this->staffRoleService->getMenu(MenuIdDto::of($request->getId())));
+    }
+
+    /**
+     * Route: DELETE /api/v1/menus
+     */
+    #[ApiOperation('删除菜单')]
+    public function deleteMenu(StaffMenuIdRequest $request): StaffDeleteAckResponse
+    {
+        return new StaffDeleteAckResponse($this->staffRoleService->deleteMenu(MenuIdDto::of($request->getId())));
+    }
+}

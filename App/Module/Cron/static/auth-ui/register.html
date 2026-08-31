@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>注册 - Schedule Job</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/common.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <h1>创建账号</h1>
+      <p>注册后即可使用 Schedule Job 管理平台</p>
+    </div>
+    <el-form class="auth-form" label-position="top">
+      <el-form-item label="账号">
+        <el-input placeholder="建议使用邮箱作为账号" prefix-icon="el-icon-message"></el-input>
+      </el-form-item>
+      <el-form-item label="用户名称">
+        <el-input placeholder="请输入显示名称" prefix-icon="el-icon-user"></el-input>
+      </el-form-item>
+      <el-form-item label="密码">
+        <el-input type="password" placeholder="至少 8 位，含字母和数字" prefix-icon="el-icon-lock" show-password></el-input>
+      </el-form-item>
+      <el-form-item label="确认密码">
+        <el-input type="password" placeholder="请再次输入密码" prefix-icon="el-icon-lock" show-password></el-input>
+      </el-form-item>
+      <el-button type="primary" class="auth-submit">注 册</el-button>
+    </el-form>
+    <div class="auth-footer">
+      已有账号？<a href="login.html">返回登录</a>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+<script>new Vue({ el: '.auth-page' });</script>
+</body>
+</html>

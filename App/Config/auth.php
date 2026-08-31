@@ -25,7 +25,7 @@
 
 return [
     'jwt' => [
-        'secret' => env('AUTH_JWT_SECRET', ''),
+        'secret' => env('AUTH_JWT_SECRET', 'schedule-job-dev-jwt-secret-change-me'),
         'algo' => env('AUTH_JWT_ALGO', 'HS256'),
         'ttl_seconds' => (int) env('AUTH_JWT_TTL', 3600),
         'issuer' => env('AUTH_JWT_ISSUER', ''),

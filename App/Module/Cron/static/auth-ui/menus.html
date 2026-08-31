@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>菜单管理 - Schedule Job</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/common.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/pages.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+<div id="app">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Schedule Job<small>权限管理</small></div>
+      <nav class="nav">
+        <div class="nav-section">Cron 管理</div>
+        <a href="../cron-admin/index.html#/dashboard"><i class="el-icon-data-line"></i> Dashboard</a>
+        <div class="nav-section">权限管理</div>
+        <a href="users.html"><i class="el-icon-user"></i> 用户管理</a>
+        <a href="roles.html"><i class="el-icon-s-custom"></i> 角色管理</a>
+        <a href="menus.html" class="router-link-active"><i class="el-icon-menu"></i> 菜单管理</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="top">
+        <div class="top-bar">
+          <div>
+            <div class="breadcrumb">权限管理 / 菜单管理</div>
+            <h1 class="title">菜单管理</h1>
+            <p class="subtitle">管理侧边栏菜单页面节点，对应 staff_menu_pages 表</p>
+          </div>
+          <div class="user-bar">
+            <div class="avatar">A</div>
+            <span class="name">admin@example.com</span>
+            <el-button size="mini" plain>退出</el-button>
+          </div>
+        </div>
+      </div>
+      <div class="content-area">
+        <div class="page-head">
+          <div>
+            <el-button size="small" @click="expandAll">展开全部</el-button>
+            <el-button size="small" @click="collapseAll">折叠全部</el-button>
+          </div>
+          <div class="actions">
+            <el-button type="primary" icon="el-icon-plus" @click="openDialog(null)">新增顶级菜单</el-button>
+          </div>
+        </div>
+        <div class="panel">
+          <el-table
+            :data="flatMenus"
+            size="small"
+            row-key="id"
+            :tree-props="{ children: 'children' }"
+            default-expand-all
+            style="width:100%">
+            <el-table-column label="菜单名称" min-width="220">
+              <template slot-scope="s">
+                <div class="menu-name-cell">
+                  <i :class="s.row.icon || 'el-icon-document'" class="menu-icon"></i>
+                  <span>{{ s.row.name }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="code" label="唯一标识" min-width="160">
+              <template slot-scope="s"><span class="mono">{{ s.row.code }}</span></template>
+            </el-table-column>
+            <el-table-column prop="uri" label="URI" min-width="180">
+              <template slot-scope="s"><span class="mono">{{ s.row.uri }}</span></template>
+            </el-table-column>
+            <el-table-column prop="sort" label="排序" width="70" align="center"></el-table-column>
+            <el-table-column label="状态" width="90">
+              <template slot-scope="s">
+                <span v-if="s.row.status === 1" class="status-mark status-success">启用</span>
+                <span v-else-if="s.row.status === 0" class="status-mark status-disabled">禁用</span>
+                <span v-else class="status-mark status-failed">已删除</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+              <template slot-scope="s">
+                <el-button type="text" size="small" @click="openDialog(s.row, true)">新增子菜单</el-button>
+                <el-button type="text" size="small" @click="openDialog(s.row)">编辑</el-button>
+                <el-button type="text" size="small" style="color:#f56c6c">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+    </main>
+
+    <!-- 新增/编辑菜单弹窗 -->
+    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="560px">
+      <el-form label-width="100px" size="small">
+        <el-form-item label="父级菜单">
+          <el-cascader
+            v-model="menuForm.parentPath"
+            :options="parentOptions"
+            :props="{ checkStrictly: true, value: 'id', label: 'name', children: 'children' }"
+            clearable
+            placeholder="无（顶级菜单）"
+            style="width:100%">
+          </el-cascader>
+        </el-form-item>
+        <el-form-item label="菜单名称" required>
+          <el-input v-model="menuForm.name" placeholder="显示名称"></el-input>
+        </el-form-item>
+        <el-form-item label="唯一标识" required>
+          <el-input v-model="menuForm.code" placeholder="如 cron:tasks" class="mono"></el-input>
+        </el-form-item>
+        <el-form-item label="URI" required>
+          <el-input v-model="menuForm.uri" placeholder="/tasks" class="mono"></el-input>
+        </el-form-item>
+        <el-form-item label="图标">
+          <el-input v-model="menuForm.icon" placeholder="el-icon-s-order">
+            <template slot="prepend"><i :class="menuForm.icon || 'el-icon-picture'"></i></template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="menuForm.sort" :min="0" :max="9999" style="width:160px"></el-input-number>
+          <span style="font-size:12px;color:var(--muted);margin-left:8px">越大越靠前</span>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-radio-group v-model="menuForm.status">
+            <el-radio :label="1">启用</el-radio>
+            <el-radio :label="0">禁用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary">确定</el-button>
+      </div>
+    </el-dialog>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+<script>
+new Vue({
+  el: '#app',
+  data: function () {
+    return {
+      dialogVisible: false,
+      dialogTitle: '新增菜单',
+      menuForm: { name: '', code: '', uri: '', icon: '', sort: 0, status: 1, parentPath: [] },
+      flatMenus: [
+        {
+          id: 1, name: 'Dashboard', code: 'cron:dashboard', uri: '/dashboard', icon: 'el-icon-data-line', sort: 100, status: 1, createdAt: '2026-01-01 00:00:00',
+          children: []
+        },
+        {
+          id: 2, name: '计划任务', code: 'cron:tasks', uri: '/tasks', icon: 'el-icon-s-order', sort: 90, status: 1, createdAt: '2026-01-01 00:00:00',
+          children: [
+            { id: 3, name: '任务列表', code: 'cron:tasks:list', uri: '/tasks', icon: 'el-icon-tickets', sort: 0, status: 1, createdAt: '2026-01-01 00:00:00' },
+            { id: 4, name: '创建任务', code: 'cron:tasks:create', uri: '/tasks/create', icon: 'el-icon-plus', sort: 0, status: 1, createdAt: '2026-01-01 00:00:00' }
+          ]
+        },
+        {
+          id: 5, name: '执行记录', code: 'cron:executions', uri: '/executions', icon: 'el-icon-time', sort: 80, status: 1, createdAt: '2026-01-01 00:00:00',
+          children: [
+            { id: 6, name: '执行日志', code: 'cron:executions:log', uri: '/executions/log', icon: 'el-icon-notebook-2', sort: 0, status: 1, createdAt: '2026-01-01 00:00:00' }
+          ]
+        },
+        { id: 7, name: 'Cron Nodes', code: 'cron:nodes', uri: '/nodes', icon: 'el-icon-monitor', sort: 70, status: 1, createdAt: '2026-01-01 00:00:00', children: [] },
+        { id: 8, name: 'Runtime', code: 'cron:runtime', uri: '/runtime', icon: 'el-icon-odometer', sort: 60, status: 1, createdAt: '2026-01-01 00:00:00', children: [] },
+        {
+          id: 9, name: '权限管理', code: 'auth', uri: '/auth', icon: 'el-icon-lock', sort: 50, status: 1, createdAt: '2026-08-01 00:00:00',
+          children: [
+            { id: 10, name: '用户管理', code: 'auth:users', uri: '/auth/users', icon: 'el-icon-user', sort: 0, status: 1, createdAt: '2026-08-01 00:00:00' },
+            { id: 11, name: '角色管理', code: 'auth:roles', uri: '/auth/roles', icon: 'el-icon-s-custom', sort: 0, status: 1, createdAt: '2026-08-01 00:00:00' },
+            { id: 12, name: '菜单管理', code: 'auth:menus', uri: '/auth/menus', icon: 'el-icon-menu', sort: 0, status: 1, createdAt: '2026-08-01 00:00:00' }
+          ]
+        }
+      ],
+      parentOptions: []
+    };
+  },
+  created: function () {
+    this.parentOptions = JSON.parse(JSON.stringify(this.flatMenus));
+  },
+  methods: {
+    openDialog: function (row, isChild) {
+      this.dialogTitle = isChild ? '新增子菜单' : (row ? '编辑菜单' : '新增顶级菜单');
+      if (row && !isChild) {
+        this.menuForm = { name: row.name, code: row.code, uri: row.uri, icon: row.icon, sort: row.sort, status: row.status, parentPath: [] };
+      } else if (row && isChild) {
+        this.menuForm = { name: '', code: '', uri: '', icon: '', sort: 0, status: 1, parentPath: [row.id] };
+      } else {
+        this.menuForm = { name: '', code: '', uri: '', icon: '', sort: 0, status: 1, parentPath: [] };
+      }
+      this.dialogVisible = true;
+    },
+    expandAll: function () {},
+    collapseAll: function () {}
+  }
+});
+</script>
+</body>
+</html>

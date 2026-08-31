@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>角色管理 - Schedule Job</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/common.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/pages.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+<div id="app">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Schedule Job<small>权限管理</small></div>
+      <nav class="nav">
+        <div class="nav-section">Cron 管理</div>
+        <a href="../cron-admin/index.html#/dashboard"><i class="el-icon-data-line"></i> Dashboard</a>
+        <div class="nav-section">权限管理</div>
+        <a href="users.html"><i class="el-icon-user"></i> 用户管理</a>
+        <a href="roles.html" class="router-link-active"><i class="el-icon-s-custom"></i> 角色管理</a>
+        <a href="menus.html"><i class="el-icon-menu"></i> 菜单管理</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="top">
+        <div class="top-bar">
+          <div>
+            <div class="breadcrumb">权限管理 / 角色管理</div>
+            <h1 class="title">角色管理</h1>
+            <p class="subtitle">定义角色并配置菜单页面权限与 API 权限</p>
+          </div>
+          <div class="user-bar">
+            <div class="avatar">A</div>
+            <span class="name">admin@example.com</span>
+            <el-button size="mini" plain>退出</el-button>
+          </div>
+        </div>
+      </div>
+      <div class="content-area">
+        <div class="page-head">
+          <div></div>
+          <div class="actions">
+            <el-button type="primary" icon="el-icon-plus" @click="goCreate">新增角色</el-button>
+          </div>
+        </div>
+        <div class="stat-row" style="grid-template-columns:repeat(3,1fr)">
+          <div class="panel stat-card">
+            <div>角色总数</div>
+            <h2>6</h2>
+            <div class="meta"><span class="status-mark status-enabled">启用 5</span> / <span class="status-mark status-disabled">禁用 1</span></div>
+          </div>
+          <div class="panel stat-card">
+            <div>超级管理员</div>
+            <h2>1</h2>
+            <div class="meta"><span class="status-mark status-success">拥有全部权限</span></div>
+          </div>
+          <div class="panel stat-card">
+            <div>关联用户</div>
+            <h2>12</h2>
+            <div class="meta"><span class="status-mark status-enabled">已分配角色</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <el-form :inline="true" size="small">
+            <el-form-item label="角色名称">
+              <el-input clearable placeholder="角色名称" style="width:160px"></el-input>
+            </el-form-item>
+            <el-form-item label="状态">
+              <el-select clearable placeholder="全部" style="width:110px">
+                <el-option :value="1" label="启用"></el-option>
+                <el-option :value="0" label="禁用"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary">查询</el-button>
+            </el-form-item>
+          </el-form>
+          <el-table :data="roles" size="small" style="width:100%">
+            <el-table-column prop="id" label="ID" width="70"></el-table-column>
+            <el-table-column label="角色名称" min-width="140">
+              <template slot-scope="s">
+                {{ s.row.name }}
+                <span v-if="s.row.isSuper" class="tag-super" style="margin-left:6px">超管</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="code" label="唯一标识" min-width="140">
+              <template slot-scope="s"><span class="mono">{{ s.row.code }}</span></template>
+            </el-table-column>
+            <el-table-column prop="desc" label="描述" min-width="200" show-overflow-tooltip></el-table-column>
+            <el-table-column prop="userCount" label="用户数" width="80" align="center"></el-table-column>
+            <el-table-column prop="menuCount" label="菜单权限" width="90" align="center"></el-table-column>
+            <el-table-column label="状态" width="90">
+              <template slot-scope="s">
+                <span :class="['status-mark', s.row.status ? 'status-success' : 'status-disabled']">
+                  {{ s.row.status ? '启用' : '禁用' }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
+            <el-table-column label="操作" width="160" fixed="right">
+              <template slot-scope="s">
+                <el-button type="text" size="small" @click="goEdit(s.row.id)">编辑</el-button>
+                <el-button type="text" size="small" :disabled="s.row.isSuper">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+<script>
+new Vue({
+  el: '#app',
+  data: function () {
+    return {
+      roles: [
+        { id: 1, name: '超级管理员', code: 'super_admin', desc: '拥有系统全部权限', isSuper: true, userCount: 1, menuCount: '全部', status: 1, createdAt: '2026-01-01 00:00:00' },
+        { id: 2, name: '运维人员', code: 'ops', desc: '管理 Cron 任务与节点', isSuper: false, userCount: 4, menuCount: 8, status: 1, createdAt: '2026-01-10 10:00:00' },
+        { id: 3, name: '开发人员', code: 'developer', desc: '查看与编辑任务', isSuper: false, userCount: 5, menuCount: 5, status: 1, createdAt: '2026-02-01 14:30:00' },
+        { id: 4, name: '只读', code: 'readonly', desc: '仅查看，不可操作', isSuper: false, userCount: 2, menuCount: 4, status: 1, createdAt: '2026-03-15 09:00:00' },
+        { id: 5, name: '审计员', code: 'auditor', desc: '查看执行记录与日志', isSuper: false, userCount: 0, menuCount: 3, status: 0, createdAt: '2026-04-01 11:20:00' }
+      ]
+    };
+  },
+  methods: {
+    goCreate: function () { window.location.href = 'role-edit.html'; },
+    goEdit: function (id) { window.location.href = 'role-edit.html?id=' + id; }
+  }
+});
+</script>
+</body>
+</html>

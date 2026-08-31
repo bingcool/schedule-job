@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>编辑角色 - Schedule Job</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/common.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/pages.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+<div id="app">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Schedule Job<small>权限管理</small></div>
+      <nav class="nav">
+        <div class="nav-section">Cron 管理</div>
+        <a href="../cron-admin/index.html#/dashboard"><i class="el-icon-data-line"></i> Dashboard</a>
+        <div class="nav-section">权限管理</div>
+        <a href="users.html"><i class="el-icon-user"></i> 用户管理</a>
+        <a href="roles.html" class="router-link-active"><i class="el-icon-s-custom"></i> 角色管理</a>
+        <a href="menus.html"><i class="el-icon-menu"></i> 菜单管理</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="top">
+        <div class="top-bar">
+          <div>
+            <div class="breadcrumb">权限管理 / 角色管理 / {{ isEdit ? '编辑角色' : '新增角色' }}</div>
+            <h1 class="title">{{ isEdit ? '编辑角色' : '新增角色' }}</h1>
+            <p class="subtitle">配置角色基本信息、菜单页面权限及 API 权限</p>
+          </div>
+          <div class="user-bar">
+            <div class="avatar">A</div>
+            <span class="name">admin@example.com</span>
+          </div>
+        </div>
+      </div>
+      <div class="content-area">
+        <div class="page-head">
+          <div>
+            <el-button size="small" icon="el-icon-arrow-left" @click="goBack">返回列表</el-button>
+          </div>
+          <div class="actions">
+            <el-button>取消</el-button>
+            <el-button type="primary">保存</el-button>
+          </div>
+        </div>
+
+        <div class="panel task-editor-page" style="margin-bottom:18px">
+          <div class="section" style="border-bottom:0;margin-bottom:0;padding-bottom:0">
+            <h3 class="section-title">基本信息</h3>
+            <p class="section-desc">对应 staff_roles 表字段</p>
+            <div class="grid">
+              <div class="field">
+                <label>角色名称 <span class="req">*</span></label>
+                <input class="form-control" v-model="form.name" placeholder="如：运维人员">
+              </div>
+              <div class="field">
+                <label>唯一标识 <span class="req">*</span></label>
+                <input class="form-control mono" v-model="form.code" placeholder="如：ops">
+              </div>
+              <div class="field full">
+                <label>角色描述</label>
+                <input class="form-control" v-model="form.desc" placeholder="简要描述该角色的职责">
+              </div>
+              <div class="field">
+                <label>状态</label>
+                <el-radio-group v-model="form.status">
+                  <el-radio :label="1">启用</el-radio>
+                  <el-radio :label="0">禁用</el-radio>
+                </el-radio-group>
+              </div>
+              <div class="field">
+                <label>超级管理员</label>
+                <el-switch v-model="form.isSuper" active-text="是" inactive-text="否"></el-switch>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px">开启后拥有全部菜单和 API 权限</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <el-tabs v-model="activeTab" type="border-card" v-if="!form.isSuper">
+          <el-tab-pane label="菜单页面权限" name="menu">
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px">
+              对应 staff_role_page 表，勾选该角色可访问的菜单页面（staff_menu_pages）
+            </p>
+            <div style="margin-bottom:12px">
+              <el-button size="mini" @click="checkAllMenu">全选</el-button>
+              <el-button size="mini" @click="uncheckAllMenu">取消全选</el-button>
+              <el-button size="mini" @click="expandAll">展开全部</el-button>
+            </div>
+            <div class="perm-tree-panel">
+              <el-tree
+                ref="menuTree"
+                :data="menuTree"
+                show-checkbox
+                node-key="id"
+                :default-checked-keys="form.menuIds"
+                :props="{ label: 'name', children: 'children' }"
+                :default-expand-all="true">
+                <span slot-scope="{ node, data }" style="display:flex;align-items:center;gap:8px">
+                  <i :class="data.icon || 'el-icon-document'" class="menu-icon"></i>
+                  <span>{{ data.name }}</span>
+                  <span class="mono" style="font-size:11px;color:var(--muted)">{{ data.uri }}</span>
+                </span>
+              </el-tree>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="API 权限" name="api">
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px">
+              对应 staff_role_permission 表（type=1），控制角色可调用的 API 接口
+            </p>
+            <el-table :data="apiPermissions" size="small" @selection-change="onApiSelect">
+              <el-table-column type="selection" width="50"></el-table-column>
+              <el-table-column prop="name" label="接口名称" min-width="160"></el-table-column>
+              <el-table-column prop="method" label="方法" width="80">
+                <template slot-scope="s">
+                  <el-tag :type="methodType(s.row.method)" size="mini">{{ s.row.method }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="path" label="路径" min-width="260">
+                <template slot-scope="s"><span class="mono">{{ s.row.path }}</span></template>
+              </el-table-column>
+              <el-table-column prop="group" label="分组" width="120"></el-table-column>
+            </el-table>
+          </el-tab-pane>
+
+          <el-tab-pane label="任务接口权限" name="task">
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px">
+              对应 staff_role_permission 表（type=2），控制角色可操作的 Cron 任务接口
+            </p>
+            <el-table :data="taskPermissions" size="small">
+              <el-table-column type="selection" width="50"></el-table-column>
+              <el-table-column prop="name" label="操作" min-width="160"></el-table-column>
+              <el-table-column prop="code" label="权限标识" min-width="200">
+                <template slot-scope="s"><span class="mono">{{ s.row.code }}</span></template>
+              </el-table-column>
+              <el-table-column prop="desc" label="说明" min-width="240"></el-table-column>
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
+
+        <div class="panel" v-else style="text-align:center;padding:40px">
+          <i class="el-icon-success" style="font-size:48px;color:var(--green)"></i>
+          <p style="font-size:16px;font-weight:600;margin:16px 0 6px">超级管理员角色</p>
+          <p style="color:var(--muted);font-size:13px">该角色自动拥有所有菜单页面权限和 API 权限，无需单独配置。</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+<script>
+new Vue({
+  el: '#app',
+  data: function () {
+    return {
+      isEdit: !!new URLSearchParams(location.search).get('id'),
+      activeTab: 'menu',
+      form: {
+        name: '运维人员',
+        code: 'ops',
+        desc: '管理 Cron 任务与节点',
+        status: 1,
+        isSuper: false,
+        menuIds: [1, 2, 3, 5, 6, 8]
+      },
+      menuTree: [
+        {
+          id: 1, name: 'Dashboard', uri: '/dashboard', icon: 'el-icon-data-line',
+          children: []
+        },
+        {
+          id: 2, name: '计划任务', uri: '/tasks', icon: 'el-icon-s-order',
+          children: [
+            { id: 3, name: '任务列表', uri: '/tasks', icon: 'el-icon-tickets' },
+            { id: 4, name: '创建任务', uri: '/tasks/create', icon: 'el-icon-plus' },
+            { id: 5, name: '任务详情', uri: '/tasks/detail', icon: 'el-icon-view' }
+          ]
+        },
+        {
+          id: 6, name: '执行记录', uri: '/executions', icon: 'el-icon-time',
+          children: [
+            { id: 7, name: '执行列表', uri: '/executions', icon: 'el-icon-document' },
+            { id: 8, name: '执行日志', uri: '/executions/log', icon: 'el-icon-notebook-2' }
+          ]
+        },
+        {
+          id: 9, name: 'Cron Nodes', uri: '/nodes', icon: 'el-icon-monitor', children: []
+        },
+        {
+          id: 10, name: 'Runtime', uri: '/runtime', icon: 'el-icon-odometer', children: []
+        },
+        {
+          id: 11, name: '权限管理', uri: '/auth', icon: 'el-icon-lock',
+          children: [
+            { id: 12, name: '用户管理', uri: '/auth/users', icon: 'el-icon-user' },
+            { id: 13, name: '角色管理', uri: '/auth/roles', icon: 'el-icon-s-custom' },
+            { id: 14, name: '菜单管理', uri: '/auth/menus', icon: 'el-icon-menu' }
+          ]
+        }
+      ],
+      apiPermissions: [
+        { id: 1, name: '任务列表', method: 'GET', path: '/api/v1/cron/tasks', group: '任务管理' },
+        { id: 2, name: '创建任务', method: 'POST', path: '/api/v1/cron/tasks', group: '任务管理' },
+        { id: 3, name: '更新任务', method: 'PUT', path: '/api/v1/cron/tasks/{id}', group: '任务管理' },
+        { id: 4, name: '删除任务', method: 'DELETE', path: '/api/v1/cron/tasks/{id}', group: '任务管理' },
+        { id: 5, name: '节点列表', method: 'GET', path: '/api/v1/cron/nodes', group: '节点管理' },
+        { id: 6, name: '执行记录', method: 'GET', path: '/api/v1/cron/executions', group: '执行记录' }
+      ],
+      taskPermissions: [
+        { id: 1, name: '立即执行', code: 'cron:task:run_once', desc: '手动触发任务执行' },
+        { id: 2, name: '启用/禁用', code: 'cron:task:switch', desc: '切换任务启用状态' },
+        { id: 3, name: '查看日志', code: 'cron:task:logs', desc: '查看任务执行日志' },
+        { id: 4, name: '编辑 GLUE', code: 'cron:task:glue_edit', desc: '编辑 GLUE 脚本内容' }
+      ]
+    };
+  },
+  methods: {
+    goBack: function () { window.location.href = 'roles.html'; },
+    methodType: function (m) {
+      var map = { GET: '', POST: 'success', PUT: 'warning', DELETE: 'danger' };
+      return map[m] || 'info';
+    },
+    checkAllMenu: function () {
+      var ids = [];
+      function walk(nodes) { nodes.forEach(function (n) { ids.push(n.id); if (n.children) walk(n.children); }); }
+      walk(this.menuTree);
+      this.$refs.menuTree.setCheckedKeys(ids);
+    },
+    uncheckAllMenu: function () { this.$refs.menuTree.setCheckedKeys([]); },
+    expandAll: function () {
+      var tree = this.$refs.menuTree;
+      Object.keys(tree.store.nodesMap).forEach(function (k) { tree.store.nodesMap[k].expanded = true; });
+    },
+    onApiSelect: function () {}
+  }
+});
+</script>
+</body>
+</html>

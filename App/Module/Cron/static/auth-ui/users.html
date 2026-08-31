@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用户管理 - Schedule Job</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/common.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/pages.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+<div id="app">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Schedule Job<small>权限管理</small></div>
+      <nav class="nav">
+        <div class="nav-section">Cron 管理</div>
+        <a href="../cron-admin/index.html#/dashboard"><i class="el-icon-data-line"></i> Dashboard</a>
+        <a href="../cron-admin/index.html#/tasks"><i class="el-icon-s-order"></i> 计划任务</a>
+        <div class="nav-section">权限管理</div>
+        <a href="users.html" class="router-link-active"><i class="el-icon-user"></i> 用户管理</a>
+        <a href="roles.html"><i class="el-icon-s-custom"></i> 角色管理</a>
+        <a href="menus.html"><i class="el-icon-menu"></i> 菜单管理</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="top">
+        <div class="top-bar">
+          <div>
+            <div class="breadcrumb">权限管理 / 用户管理</div>
+            <h1 class="title">用户管理</h1>
+            <p class="subtitle">管理系统登录用户及其角色分配</p>
+          </div>
+          <div class="user-bar">
+            <div class="avatar">A</div>
+            <span class="name">admin@example.com</span>
+            <el-button size="mini" plain>退出</el-button>
+          </div>
+        </div>
+      </div>
+      <div class="content-area">
+        <div class="page-head">
+          <div></div>
+          <div class="actions">
+            <el-button type="primary" icon="el-icon-plus" @click="goCreate">新增用户</el-button>
+          </div>
+        </div>
+        <div class="panel">
+          <el-form :inline="true" size="small">
+            <el-form-item label="账号">
+              <el-input v-model="query.account" clearable placeholder="账号/邮箱" style="width:180px"></el-input>
+            </el-form-item>
+            <el-form-item label="用户名称">
+              <el-input v-model="query.userName" clearable placeholder="用户名称" style="width:160px"></el-input>
+            </el-form-item>
+            <el-form-item label="状态">
+              <el-select v-model="query.status" clearable placeholder="全部" style="width:110px">
+                <el-option :value="1" label="正常"></el-option>
+                <el-option :value="0" label="已禁用"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary">查询</el-button>
+              <el-button>重置</el-button>
+            </el-form-item>
+          </el-form>
+          <el-table :data="users" size="small" style="width:100%">
+            <el-table-column prop="id" label="ID" width="70"></el-table-column>
+            <el-table-column prop="account" label="账号" min-width="180"></el-table-column>
+            <el-table-column prop="userName" label="用户名称" min-width="120"></el-table-column>
+            <el-table-column label="角色" min-width="200">
+              <template slot-scope="s">
+                <el-tag v-for="r in s.row.roles" :key="r" size="mini" class="role-tag" type="info">{{ r }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template slot-scope="s">
+                <span :class="['status-mark', s.row.status ? 'status-success' : 'status-disabled']">
+                  {{ s.row.status ? '正常' : '已禁用' }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+              <template slot-scope="s">
+                <el-button type="text" size="small" @click="goEdit(s.row.id)">编辑</el-button>
+                <el-button type="text" size="small">分配角色</el-button>
+                <el-button type="text" size="small" :style="{color: s.row.status ? '#f56c6c' : '#67c23a'}">
+                  {{ s.row.status ? '禁用' : '启用' }}
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div style="margin-top:16px;text-align:right">
+            <el-pagination
+              background
+              layout="total, prev, pager, next"
+              :total="48"
+              :page-size="10"
+              :current-page="1">
+            </el-pagination>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+<script>
+new Vue({
+  el: '#app',
+  data: function () {
+    return {
+      query: { account: '', userName: '', status: null },
+      users: [
+        { id: 1, account: 'admin@example.com', userName: '超级管理员', roles: ['超级管理员'], status: 1, createdAt: '2026-01-15 10:30:00' },
+        { id: 2, account: 'ops@example.com', userName: '运维小王', roles: ['运维人员', '只读'], status: 1, createdAt: '2026-02-20 14:22:00' },
+        { id: 3, account: 'dev@example.com', userName: '开发小李', roles: ['开发人员'], status: 1, createdAt: '2026-03-08 09:15:00' },
+        { id: 4, account: 'guest@example.com', userName: '访客', roles: ['只读'], status: 0, createdAt: '2026-04-01 16:40:00' }
+      ]
+    };
+  },
+  methods: {
+    goCreate: function () { window.location.href = 'user-edit.html'; },
+    goEdit: function (id) { window.location.href = 'user-edit.html?id=' + id; }
+  }
+});
+</script>
+</body>
+</html>

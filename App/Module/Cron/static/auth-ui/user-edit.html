@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>编辑用户 - Schedule Job</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/common.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/pages.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+<div id="app">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Schedule Job<small>权限管理</small></div>
+      <nav class="nav">
+        <div class="nav-section">Cron 管理</div>
+        <a href="../cron-admin/index.html#/dashboard"><i class="el-icon-data-line"></i> Dashboard</a>
+        <div class="nav-section">权限管理</div>
+        <a href="users.html" class="router-link-active"><i class="el-icon-user"></i> 用户管理</a>
+        <a href="roles.html"><i class="el-icon-s-custom"></i> 角色管理</a>
+        <a href="menus.html"><i class="el-icon-menu"></i> 菜单管理</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="top">
+        <div class="top-bar">
+          <div>
+            <div class="breadcrumb">权限管理 / 用户管理 / {{ isEdit ? '编辑用户' : '新增用户' }}</div>
+            <h1 class="title">{{ isEdit ? '编辑用户' : '新增用户' }}</h1>
+            <p class="subtitle">配置用户基本信息、密码及角色权限</p>
+          </div>
+          <div class="user-bar">
+            <div class="avatar">A</div>
+            <span class="name">admin@example.com</span>
+          </div>
+        </div>
+      </div>
+      <div class="content-area">
+        <div class="page-head">
+          <div>
+            <el-button size="small" icon="el-icon-arrow-left" @click="goBack">返回列表</el-button>
+          </div>
+          <div class="actions">
+            <el-button>取消</el-button>
+            <el-button type="primary">保存</el-button>
+          </div>
+        </div>
+        <div class="editor-layout">
+          <div>
+            <div class="panel task-editor-page">
+              <div class="section">
+                <h3 class="section-title">基本信息</h3>
+                <p class="section-desc">对应 staff_user 表字段</p>
+                <div class="grid">
+                  <div class="field">
+                    <label>账号 <span class="req">*</span></label>
+                    <input class="form-control" v-model="form.account" placeholder="建议使用邮箱">
+                  </div>
+                  <div class="field">
+                    <label>用户名称 <span class="req">*</span></label>
+                    <input class="form-control" v-model="form.userName" placeholder="显示名称">
+                  </div>
+                  <div class="field">
+                    <label>{{ isEdit ? '新密码' : '密码' }} <span class="req" v-if="!isEdit">*</span></label>
+                    <input class="form-control" type="password" :placeholder="isEdit ? '留空则不修改' : '至少 8 位'">
+                  </div>
+                  <div class="field">
+                    <label>确认密码</label>
+                    <input class="form-control" type="password" placeholder="再次输入密码">
+                  </div>
+                </div>
+              </div>
+              <div class="section">
+                <h3 class="section-title">角色分配</h3>
+                <p class="section-desc">对应 staff_user_role 表，一个用户可拥有多个角色</p>
+                <el-checkbox-group v-model="form.roleIds">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <el-checkbox v-for="r in roleOptions" :key="r.id" :label="r.id">
+                      {{ r.name }}
+                      <span v-if="r.isSuper" class="tag-super" style="margin-left:6px">超管</span>
+                    </el-checkbox>
+                  </div>
+                </el-checkbox-group>
+              </div>
+              <div class="section">
+                <h3 class="section-title">节点组授权</h3>
+                <p class="section-desc">对应 staff_user_relate_node_group 表，限制用户可管理的 Cron 节点组</p>
+                <el-select v-model="form.nodeGroupIds" multiple placeholder="选择节点组（空=全部）" style="width:100%">
+                  <el-option v-for="g in nodeGroups" :key="g.id" :value="g.id" :label="g.name"></el-option>
+                </el-select>
+              </div>
+            </div>
+          </div>
+          <div class="panel preview-card">
+            <div class="preview-head">
+              <span class="preview-title">用户预览</span>
+              <span :class="['badge', form.status ? '' : 'disabled']">{{ form.status ? '正常' : '已禁用' }}</span>
+            </div>
+            <div class="task-name">{{ form.userName || '未命名用户' }}</div>
+            <div class="task-desc mono">{{ form.account || '—' }}</div>
+            <div class="kv"><span>用户 ID</span><span>{{ form.id || '新建' }}</span></div>
+            <div class="kv"><span>已选角色</span><span>{{ selectedRoleNames.length }} 个</span></div>
+            <div class="kv"><span>节点组</span><span>{{ form.nodeGroupIds.length || '全部' }}</span></div>
+            <div class="callout info" style="margin-top:14px">
+              超级管理员角色拥有所有菜单和 API 权限，无需单独配置。
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+<script>
+new Vue({
+  el: '#app',
+  data: function () {
+    return {
+      isEdit: !!new URLSearchParams(location.search).get('id'),
+      form: {
+        id: 2,
+        account: 'ops@example.com',
+        userName: '运维小王',
+        status: 1,
+        roleIds: [2, 4],
+        nodeGroupIds: [1, 3]
+      },
+      roleOptions: [
+        { id: 1, name: '超级管理员', isSuper: true },
+        { id: 2, name: '运维人员', isSuper: false },
+        { id: 3, name: '开发人员', isSuper: false },
+        { id: 4, name: '只读', isSuper: false }
+      ],
+      nodeGroups: [
+        { id: 1, name: '生产环境' },
+        { id: 2, name: '预发布环境' },
+        { id: 3, name: '测试环境' }
+      ]
+    };
+  },
+  computed: {
+    selectedRoleNames: function () {
+      var self = this;
+      return this.roleOptions.filter(function (r) { return self.form.roleIds.indexOf(r.id) >= 0; }).map(function (r) { return r.name; });
+    }
+  },
+  methods: {
+    goBack: function () { window.location.href = 'users.html'; }
+  }
+});
+</script>
+</body>
+</html>

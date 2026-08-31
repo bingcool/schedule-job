@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 - Schedule Job</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+  <link rel="stylesheet" href="../cron-admin/assets/css/common.css">
+  <link rel="stylesheet" href="assets/css/auth.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <h1>Schedule Job</h1>
+      <p>定时任务调度管理平台</p>
+    </div>
+    <el-form class="auth-form" label-position="top">
+      <el-form-item label="账号">
+        <el-input placeholder="请输入邮箱或账号" prefix-icon="el-icon-user"></el-input>
+      </el-form-item>
+      <el-form-item label="密码">
+        <el-input type="password" placeholder="请输入密码" prefix-icon="el-icon-lock" show-password></el-input>
+      </el-form-item>
+      <el-form-item>
+        <el-checkbox>记住我</el-checkbox>
+      </el-form-item>
+      <el-button type="primary" class="auth-submit">登 录</el-button>
+    </el-form>
+    <div class="auth-footer">
+      还没有账号？<a href="register.html">立即注册</a>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+<script>new Vue({ el: '.auth-page' });</script>
+</body>
+</html>
