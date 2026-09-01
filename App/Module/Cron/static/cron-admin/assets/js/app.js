@@ -100,11 +100,6 @@
       },
       pageSubtitle: function () {
         return (this.$route.meta && this.$route.meta.subtitle) || '';
-      },
-      userInitial: function () {
-        var user = this.currentUser || {};
-        var name = user.userName || user.account || 'U';
-        return String(name).charAt(0).toUpperCase();
       }
     },
     created: function () {

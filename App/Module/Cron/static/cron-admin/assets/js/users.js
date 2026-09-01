@@ -96,6 +96,10 @@
         }
       },
       openGrant: function (row) {
+        if (row.isSuper) {
+          this.$message.warning('超级管理员固定拥有所有节点，无需单独授权');
+          return;
+        }
         this.grantUser = { id: Number(row.id), userName: row.userName || '', account: row.account || '' };
         this.grantForm = { nodeGroupIds: (row.nodeGroupIds || []).map(Number) };
         this.grantDlg = true;

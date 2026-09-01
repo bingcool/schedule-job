@@ -48,7 +48,6 @@
             </div>
           </div>
           <div class="user-bar" v-if="currentUser">
-            <div class="avatar">{{ userInitial }}</div>
             <el-dropdown trigger="click" @command="onUserCommand">
               <span class="name user-name-link">{{ currentUser.userName || currentUser.account }}<i class="el-icon-arrow-down el-icon--right"></i></span>
               <el-dropdown-menu slot="dropdown">
@@ -824,14 +823,20 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
-        <el-table-column label="节点组" width="90" align="center">
-          <template slot-scope="s">{{ (s.row.nodeGroupIds || []).length }}</template>
+        <el-table-column label="授权节点组" min-width="200">
+          <template slot-scope="s">
+            <el-tag v-if="s.row.isSuper" size="mini" type="warning">所有节点</el-tag>
+            <template v-else>
+              <el-tag v-for="g in (s.row.nodeGroups || [])" :key="g.id || g" size="mini" class="role-tag" type="info">{{ g.groupName || g.name || g }}</el-tag>
+              <span v-if="!(s.row.nodeGroups || []).length" class="text-muted">未授权</span>
+            </template>
+          </template>
         </el-table-column>
         <el-table-column label="操作" width="260" fixed="right">
           <template slot-scope="s">
             <el-button type="text" size="small" @click="$router.push('/users/edit/' + s.row.id)">编辑</el-button>
             <el-button type="text" size="small" @click="openRoles(s.row)">角色分配</el-button>
-            <el-button type="text" size="small" @click="openGrant(s.row)">节点组授权</el-button>
+            <el-button type="text" size="small" :disabled="!!s.row.isSuper" @click="openGrant(s.row)">节点组授权</el-button>
             <el-button type="text" size="small" style="color:#f56c6c" @click="remove(s.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -1115,11 +1120,11 @@
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js"></script>
 <script defer src="/cron-admin/assets/js/register.js"></script>
-<script defer src="/cron-admin/assets/js/users.js?v=roles-1"></script>
+<script defer src="/cron-admin/assets/js/users.js?v=roles-2"></script>
 <script defer src="/cron-admin/assets/js/user-editor.js?v=roles-1"></script>
 <script defer src="/cron-admin/assets/js/roles.js?v=status-1"></script>
 <script defer src="/cron-admin/assets/js/role-editor.js"></script>
 <script defer src="/cron-admin/assets/js/menus.js"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=settings-3"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=settings-4"></script>
 </body>
 </html>

@@ -39,6 +39,12 @@ class StaffUserRowDto extends AbstractDto
     #[ApiProperty(description: '节点组 ID')]
     protected array $nodeGroupIds = [];
 
+    /**
+     * @var array<int, array<string, mixed>>
+     */
+    #[ApiProperty(description: '授权节点组')]
+    protected array $nodeGroups = [];
+
     #[ApiProperty(description: '是否超级管理员')]
     protected bool $isSuper = false;
 
@@ -61,6 +67,9 @@ class StaffUserRowDto extends AbstractDto
         $dto->roles = is_array($row['roles'] ?? null) ? $row['roles'] : [];
         $dto->roleIds = array_values(array_map('intval', $row['role_ids'] ?? $row['roleIds'] ?? []));
         $dto->nodeGroupIds = array_values(array_map('intval', $row['node_group_ids'] ?? $row['nodeGroupIds'] ?? []));
+        $dto->nodeGroups = is_array($row['node_groups'] ?? $row['nodeGroups'] ?? null)
+            ? ($row['node_groups'] ?? $row['nodeGroups'] ?? [])
+            : [];
         $dto->isSuper = (bool) ($row['is_super'] ?? $row['isSuper'] ?? false);
         $dto->createdAt = (string) ($row['created_at'] ?? $row['createdAt'] ?? '');
         $dto->updatedAt = (string) ($row['updated_at'] ?? $row['updatedAt'] ?? '');
@@ -110,6 +119,14 @@ class StaffUserRowDto extends AbstractDto
     public function getNodeGroupIds(): array
     {
         return $this->nodeGroupIds;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getNodeGroups(): array
+    {
+        return $this->nodeGroups;
     }
 
     public function getIsSuper(): bool

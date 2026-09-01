@@ -61,13 +61,22 @@ class StaffUserService
         $userIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
         $rolesMap = $this->staffRoleService->rolesGroupedByUserIds($userIds);
         $groupsMap = $this->nodeGroupIdsGroupedByUserIds($userIds);
+        $allGroupIds = [];
+        foreach ($groupsMap as $ids) {
+            foreach ($ids as $groupId) {
+                $allGroupIds[$groupId] = $groupId;
+            }
+        }
+        $groupRows = $this->nodeGroupsByIds(array_values($allGroupIds));
 
         foreach ($rows as $row) {
             $userId = (int) $row['id'];
             $roles = $rolesMap[$userId] ?? [];
+            $groupIds = $groupsMap[$userId] ?? [];
             $row['roles'] = $roles;
             $row['role_ids'] = array_map(static fn (array $role): int => (int) $role['id'], $roles);
-            $row['node_group_ids'] = $groupsMap[$userId] ?? [];
+            $row['node_group_ids'] = $groupIds;
+            $row['node_groups'] = $this->nodeGroupsOfIds($groupIds, $groupRows);
             $row['is_super'] = $this->hasSuperRole($roles);
             $pageResult->addListItem(StaffUserRowDto::fromEntityRow($row));
         }
@@ -150,6 +159,7 @@ class StaffUserService
         $attrs['roles'] = $roles;
         $attrs['role_ids'] = array_map(static fn (array $role): int => (int) $role['id'], $roles);
         $attrs['node_group_ids'] = $this->nodeGroupIdsGroupedByUserIds([(int) $user->id])[(int) $user->id] ?? [];
+        $attrs['node_groups'] = $this->nodeGroupsOfIds($attrs['node_group_ids']);
         $attrs['is_super'] = $this->hasSuperRole($roles);
 
         return $attrs;
@@ -173,6 +183,9 @@ class StaffUserService
     public function grantNodeGroups(GrantUserNodeGroupsDto $dto): array
     {
         $user = $this->requireUser($dto->getId());
+        if ($this->isSuperUser((int) $user->id)) {
+            throw StaffException::throw('超级管理员固定拥有所有节点，无需单独授权', -1);
+        }
         $this->assertNodeGroupsExist($dto->getNodeGroupIds());
         $viewerGroups = $this->viewerAuthorizedNodeGroupIds();
         if ($viewerGroups !== null) {
@@ -343,6 +356,49 @@ class StaffUserService
         if (count($rows) !== count(array_unique($groupIds))) {
             throw StaffException::throw('节点组不存在', -1);
         }
+    }
+
+    /**
+     * @param array<int, int> $groupIds
+     * @return array<int, array{id:int,groupName:string}>
+     */
+    private function nodeGroupsByIds(array $groupIds): array
+    {
+        $map = [];
+        if ($groupIds === []) {
+            return $map;
+        }
+        $rows = CronAgentNodeGroupEntity::query()->whereIn('id', $groupIds)->select()->toArray();
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $map[$id] = [
+                'id' => $id,
+                'groupName' => (string) ($row['group_name'] ?? ''),
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param array<int, int> $groupIds
+     * @param array<int, array{id:int,groupName:string}>|null $preloaded
+     * @return array<int, array{id:int,groupName:string}>
+     */
+    private function nodeGroupsOfIds(array $groupIds, ?array $preloaded = null): array
+    {
+        $map = $preloaded ?? $this->nodeGroupsByIds($groupIds);
+        $list = [];
+        foreach ($groupIds as $groupId) {
+            if (isset($map[$groupId])) {
+                $list[] = $map[$groupId];
+            }
+        }
+
+        return $list;
     }
 
     /**
