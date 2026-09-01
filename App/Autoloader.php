@@ -39,7 +39,11 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         private static $registered = false;
 
         /**
-         * @param string $className
+         * PSR-4 风格自动加载：把 App\Foo\Bar 映射为 {START_DIR_ROOT}/App/Foo/Bar.php。
+         * 仅在 class / interface / trait / enum 真正定义成功后写入 classMap，避免失败后本 Worker 不再重试。
+         * 同一 Worker 内并发协程加载同一类时，后来者等待，避免 require 竞态。
+         *
+         * @param string $className 完整类名（含命名空间）
          */
         public static function autoload($className): void
         {
@@ -72,9 +76,9 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         }
 
         /**
-         * Worker 接请求前只预加载 Model / Entity。
-         * Controller、Service、DTO 仍懒加载；协程竞态由 autoload 锁处理。
-         * 全量 require App/ 会随业务文件线性变慢，且每个 Worker 都要付一遍。
+         * Worker 接请求前预加载 Model 与各模块 Entity，把最容易在请求里首次用到的类送进进程内存。
+         * Controller / Service / DTO 仍走懒加载；协程竞态由 autoload 锁处理。
+         * 不要全量 require App/：文件数线性变慢，且每个 Worker 都要付一遍。
          */
         public static function preloadAppClasses(): void
         {
@@ -97,6 +101,11 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
             }
         }
 
+        /**
+         * 向 spl_autoload 注册本加载器，进程内只注册一次。
+         *
+         * @param bool $prepend true 时插到队列最前，优先于 Composer 等其他 autoload
+         */
         public static function register($prepend = false): void
         {
             if (self::$registered) {
@@ -114,6 +123,12 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
             }
         }
 
+        /**
+         * 按根命名空间把类名拼成磁盘路径并 require_once。
+         * is_file 失败时先 clearstatcache 再试一次，减轻 Alpine overlayfs / realpath 缓存误判。
+         *
+         * @param string $className 完整类名（含命名空间）
+         */
         private static function loadFromFile(string $className): void
         {
             foreach (self::$rootNamespace as $namespace) {
@@ -140,6 +155,12 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
             }
         }
 
+        /**
+         * 当前协程已有其它协程在 require 同一类时，让出执行直到对方完成或超时（约 2s）。
+         * 超时或对方未定义成功则自己再 load 一次，避免永久等死。
+         *
+         * @param string $className 完整类名（含命名空间）
+         */
         private static function waitUntilLoaded(string $className): void
         {
             $spins = 0;
@@ -165,6 +186,12 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
             }
         }
 
+        /**
+         * 判断符号是否已在当前进程定义（不触发 autoload）。
+         *
+         * @param string $name 完整类名 / 接口名 / trait 名 / enum 名
+         * @return bool 已定义返回 true（不触发 autoload）
+         */
         private static function isDefined(string $name): bool
         {
             return class_exists($name, false)
@@ -173,6 +200,11 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
                 || enum_exists($name, false);
         }
 
+        /**
+         * 当前协程 ID。无 Swoole 或不在协程内时返回 -1。
+         *
+         * @return int 协程 ID，或 -1
+         */
         private static function coroutineId(): int
         {
             if (!extension_loaded('swoole')) {
@@ -182,6 +214,12 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
             return (int) \Swoole\Coroutine::getCid();
         }
 
+        /**
+         * 类文件根目录：优先 START_DIR_ROOT（项目根），否则退回本文件的上一级。
+         * App\Foo 对应 {base}/App/Foo.php。
+         *
+         * @return string 绝对路径，无末尾分隔符
+         */
         private static function baseDirectory(): string
         {
             if (self::$baseDirectory === null) {
@@ -194,9 +232,11 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         }
 
         /**
-         * 只收集 App/Model 与各模块 Entity 目录，避免扫整棵业务树。
+         * 收集预加载文件：App/Model 以及 App/Module 下各模块的 Entity 目录。
+         * 只扫这两个位置，避免遍历整棵业务树。
          *
-         * @return list<string>
+         * @param string $appPath 应用目录（通常为 APP_PATH）
+         * @return list<string> PHP 文件绝对路径
          */
         private static function collectPreloadPhpFiles(string $appPath): array
         {
@@ -230,7 +270,10 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         }
 
         /**
-         * @return list<string>
+         * 递归收集目录下全部 .php 文件。
+         *
+         * @param string $dir 绝对目录
+         * @return list<string> PHP 文件绝对路径
          */
         private static function collectPhpFilesIn(string $dir): array
         {
@@ -254,6 +297,13 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
             return $files;
         }
 
+        /**
+         * 由磁盘路径反推 PSR-4 类名。路径必须落在 baseDirectory 下，且以 .php 结尾。
+         * 例如 {base}/App/Module/Staff/Entity/StaffUserEntity.php → App\Module\Staff\Entity\StaffUserEntity。
+         *
+         * @param string $filepath PHP 文件绝对路径
+         * @return string|null 完整类名；路径不在根目录下或不是 .php 时返回 null
+         */
         private static function classNameFromFile(string $filepath): ?string
         {
             $base = self::baseDirectory();
