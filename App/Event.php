@@ -42,6 +42,8 @@ class Event extends EventHandler
      */
     public function onWorkerStart($server, $worker_id)
     {
+        Autoloader::preloadAppClasses();
+
         if (!SystemEnv::isWorkerService()) {
             // todo
         }

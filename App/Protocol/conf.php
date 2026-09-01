@@ -62,7 +62,7 @@ return [
         'reload_async'           => true,
         'enable_deadlock_check'  => false,
         'enable_coroutine'       => 1,
-        'enable_preemptive_scheduler' => 1,
+        'enable_preemptive_scheduler' => 0,
         // 参数将决定最多同时有多少个等待accept的连接,建议128~512
         'backlog'                => 256,
         // 在PHP ZTS下，如果使用SWOOLE_PROCESS模式，一定要设置该值为 true

@@ -32,42 +32,80 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         /** @var array<string, true> */
         private static $classMapNamespace = [];
 
+        /** @var array<string, int> className => coroutine id currently requiring the file */
+        private static $loading = [];
+
         /** @var bool */
         private static $registered = false;
+
+        /** @var list<string> 预加载时跳过的目录名（配置 / 路由注册 / 静态资源等） */
+        private static $preloadSkipDirNames = [
+            'Config',
+            'Protocol',
+            'Resource',
+            'Router',
+            'Scripts',
+            'Storage',
+            'WorkerCron',
+            'WorkerDaemon',
+            'static',
+            'Static',
+        ];
 
         /**
          * @param string $className
          */
         public static function autoload($className): void
         {
-            if (isset(self::$classMapNamespace[$className])) {
+            if (self::isDefined($className)) {
+                self::$classMapNamespace[$className] = true;
                 return;
             }
 
-            if (self::$baseDirectory === null) {
-                self::$baseDirectory = defined('START_DIR_ROOT')
-                    ? START_DIR_ROOT
-                    : dirname(__DIR__);
+            $cid = self::coroutineId();
+            if ($cid >= 0 && isset(self::$loading[$className])) {
+                if (self::$loading[$className] === $cid) {
+                    return;
+                }
+                self::waitUntilLoaded($className);
+                return;
             }
 
-            foreach (self::$rootNamespace as $namespace) {
-                // 精确前缀：Foo 不匹配 Foobar\
-                if ($className !== $namespace && !str_starts_with($className, $namespace . '\\')) {
-                    continue;
-                }
+            if ($cid >= 0) {
+                self::$loading[$className] = $cid;
+            }
 
-                $parts = explode('\\', $className);
-                $filepath = self::$baseDirectory
-                    . DIRECTORY_SEPARATOR
-                    . implode(DIRECTORY_SEPARATOR, $parts)
-                    . '.php';
-
-                if (is_file($filepath)) {
-                    require_once $filepath;
+            try {
+                self::loadFromFile($className);
+                if (self::isDefined($className)) {
                     self::$classMapNamespace[$className] = true;
                 }
+            } finally {
+                unset(self::$loading[$className]);
+            }
+        }
 
-                break;
+        /**
+         * Worker 接请求前把业务类载入进程内存，避免协程里第一次 autoload 竞态。
+         */
+        public static function preloadAppClasses(): void
+        {
+            $appPath = defined('APP_PATH')
+                ? APP_PATH
+                : (self::baseDirectory() . DIRECTORY_SEPARATOR . 'App');
+            if (!is_dir($appPath)) {
+                return;
+            }
+
+            $files = self::collectPhpFiles($appPath);
+            sort($files, SORT_STRING);
+
+            foreach ($files as $filepath) {
+                require_once $filepath;
+                $className = self::classNameFromFile($filepath);
+                if ($className !== null && self::isDefined($className)) {
+                    self::$classMapNamespace[$className] = true;
+                }
             }
         }
 
@@ -86,6 +124,134 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
                     E_USER_WARNING,
                 );
             }
+        }
+
+        private static function loadFromFile(string $className): void
+        {
+            foreach (self::$rootNamespace as $namespace) {
+                // 精确前缀：Foo 不匹配 Foobar\
+                if ($className !== $namespace && !str_starts_with($className, $namespace . '\\')) {
+                    continue;
+                }
+
+                $parts = explode('\\', $className);
+                $filepath = self::baseDirectory()
+                    . DIRECTORY_SEPARATOR
+                    . implode(DIRECTORY_SEPARATOR, $parts)
+                    . '.php';
+
+                if (!is_file($filepath)) {
+                    clearstatcache(true, $filepath);
+                }
+
+                if (is_file($filepath)) {
+                    require_once $filepath;
+                }
+
+                break;
+            }
+        }
+
+        private static function waitUntilLoaded(string $className): void
+        {
+            $spins = 0;
+            while (isset(self::$loading[$className])) {
+                if (self::isDefined($className)) {
+                    self::$classMapNamespace[$className] = true;
+                    return;
+                }
+                if (++$spins > 2000) {
+                    break;
+                }
+                \Swoole\Coroutine::sleep(0.001);
+            }
+
+            if (self::isDefined($className)) {
+                self::$classMapNamespace[$className] = true;
+                return;
+            }
+
+            self::loadFromFile($className);
+            if (self::isDefined($className)) {
+                self::$classMapNamespace[$className] = true;
+            }
+        }
+
+        private static function isDefined(string $name): bool
+        {
+            return class_exists($name, false)
+                || interface_exists($name, false)
+                || trait_exists($name, false)
+                || enum_exists($name, false);
+        }
+
+        private static function coroutineId(): int
+        {
+            if (!extension_loaded('swoole')) {
+                return -1;
+            }
+
+            return (int) \Swoole\Coroutine::getCid();
+        }
+
+        private static function baseDirectory(): string
+        {
+            if (self::$baseDirectory === null) {
+                self::$baseDirectory = defined('START_DIR_ROOT')
+                    ? START_DIR_ROOT
+                    : dirname(__DIR__);
+            }
+
+            return self::$baseDirectory;
+        }
+
+        /**
+         * @return list<string>
+         */
+        private static function collectPhpFiles(string $appPath): array
+        {
+            $files = [];
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveCallbackFilterIterator(
+                    new \RecursiveDirectoryIterator(
+                        $appPath,
+                        \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::CURRENT_AS_FILEINFO
+                    ),
+                    static function (\SplFileInfo $current, $key, \RecursiveDirectoryIterator $iterator): bool {
+                        if ($iterator->hasChildren() || $current->isDir()) {
+                            return !in_array($current->getFilename(), self::$preloadSkipDirNames, true);
+                        }
+                        return $current->isFile()
+                            && strtolower($current->getExtension()) === 'php'
+                            && $current->getFilename() !== 'Autoloader.php';
+                    }
+                )
+            );
+
+            foreach ($iterator as $file) {
+                if ($file instanceof \SplFileInfo && $file->isFile()) {
+                    $files[] = $file->getPathname();
+                }
+            }
+
+            return $files;
+        }
+
+        private static function classNameFromFile(string $filepath): ?string
+        {
+            $base = self::baseDirectory();
+            $normalizedBase = rtrim(str_replace('\\', '/', $base), '/') . '/';
+            $normalizedFile = str_replace('\\', '/', $filepath);
+            if (!str_starts_with($normalizedFile, $normalizedBase)) {
+                return null;
+            }
+
+            $relative = substr($normalizedFile, strlen($normalizedBase));
+            if (!str_ends_with($relative, '.php')) {
+                return null;
+            }
+
+            return str_replace('/', '\\', substr($relative, 0, -4));
         }
     }
 
