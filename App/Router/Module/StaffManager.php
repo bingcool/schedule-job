@@ -33,6 +33,12 @@ Route::group([
     Route::get('/auth/me', [
         'dispatch_route' => [StaffAuthController::class, 'me'],
     ]);
+    Route::match(['POST', 'PUT'], '/auth/password', [
+        'dispatch_route' => [StaffAuthController::class, 'changePassword'],
+    ]);
+    Route::match(['POST', 'PUT'], '/auth/profile', [
+        'dispatch_route' => [StaffAuthController::class, 'updateProfile'],
+    ]);
 
     Route::get('/users', [
         'dispatch_route' => [StaffUserController::class, 'listUsers'],
@@ -51,6 +57,12 @@ Route::group([
     ]);
     Route::match(['POST', 'PUT'], '/users/status', [
         'dispatch_route' => [StaffUserController::class, 'switchStatus'],
+    ]);
+    Route::match(['POST', 'PUT'], '/users/roles', [
+        'dispatch_route' => [StaffUserController::class, 'grantRoles'],
+    ]);
+    Route::match(['POST', 'PUT'], '/users/node-groups', [
+        'dispatch_route' => [StaffUserController::class, 'grantNodeGroups'],
     ]);
 
     Route::get('/roles', [

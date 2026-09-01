@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Module\Staff\Controller;
 
 use App\Module\Staff\Dto\StaffManager\CreateUserDto;
+use App\Module\Staff\Dto\StaffManager\GrantUserNodeGroupsDto;
+use App\Module\Staff\Dto\StaffManager\GrantUserRolesDto;
 use App\Module\Staff\Dto\StaffManager\ListUsersQueryDto;
 use App\Module\Staff\Dto\StaffManager\SwitchUserStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateUserDto;
@@ -12,6 +14,8 @@ use App\Module\Staff\Dto\StaffManager\UserIdDto;
 use App\Module\Staff\Request\StaffManager\ListUsersRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserCreateRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserIdRequest;
+use App\Module\Staff\Request\StaffManager\StaffUserNodeGroupsRequest;
+use App\Module\Staff\Request\StaffManager\StaffUserRolesRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserStatusRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserUpdateRequest;
 use App\Module\Staff\Response\StaffManager\ListUsersResponse;
@@ -59,7 +63,7 @@ class StaffUserController extends BController
      curl -X POST 'http://127.0.0.1:9501/api/v1/users' \
        -H 'Authorization: Bearer <jwt>' \
        -H 'Content-Type: application/json' \
-       -d '{"account":"ops@example.com","userName":"运维","password":"12345678","roleIds":[1],"nodeGroupIds":[]}'
+       -d '{"account":"ops@example.com","userName":"运维","password":"12345678"}'
      ```
      */
     #[ApiOperation('创建用户')]
@@ -68,9 +72,7 @@ class StaffUserController extends BController
         $dto = (new CreateUserDto())
             ->setAccount($request->getAccount())
             ->setUserName($request->getUserName())
-            ->setPassword($request->getPassword())
-            ->setRoleIds($request->getRoleIds())
-            ->setNodeGroupIds($request->getNodeGroupIds());
+            ->setPassword($request->getPassword());
 
         return new StaffUserRowResponse($this->staffUserService->createUser($dto));
     }
@@ -84,10 +86,7 @@ class StaffUserController extends BController
         $dto = (new UpdateUserDto())
             ->setId($request->getId())
             ->setAccount($request->getAccount())
-            ->setUserName($request->getUserName())
-            ->setPassword($request->getPassword())
-            ->setRoleIds($request->getRoleIds())
-            ->setNodeGroupIds($request->getNodeGroupIds());
+            ->setUserName($request->getUserName());
 
         return new StaffUserRowResponse($this->staffUserService->updateUser($dto));
     }
@@ -132,5 +131,45 @@ class StaffUserController extends BController
         );
 
         return new StaffUserStatusAckResponse($ack->getId(), $ack->getStatus());
+    }
+
+    /**
+     * 独立分配用户角色。
+     *
+     * Route: PUT /api/v1/users/roles
+     *
+     ```bash
+     curl -X PUT 'http://127.0.0.1:9501/api/v1/users/roles' \
+       -H 'Authorization: Bearer <jwt>' \
+       -H 'Content-Type: application/json' \
+       -d '{"id": 2, "roleIds": [1, 3]}'
+     ```
+     */
+    #[ApiOperation('分配用户角色')]
+    public function grantRoles(StaffUserRolesRequest $request): StaffUserRowResponse
+    {
+        return new StaffUserRowResponse($this->staffUserService->grantRoles(
+            GrantUserRolesDto::of($request->getId(), $request->getRoleIds())
+        ));
+    }
+
+    /**
+     * 独立授权用户可管理的节点组。
+     *
+     * Route: PUT /api/v1/users/node-groups
+     *
+     ```bash
+     curl -X PUT 'http://127.0.0.1:9501/api/v1/users/node-groups' \
+       -H 'Authorization: Bearer <jwt>' \
+       -H 'Content-Type: application/json' \
+       -d '{"id": 2, "nodeGroupIds": [1, 3]}'
+     ```
+     */
+    #[ApiOperation('授权用户节点组')]
+    public function grantNodeGroups(StaffUserNodeGroupsRequest $request): StaffUserRowResponse
+    {
+        return new StaffUserRowResponse($this->staffUserService->grantNodeGroups(
+            GrantUserNodeGroupsDto::of($request->getId(), $request->getNodeGroupIds())
+        ));
     }
 }

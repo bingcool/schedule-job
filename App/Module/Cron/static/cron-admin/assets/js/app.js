@@ -79,7 +79,13 @@
     router: router,
     data: function () {
       return {
-        currentUser: common.getUser()
+        currentUser: common.getUser(),
+        settingsDlg: false,
+        passwordSaving: false,
+        passwordForm: { oldPassword: '', newPassword: '', newPasswordConfirm: '' },
+        profileDlg: false,
+        profileSaving: false,
+        profileForm: { account: '', userName: '' }
       };
     },
     computed: {
@@ -122,6 +128,85 @@
         common.clearAuth();
         this.currentUser = null;
         this.$router.replace('/login');
+      },
+      onUserCommand: function (command) {
+        if (command === 'password') {
+          this.resetPasswordForm();
+          this.settingsDlg = true;
+        }
+        if (command === 'profile') {
+          this.openProfile();
+        }
+      },
+      openProfile: function () {
+        var user = this.currentUser || {};
+        this.profileForm = {
+          account: user.account || '',
+          userName: user.userName || ''
+        };
+        this.profileDlg = true;
+      },
+      submitProfile: async function () {
+        var form = this.profileForm;
+        if (!form.userName) {
+          this.$message.warning('请填写用户名称');
+          return;
+        }
+        this.profileSaving = true;
+        try {
+          var user = await common.api('/auth/profile', {
+            method: 'PUT',
+            body: { userName: form.userName }
+          });
+          common.setUser(user);
+          this.currentUser = user;
+          this.$message.success('资料已保存');
+          this.profileDlg = false;
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.profileSaving = false;
+        }
+      },
+      resetPasswordForm: function () {
+        this.passwordForm = { oldPassword: '', newPassword: '', newPasswordConfirm: '' };
+      },
+      submitPassword: async function () {
+        var form = this.passwordForm;
+        if (!form.oldPassword || !form.newPassword || !form.newPasswordConfirm) {
+          this.$message.warning('请填写旧密码、新密码和确认新密码');
+          return;
+        }
+        if (form.newPassword !== form.newPasswordConfirm) {
+          this.$message.warning('两次输入的新密码不一致');
+          return;
+        }
+        if (form.newPassword.length < 8) {
+          this.$message.warning('新密码至少 8 位');
+          return;
+        }
+        if (form.oldPassword === form.newPassword) {
+          this.$message.warning('新密码不能与旧密码相同');
+          return;
+        }
+        this.passwordSaving = true;
+        try {
+          await common.api('/auth/password', {
+            method: 'PUT',
+            body: {
+              oldPassword: form.oldPassword,
+              newPassword: form.newPassword,
+              newPasswordConfirm: form.newPasswordConfirm
+            }
+          });
+          this.$message.success('密码已修改');
+          this.settingsDlg = false;
+          this.resetPasswordForm();
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.passwordSaving = false;
+        }
       }
     }
   });

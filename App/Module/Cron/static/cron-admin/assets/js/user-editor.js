@@ -4,7 +4,7 @@
   var common = window.CronAdminCommon;
 
   function emptyForm() {
-    return { account: '', userName: '', password: '', passwordConfirm: '', roleIds: [], nodeGroupIds: [] };
+    return { account: '', userName: '', password: '', passwordConfirm: '' };
   }
 
   window.CronAdminUserEditor = {
@@ -12,8 +12,6 @@
     data: function () {
       return {
         form: emptyForm(),
-        roleOptions: [],
-        nodeGroups: [],
         saving: false,
         userId: 0
       };
@@ -21,10 +19,6 @@
     computed: {
       isEdit: function () {
         return !!this.$route.params.id;
-      },
-      selectedRoleNames: function () {
-        var ids = this.form.roleIds || [];
-        return this.roleOptions.filter(function (r) { return ids.indexOf(r.id) >= 0; });
       }
     },
     created: function () {
@@ -33,23 +27,15 @@
     methods: {
       init: async function () {
         try {
-          var reqs = [common.api('/roles/options'), common.api('/node-groups')];
-          if (this.isEdit) reqs.push(common.api('/users/detail?id=' + this.$route.params.id));
-          var results = await Promise.all(reqs);
-          this.roleOptions = (results[0] && results[0].list) || [];
-          this.nodeGroups = (results[1] && results[1].list) || [];
-          if (this.isEdit && results[2]) {
-            var d = results[2];
-            this.userId = d.id;
-            this.form = {
-              account: d.account || '',
-              userName: d.userName || '',
-              password: '',
-              passwordConfirm: '',
-              roleIds: d.roleIds || [],
-              nodeGroupIds: d.nodeGroupIds || []
-            };
-          }
+          if (!this.isEdit) return;
+          var d = await common.api('/users/detail?id=' + this.$route.params.id);
+          this.userId = d.id;
+          this.form = {
+            account: d.account || '',
+            userName: d.userName || '',
+            password: '',
+            passwordConfirm: ''
+          };
         } catch (e) {
           common.toastErr(this, e);
         }
@@ -72,9 +58,7 @@
           var body = {
             account: this.form.account,
             userName: this.form.userName,
-            password: this.form.password || '',
-            roleIds: this.form.roleIds,
-            nodeGroupIds: this.form.nodeGroupIds
+            password: this.form.password || ''
           };
           if (this.isEdit) {
             body.id = Number(this.$route.params.id);

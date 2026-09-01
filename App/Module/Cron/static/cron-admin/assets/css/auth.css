@@ -106,6 +106,21 @@
   font-weight: 600;
 }
 
+.user-bar .user-name-link {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+}
+
+.user-bar .user-name-link:hover {
+  color: var(--primary);
+}
+
+.reset-password-form .el-form-item__label {
+  white-space: nowrap;
+}
+
 .top-bar {
   display: flex;
   align-items: flex-start;

@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=task-list-6">
-  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=rbac-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=settings-2">
 </head>
 <body>
 <div id="app" v-cloak>
@@ -49,9 +49,48 @@
           </div>
           <div class="user-bar" v-if="currentUser">
             <div class="avatar">{{ userInitial }}</div>
-            <span class="name">{{ currentUser.userName || currentUser.account }}</span>
+            <el-dropdown trigger="click" @command="onUserCommand">
+              <span class="name user-name-link">{{ currentUser.userName || currentUser.account }}<i class="el-icon-arrow-down el-icon--right"></i></span>
+              <el-dropdown-menu slot="dropdown">
+                <el-dropdown-item command="password"><i class="el-icon-key"></i> 重置密码</el-dropdown-item>
+                <el-dropdown-item command="profile"><i class="el-icon-user"></i> 个人设置</el-dropdown-item>
+              </el-dropdown-menu>
+            </el-dropdown>
             <el-button size="mini" plain @click="logout">退出</el-button>
           </div>
+          <el-dialog title="重置密码" :visible.sync="settingsDlg" width="440px" append-to-body @closed="resetPasswordForm">
+            <p class="section-desc" style="margin:0 0 14px">修改当前账号密码，需校验旧密码。</p>
+            <el-form class="reset-password-form" label-width="108px" size="small" @submit.native.prevent="submitPassword">
+              <el-form-item label="旧密码" required>
+                <el-input v-model="passwordForm.oldPassword" type="password" show-password autocomplete="current-password"></el-input>
+              </el-form-item>
+              <el-form-item label="新密码" required>
+                <el-input v-model="passwordForm.newPassword" type="password" show-password autocomplete="new-password" placeholder="至少 8 位"></el-input>
+              </el-form-item>
+              <el-form-item label="确认新密码" required>
+                <el-input v-model="passwordForm.newPasswordConfirm" type="password" show-password autocomplete="new-password" @keyup.enter.native="submitPassword"></el-input>
+              </el-form-item>
+            </el-form>
+            <div slot="footer">
+              <el-button @click="settingsDlg = false">取消</el-button>
+              <el-button type="primary" :loading="passwordSaving" @click="submitPassword">提交</el-button>
+            </div>
+          </el-dialog>
+          <el-dialog title="个人设置" :visible.sync="profileDlg" width="440px" append-to-body>
+            <p class="section-desc" style="margin:0 0 14px">可修改显示名称。账号仅能由有用户编辑权限的人在用户管理中修改。</p>
+            <el-form class="reset-password-form" label-width="108px" size="small" @submit.native.prevent="submitProfile">
+              <el-form-item label="账号">
+                <el-input :value="profileForm.account" disabled></el-input>
+              </el-form-item>
+              <el-form-item label="用户名称" required>
+                <el-input v-model="profileForm.userName" autocomplete="name" placeholder="显示名称" @keyup.enter.native="submitProfile"></el-input>
+              </el-form-item>
+            </el-form>
+            <div slot="footer">
+              <el-button @click="profileDlg = false">取消</el-button>
+              <el-button type="primary" :loading="profileSaving" @click="submitProfile">保存</el-button>
+            </div>
+          </el-dialog>
         </div>
       </div>
       <div class="content-area"><router-view></router-view></div>
@@ -785,9 +824,14 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="节点组" width="90" align="center">
+          <template slot-scope="s">{{ (s.row.nodeGroupIds || []).length }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="260" fixed="right">
           <template slot-scope="s">
             <el-button type="text" size="small" @click="$router.push('/users/edit/' + s.row.id)">编辑</el-button>
+            <el-button type="text" size="small" @click="openRoles(s.row)">角色分配</el-button>
+            <el-button type="text" size="small" @click="openGrant(s.row)">节点组授权</el-button>
             <el-button type="text" size="small" style="color:#f56c6c" @click="remove(s.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -796,6 +840,37 @@
         <el-pagination background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
       </div>
     </div>
+    <el-dialog title="角色分配" :visible.sync="roleDlg" width="520px">
+      <p style="margin:0 0 12px;color:var(--muted);font-size:13px">为「{{ roleUser.userName || roleUser.account }}」分配角色，一个用户可拥有多个角色。</p>
+      <div style="margin-bottom:10px">
+        <el-button size="mini" @click="selectAllRoles">全部勾选</el-button>
+        <el-button size="mini" @click="clearAllRoles">清空</el-button>
+      </div>
+      <el-select v-model="roleForm.roleIds" multiple filterable collapse-tags placeholder="下拉多选角色" style="width:100%">
+        <el-option v-for="r in roleOptions" :key="r.id" :value="Number(r.id)" :label="r.name">
+          <span>{{ r.name }}</span>
+          <span v-if="r.isSuper" class="tag-super" style="margin-left:6px">超管</span>
+        </el-option>
+      </el-select>
+      <div slot="footer">
+        <el-button @click="roleDlg = false">取消</el-button>
+        <el-button type="primary" :loading="roleSaving" @click="saveRoles">保存</el-button>
+      </div>
+    </el-dialog>
+    <el-dialog title="节点组授权" :visible.sync="grantDlg" width="520px">
+      <p style="margin:0 0 12px;color:var(--muted);font-size:13px">为「{{ grantUser.userName || grantUser.account }}」授权可管理的节点组，未授权的节点组任务对其不可见。</p>
+      <div style="margin-bottom:10px">
+        <el-button size="mini" @click="selectAllGroups">全部勾选</el-button>
+        <el-button size="mini" @click="clearAllGroups">清空</el-button>
+      </div>
+      <el-select v-model="grantForm.nodeGroupIds" multiple filterable collapse-tags placeholder="下拉多选节点组" style="width:100%">
+        <el-option v-for="g in grantGroupOptions" :key="g.id" :value="Number(g.id)" :label="g.groupName || g.name"></el-option>
+      </el-select>
+      <div slot="footer">
+        <el-button @click="grantDlg = false">取消</el-button>
+        <el-button type="primary" :loading="grantSaving" @click="saveGrant">保存</el-button>
+      </div>
+    </el-dialog>
   </div>
 </script>
 
@@ -816,37 +891,16 @@
           <div class="grid">
             <div class="field"><label>账号 <span class="req">*</span></label><input class="form-control" v-model="form.account" placeholder="建议使用邮箱"></div>
             <div class="field"><label>用户名称 <span class="req">*</span></label><input class="form-control" v-model="form.userName" placeholder="显示名称"></div>
-            <div class="field"><label>{{ isEdit ? '新密码' : '密码' }} <span class="req" v-if="!isEdit">*</span></label><input class="form-control" type="password" v-model="form.password" :placeholder="isEdit ? '留空则不修改' : '至少 8 位'"></div>
-            <div class="field"><label>确认密码</label><input class="form-control" type="password" v-model="form.passwordConfirm" placeholder="再次输入密码"></div>
+            <div class="field" v-if="!isEdit"><label>密码 <span class="req">*</span></label><input class="form-control" type="password" v-model="form.password" placeholder="至少 8 位"></div>
+            <div class="field" v-if="!isEdit"><label>确认密码</label><input class="form-control" type="password" v-model="form.passwordConfirm" placeholder="再次输入密码"></div>
           </div>
-        </div>
-        <div class="section">
-          <h3 class="section-title">角色分配</h3>
-          <p class="section-desc">对应 staff_user_role，一个用户可拥有多个角色</p>
-          <el-checkbox-group v-model="form.roleIds">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-              <el-checkbox v-for="r in roleOptions" :key="r.id" :label="r.id">
-                {{ r.name }}
-                <span v-if="r.isSuper" class="tag-super" style="margin-left:6px">超管</span>
-              </el-checkbox>
-            </div>
-          </el-checkbox-group>
-        </div>
-        <div class="section">
-          <h3 class="section-title">节点组授权</h3>
-          <p class="section-desc">对应 staff_user_relate_node_group，空表示不限制</p>
-          <el-select v-model="form.nodeGroupIds" multiple placeholder="选择节点组" style="width:100%">
-            <el-option v-for="g in nodeGroups" :key="g.id" :value="g.id" :label="g.groupName || g.name"></el-option>
-          </el-select>
         </div>
       </div>
       <div class="panel preview-card">
         <div class="preview-head"><span class="preview-title">用户预览</span></div>
         <div class="task-name">{{ form.userName || '未命名用户' }}</div>
         <div class="task-desc mono">{{ form.account || '—' }}</div>
-        <div class="kv"><span>已选角色</span><span>{{ selectedRoleNames.length }} 个</span></div>
-        <div class="kv"><span>节点组</span><span>{{ form.nodeGroupIds.length || '不限制' }}</span></div>
-        <div class="callout info">超级管理员角色拥有所有菜单和 API 权限。</div>
+        <div class="callout info">角色分配、节点组授权请在用户列表中单独操作。</div>
       </div>
     </div>
   </div>
@@ -1051,7 +1105,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@2.7.16/dist/vue.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/vue-router@3.6.5/dist/vue-router.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue-router@3.6.5/dist/vue-router.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-ui@2.15.14/lib/index.js'"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=rbac-4"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=rbac-5"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-list-6"></script>
 <script defer src="/cron-admin/assets/js/editor.js"></script>
@@ -1061,11 +1115,11 @@
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js"></script>
 <script defer src="/cron-admin/assets/js/register.js"></script>
-<script defer src="/cron-admin/assets/js/users.js?v=status-2"></script>
-<script defer src="/cron-admin/assets/js/user-editor.js"></script>
+<script defer src="/cron-admin/assets/js/users.js?v=roles-1"></script>
+<script defer src="/cron-admin/assets/js/user-editor.js?v=roles-1"></script>
 <script defer src="/cron-admin/assets/js/roles.js?v=status-1"></script>
 <script defer src="/cron-admin/assets/js/role-editor.js"></script>
 <script defer src="/cron-admin/assets/js/menus.js"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=rbac-1"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=settings-3"></script>
 </body>
 </html>

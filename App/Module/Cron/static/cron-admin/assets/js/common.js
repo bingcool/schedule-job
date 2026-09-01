@@ -294,10 +294,28 @@
     });
   }
 
+  function isViewerSuper() {
+    var user = getUser() || {};
+    return !!user.isSuper;
+  }
+
+  function viewerNodeGroupIds() {
+    var user = getUser() || {};
+    return Array.isArray(user.nodeGroupIds) ? user.nodeGroupIds.map(Number) : [];
+  }
+
+  function filterGroupsForViewer(groups) {
+    if (isViewerSuper()) return groups || [];
+    var allowed = viewerNodeGroupIds();
+    return (groups || []).filter(function (g) {
+      return allowed.indexOf(Number(g.id)) >= 0;
+    });
+  }
+
   function buildGroupOptions(groups, nodes) {
-    var list = (groups || []).slice();
+    var list = filterGroupsForViewer(groups);
     var hasUngrouped = (nodes || []).some(function (n) { return !n.groupId; });
-    if (hasUngrouped) {
+    if (hasUngrouped && isViewerSuper()) {
       list = [{ id: -1, groupName: '未分组' }].concat(list);
     }
     return list;
@@ -313,6 +331,9 @@
     clearAuth: clearAuth,
     saveSession: saveSession,
     isAuthPublicPath: isAuthPublicPath,
+    isViewerSuper: isViewerSuper,
+    viewerNodeGroupIds: viewerNodeGroupIds,
+    filterGroupsForViewer: filterGroupsForViewer,
     toastErr: toastErr,
     confirmDialog: confirmDialog,
     confirmTaskStatusChange: confirmTaskStatusChange,

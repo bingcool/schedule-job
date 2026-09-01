@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Module\Staff\Service;
 
 use App\Module\Staff\Dto\StaffManager\AuthSessionDto;
+use App\Module\Staff\Dto\StaffManager\ChangePasswordDto;
 use App\Module\Staff\Dto\StaffManager\LoginDto;
 use App\Module\Staff\Dto\StaffManager\RegisterDto;
+use App\Module\Staff\Dto\StaffManager\UpdateProfileDto;
 use App\Module\Staff\Entity\StaffUserEntity;
 use App\Module\Staff\Exception\StaffException;
 use Swoolefy\Core\Application;
@@ -105,6 +107,53 @@ class StaffAuthService
         return $this->profileOf($user);
     }
 
+    public function changePassword(ChangePasswordDto $dto): int
+    {
+        $authUser = FrameworkContext::userOrFail();
+        $user = $this->staffUserService->requireUser((int) $authUser->userId);
+        if ($user->isDisabled()) {
+            throw StaffException::throw('账号已禁用', -1);
+        }
+        if ($dto->getOldPassword() === '' || $dto->getNewPassword() === '') {
+            throw StaffException::throw('旧密码和新密码不能为空', -1);
+        }
+        if ($dto->getNewPassword() !== $dto->getNewPasswordConfirm()) {
+            throw StaffException::throw('两次输入的新密码不一致', -1);
+        }
+        if (!password_verify($dto->getOldPassword(), (string) $user->password)) {
+            throw StaffException::throw('旧密码不正确', -1);
+        }
+        if (password_verify($dto->getNewPassword(), (string) $user->password)) {
+            throw StaffException::throw('新密码不能与旧密码相同', -1);
+        }
+        StaffUserService::assertPassword($dto->getNewPassword());
+
+        $user->setData([
+            'password' => StaffUserService::hashPassword($dto->getNewPassword()),
+        ]);
+        $user->save();
+
+        return (int) $user->id;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function updateProfile(UpdateProfileDto $dto): array
+    {
+        $authUser = FrameworkContext::userOrFail();
+        $current = $this->staffUserService->requireUser((int) $authUser->userId);
+        if ($current->isDisabled()) {
+            throw StaffException::throw('账号已禁用', -1);
+        }
+        $user = $this->staffUserService->updateSelfProfile(
+            (int) $current->id,
+            $dto->getUserName(),
+        );
+
+        return $this->profileOf($user);
+    }
+
     private function issueSession(StaffUserEntity $user): AuthSessionDto
     {
         $profile = $this->profileOf($user);
@@ -149,6 +198,7 @@ class StaffAuthService
             'userName' => (string) $user->user_name,
             'isSuper' => $isSuper,
             'roles' => $roles,
+            'nodeGroupIds' => $this->staffUserService->nodeGroupIdsOfUser((int) $user->id),
             'menus' => $this->staffRoleService->menusForUser((int) $user->id, $isSuper),
         ];
     }

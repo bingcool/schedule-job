@@ -2,6 +2,7 @@
 
 namespace App\Router;
 
+use Swoolefy\Http\Middleware\AuthenticateMiddleware;
 use Swoolefy\Http\Middleware\CorsMiddleware;
 use Swoolefy\Http\Route;
 use App\Module\Cron\Controller\CronAdminController;
@@ -84,6 +85,7 @@ Route::group([
     'prefix' => 'api/v1',
     'middleware' => [
         CorsMiddleware::class,
+        AuthenticateMiddleware::class,
     ]
 ], function () {
     // 任务管理
@@ -173,8 +175,14 @@ Route::group([
     Route::get('/runtime/overview', [
         'dispatch_route' => [CronTaskManagerController::class, 'runtimeOverview'],
     ]);
+});
 
-    // Agent节点拉取任务
+Route::group([
+    'prefix' => 'api/v1',
+    'middleware' => [
+        CorsMiddleware::class,
+    ]
+], function () {
     Route::get('/agent/tasks', [
         'dispatch_route' => [CronTaskManagerController::class, 'agentTasks'],
     ]);

@@ -10,10 +10,27 @@
         items: [],
         total: 0,
         loading: false,
-        query: { page: 1, pageSize: 20, account: '', userName: '', status: '' }
+        query: { page: 1, pageSize: 20, account: '', userName: '', status: '' },
+        nodeGroups: [],
+        roleOptions: [],
+        grantDlg: false,
+        grantSaving: false,
+        grantUser: { id: 0, userName: '', account: '' },
+        grantForm: { nodeGroupIds: [] },
+        roleDlg: false,
+        roleSaving: false,
+        roleUser: { id: 0, userName: '', account: '' },
+        roleForm: { roleIds: [] }
       };
     },
+    computed: {
+      grantGroupOptions: function () {
+        return common.filterGroupsForViewer(this.nodeGroups);
+      }
+    },
     created: function () {
+      this.loadGroups();
+      this.loadRoles();
       this.load();
     },
     methods: {
@@ -32,6 +49,77 @@
           common.toastErr(this, e);
         } finally {
           this.loading = false;
+        }
+      },
+      loadRoles: async function () {
+        try {
+          var d = await common.api('/roles/options');
+          this.roleOptions = (d && d.list) || [];
+        } catch (e) {
+          common.toastErr(this, e);
+        }
+      },
+      openRoles: function (row) {
+        var ids = row.roleIds || (row.roles || []).map(function (r) { return r.id; });
+        this.roleUser = { id: Number(row.id), userName: row.userName || '', account: row.account || '' };
+        this.roleForm = { roleIds: (ids || []).map(Number) };
+        this.roleDlg = true;
+      },
+      selectAllRoles: function () {
+        this.roleForm.roleIds = this.roleOptions.map(function (r) { return Number(r.id); });
+      },
+      clearAllRoles: function () {
+        this.roleForm.roleIds = [];
+      },
+      saveRoles: async function () {
+        this.roleSaving = true;
+        try {
+          await common.api('/users/roles', {
+            method: 'PUT',
+            body: { id: this.roleUser.id, roleIds: this.roleForm.roleIds }
+          });
+          this.$message.success('角色分配已保存');
+          this.roleDlg = false;
+          this.load();
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.roleSaving = false;
+        }
+      },
+      loadGroups: async function () {
+        try {
+          var d = await common.api('/node-groups');
+          this.nodeGroups = (d && d.list) || [];
+        } catch (e) {
+          common.toastErr(this, e);
+        }
+      },
+      openGrant: function (row) {
+        this.grantUser = { id: Number(row.id), userName: row.userName || '', account: row.account || '' };
+        this.grantForm = { nodeGroupIds: (row.nodeGroupIds || []).map(Number) };
+        this.grantDlg = true;
+      },
+      selectAllGroups: function () {
+        this.grantForm.nodeGroupIds = this.grantGroupOptions.map(function (g) { return Number(g.id); });
+      },
+      clearAllGroups: function () {
+        this.grantForm.nodeGroupIds = [];
+      },
+      saveGrant: async function () {
+        this.grantSaving = true;
+        try {
+          await common.api('/users/node-groups', {
+            method: 'PUT',
+            body: { id: this.grantUser.id, nodeGroupIds: this.grantForm.nodeGroupIds }
+          });
+          this.$message.success('节点组授权已保存');
+          this.grantDlg = false;
+          this.load();
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.grantSaving = false;
         }
       },
       search: function () {

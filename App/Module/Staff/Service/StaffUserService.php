@@ -6,6 +6,8 @@ namespace App\Module\Staff\Service;
 
 use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
 use App\Module\Staff\Dto\StaffManager\CreateUserDto;
+use App\Module\Staff\Dto\StaffManager\GrantUserNodeGroupsDto;
+use App\Module\Staff\Dto\StaffManager\GrantUserRolesDto;
 use App\Module\Staff\Dto\StaffManager\ListUsersQueryDto;
 use App\Module\Staff\Dto\StaffManager\StaffUserRowDto;
 use App\Module\Staff\Dto\StaffManager\SwitchUserStatusDto;
@@ -83,9 +85,6 @@ class StaffUserService
         if ((new StaffUserEntity())->loadByAccount($dto->getAccount())) {
             throw StaffException::throw('账号已存在', -1);
         }
-        $this->staffRoleService->assertRolesExist($dto->getRoleIds());
-        $this->assertNodeGroupsExist($dto->getNodeGroupIds());
-
         $user = new StaffUserEntity();
         $user->setData([
             'account' => $dto->getAccount(),
@@ -95,9 +94,6 @@ class StaffUserService
             'enabled_at' => date('Y-m-d H:i:s'),
         ]);
         $user->save();
-
-        $this->replaceUserRoles((int) $user->id, $dto->getRoleIds());
-        $this->replaceUserNodeGroups((int) $user->id, $dto->getNodeGroupIds());
 
         return $this->getUser(UserIdDto::of((int) $user->id));
     }
@@ -113,24 +109,33 @@ class StaffUserService
         if ($exist) {
             throw StaffException::throw('账号已存在', -1);
         }
-        $this->staffRoleService->assertRolesExist($dto->getRoleIds());
-        $this->assertNodeGroupsExist($dto->getNodeGroupIds());
 
         $data = [
             'account' => $dto->getAccount(),
             'user_name' => $dto->getUserName(),
         ];
-        if ($dto->getPassword() !== '') {
-            $this->assertPassword($dto->getPassword());
-            $data['password'] = self::hashPassword($dto->getPassword());
-        }
         $user->setData($data);
         $user->save();
 
-        $this->replaceUserRoles((int) $user->id, $dto->getRoleIds());
-        $this->replaceUserNodeGroups((int) $user->id, $dto->getNodeGroupIds());
-
         return $this->getUser(UserIdDto::of((int) $user->id));
+    }
+
+    /**
+     * @return StaffUserEntity
+     */
+    public function updateSelfProfile(int $userId, string $userName): StaffUserEntity
+    {
+        $user = $this->requireUser($userId);
+        $userName = trim($userName);
+        if ($userName === '') {
+            throw StaffException::throw('用户名称不能为空', -1);
+        }
+        $user->setData([
+            'user_name' => $userName,
+        ]);
+        $user->save();
+
+        return $user;
     }
 
     /**
@@ -148,6 +153,71 @@ class StaffUserService
         $attrs['is_super'] = $this->hasSuperRole($roles);
 
         return $attrs;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function grantRoles(GrantUserRolesDto $dto): array
+    {
+        $user = $this->requireUser($dto->getId());
+        $this->staffRoleService->assertRolesExist($dto->getRoleIds());
+        $this->replaceUserRoles((int) $user->id, $dto->getRoleIds());
+
+        return $this->getUser(UserIdDto::of((int) $user->id));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function grantNodeGroups(GrantUserNodeGroupsDto $dto): array
+    {
+        $user = $this->requireUser($dto->getId());
+        $this->assertNodeGroupsExist($dto->getNodeGroupIds());
+        $viewerGroups = $this->viewerAuthorizedNodeGroupIds();
+        if ($viewerGroups !== null) {
+            foreach ($dto->getNodeGroupIds() as $groupId) {
+                if (!in_array($groupId, $viewerGroups, true)) {
+                    throw StaffException::throw('不能授权自己无权管理的节点组', -1);
+                }
+            }
+        }
+        $this->replaceUserNodeGroups((int) $user->id, $dto->getNodeGroupIds());
+
+        return $this->getUser(UserIdDto::of((int) $user->id));
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function nodeGroupIdsOfUser(int $userId): array
+    {
+        return $this->nodeGroupIdsGroupedByUserIds([$userId])[$userId] ?? [];
+    }
+
+    public function isSuperUser(int $userId): bool
+    {
+        $roles = $this->staffRoleService->rolesGroupedByUserIds([$userId])[$userId] ?? [];
+
+        return $this->hasSuperRole($roles);
+    }
+
+    /**
+     * 当前登录者可查看的节点组。null=超级管理员不限制；[]=未授权任何节点组。
+     *
+     * @return array<int, int>|null
+     */
+    public function viewerAuthorizedNodeGroupIds(): ?array
+    {
+        $userId = (int) (FrameworkContext::getUserId() ?? 0);
+        if ($userId <= 0) {
+            return [];
+        }
+        if ($this->isSuperUser($userId)) {
+            return null;
+        }
+
+        return $this->nodeGroupIdsOfUser($userId);
     }
 
     public function deleteUser(UserIdDto $dto): int
