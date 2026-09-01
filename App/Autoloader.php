@@ -38,20 +38,6 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         /** @var bool */
         private static $registered = false;
 
-        /** @var list<string> 预加载时跳过的目录名（配置 / 路由注册 / 静态资源等） */
-        private static $preloadSkipDirNames = [
-            'Config',
-            'Protocol',
-            'Resource',
-            'Router',
-            'Scripts',
-            'Storage',
-            'WorkerCron',
-            'WorkerDaemon',
-            'static',
-            'Static',
-        ];
-
         /**
          * @param string $className
          */
@@ -86,7 +72,9 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         }
 
         /**
-         * Worker 接请求前把业务类载入进程内存，避免协程里第一次 autoload 竞态。
+         * Worker 接请求前只预加载 Model / Entity。
+         * Controller、Service、DTO 仍懒加载；协程竞态由 autoload 锁处理。
+         * 全量 require App/ 会随业务文件线性变慢，且每个 Worker 都要付一遍。
          */
         public static function preloadAppClasses(): void
         {
@@ -97,7 +85,7 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
                 return;
             }
 
-            $files = self::collectPhpFiles($appPath);
+            $files = self::collectPreloadPhpFiles($appPath);
             sort($files, SORT_STRING);
 
             foreach ($files as $filepath) {
@@ -206,30 +194,59 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         }
 
         /**
+         * 只收集 App/Model 与各模块 Entity 目录，避免扫整棵业务树。
+         *
          * @return list<string>
          */
-        private static function collectPhpFiles(string $appPath): array
+        private static function collectPreloadPhpFiles(string $appPath): array
+        {
+            $files = [];
+            $modelDir = $appPath . DIRECTORY_SEPARATOR . 'Model';
+            if (is_dir($modelDir)) {
+                $files = array_merge($files, self::collectPhpFilesIn($modelDir));
+            }
+
+            $moduleDir = $appPath . DIRECTORY_SEPARATOR . 'Module';
+            if (!is_dir($moduleDir)) {
+                return $files;
+            }
+
+            $modules = scandir($moduleDir);
+            if ($modules === false) {
+                return $files;
+            }
+
+            foreach ($modules as $name) {
+                if ($name === '.' || $name === '..') {
+                    continue;
+                }
+                $entityDir = $moduleDir . DIRECTORY_SEPARATOR . $name . DIRECTORY_SEPARATOR . 'Entity';
+                if (is_dir($entityDir)) {
+                    $files = array_merge($files, self::collectPhpFilesIn($entityDir));
+                }
+            }
+
+            return $files;
+        }
+
+        /**
+         * @return list<string>
+         */
+        private static function collectPhpFilesIn(string $dir): array
         {
             $files = [];
             $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveCallbackFilterIterator(
-                    new \RecursiveDirectoryIterator(
-                        $appPath,
-                        \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::CURRENT_AS_FILEINFO
-                    ),
-                    static function (\SplFileInfo $current, $key, \RecursiveDirectoryIterator $iterator): bool {
-                        if ($iterator->hasChildren() || $current->isDir()) {
-                            return !in_array($current->getFilename(), self::$preloadSkipDirNames, true);
-                        }
-                        return $current->isFile()
-                            && strtolower($current->getExtension()) === 'php'
-                            && $current->getFilename() !== 'Autoloader.php';
-                    }
+                new \RecursiveDirectoryIterator(
+                    $dir,
+                    \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::CURRENT_AS_FILEINFO
                 )
             );
 
             foreach ($iterator as $file) {
-                if ($file instanceof \SplFileInfo && $file->isFile()) {
+                if ($file instanceof \SplFileInfo
+                    && $file->isFile()
+                    && strtolower($file->getExtension()) === 'php'
+                ) {
                     $files[] = $file->getPathname();
                 }
             }
