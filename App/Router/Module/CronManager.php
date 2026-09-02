@@ -124,6 +124,9 @@ Route::group([
     Route::post('/tasks/run', [
         'dispatch_route' => [CronTaskManagerController::class, 'runTaskOnce'],
     ]);
+    Route::match(['POST', 'PUT'], '/tasks/owner', [
+        'dispatch_route' => [CronTaskManagerController::class, 'transferTaskOwner'],
+    ]);
 
     // 节点管理
     Route::get('/nodes', [

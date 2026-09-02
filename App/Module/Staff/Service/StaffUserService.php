@@ -208,6 +208,65 @@ class StaffUserService
         return $this->nodeGroupIdsGroupedByUserIds([$userId])[$userId] ?? [];
     }
 
+    public function userHasNodeGroup(int $userId, int $nodeGroupId): bool
+    {
+        if ($userId <= 0 || $nodeGroupId <= 0) {
+            return false;
+        }
+
+        return StaffUserRelateNodeGroupEntity::queryActive()
+            ->where('user_id', $userId)
+            ->where('node_group_id', $nodeGroupId)
+            ->count() > 0;
+    }
+
+    /**
+     * @return list<array{id:int,account:string,userName:string}>
+     */
+    public function listUsersByNodeGroup(int $nodeGroupId): array
+    {
+        $this->assertSuperViewer();
+
+        if ($nodeGroupId <= 0) {
+            return [];
+        }
+
+        $rows = StaffUserRelateNodeGroupEntity::queryActive()
+            ->where('node_group_id', $nodeGroupId)
+            ->field(['user_id'])
+            ->select()
+            ->toArray();
+        $userIds = [];
+        foreach ($rows as $row) {
+            $userId = (int) ($row['user_id'] ?? 0);
+            if ($userId > 0) {
+                $userIds[$userId] = $userId;
+            }
+        }
+        if ($userIds === []) {
+            return [];
+        }
+
+        $users = StaffUserEntity::queryActive()
+            ->whereIn('id', array_values($userIds))
+            ->where('status', 1)
+            ->field(['id', 'account', 'user_name'])
+            ->order('id', 'desc')
+            ->select()
+            ->toArray();
+
+        $list = [];
+        foreach ($users as $user) {
+            $list[] = [
+                'id' => (int) ($user['id'] ?? 0),
+                'account' => (string) ($user['account'] ?? ''),
+                'userName' => (string) ($user['user_name'] ?? ''),
+            ];
+        }
+
+        return $list;
+    }
+
     public function isSuperUser(int $userId): bool
     {
         $roles = $this->staffRoleService->rolesGroupedByUserIds([$userId])[$userId] ?? [];
@@ -438,6 +497,14 @@ class StaffUserService
         $currentId = (int) (FrameworkContext::getUserId() ?? 0);
         if ($currentId > 0 && $currentId === $userId) {
             throw StaffException::throw($message, -1);
+        }
+    }
+
+    private function assertSuperViewer(): void
+    {
+        $userId = (int) (FrameworkContext::getUserId() ?? 0);
+        if ($userId <= 0 || !$this->isSuperUser($userId)) {
+            throw StaffException::throw('无权限操作', -1);
         }
     }
 }

@@ -265,6 +265,36 @@ class CronTaskManagerService
     }
 
     /**
+     * 超级管理员变更任务权限所属人（created_by）。
+     *
+     * @return array<string, mixed>
+     */
+    public function transferTaskOwner(int $taskId, int $userId): array
+    {
+        $this->assertSuperViewer();
+        $task = $this->requireTask($taskId);
+        $this->assertTaskVisible((int) $task->id);
+
+        if ($userId <= 0) {
+            throw CronTaskException::throw('请选择新的权限所属人', -1);
+        }
+
+        $groupId = $this->resolveTaskNodeGroupId($task);
+        if ($groupId <= 0) {
+            throw CronTaskException::throw('任务节点未分组，无法分配权限所属人', -1);
+        }
+
+        if (!$this->staffUserService->userHasNodeGroup($userId, $groupId)) {
+            throw CronTaskException::throw('所选用户未授权该节点分组', -1);
+        }
+
+        $task->setData(['created_by' => $userId]);
+        $task->save();
+
+        return $this->attachTaskNodeGroupInfo([$task->getAttributes()])[0];
+    }
+
+    /**
      * 删除定时任务（软删 deleted_at）。
      *
      * 与列表同一可见性：loadById 只找 deleted_at IS NULL 的行。
@@ -1586,6 +1616,34 @@ class CronTaskManagerService
         if ($createdBy <= 0 || $createdBy !== $userId) {
             throw CronTaskException::throw('无权限操作', -1);
         }
+    }
+
+    protected function assertSuperViewer(): void
+    {
+        $userId = $this->currentUserId();
+        if ($userId <= 0 || !$this->staffUserService->isSuperUser($userId)) {
+            throw CronTaskException::throw('无权限操作', -1);
+        }
+    }
+
+    protected function resolveTaskNodeGroupId(CronTaskEntity $task): int
+    {
+        $nodeId = (int) ($task->node_id ?? 0);
+        if ($nodeId <= 0) {
+            return 0;
+        }
+
+        $node = CronAgentNodeEntity::query()
+            ->where('id', $nodeId)
+            ->field(['group_id'])
+            ->find();
+        if (!$node) {
+            return 0;
+        }
+
+        $attrs = is_array($node) ? $node : $node->getAttributes();
+
+        return (int) ($attrs['group_id'] ?? 0);
     }
 
     /**

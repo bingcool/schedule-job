@@ -14,7 +14,12 @@
         groups: [],
         sel: [],
         query: { page: 1, pageSize: 20, keyword: '', status: '', groupId: '', nodeId: '', execType: '' },
-        commandTip: { visible: false, text: '', x: 0, y: 0, flipX: false }
+        commandTip: { visible: false, text: '', x: 0, y: 0, flipX: false },
+        ownerDlg: false,
+        ownerSaving: false,
+        ownerTask: null,
+        ownerUserOptions: [],
+        ownerForm: { userId: null }
       };
     },
     created: function () {
@@ -324,6 +329,53 @@
           return;
         }
         this.batch(status);
+      },
+      isViewerSuper: function () {
+        return common.isViewerSuper();
+      },
+      openTransferOwner: async function (row) {
+        var groupId = Number(row.groupId || row.group_id || 0);
+        if (!groupId) {
+          this.$message.warning('任务节点未分组，无法更改权限所属人');
+          return;
+        }
+        this.ownerTask = row;
+        var currentOwner = Number(row.createdBy || row.created_by || 0);
+        this.ownerForm = { userId: currentOwner > 0 ? currentOwner : null };
+        this.ownerUserOptions = [];
+        this.ownerDlg = true;
+        try {
+          var d = await common.api('/users/by-node-group?nodeGroupId=' + encodeURIComponent(groupId));
+          this.ownerUserOptions = (d && d.list) || [];
+          if (!this.ownerUserOptions.length) {
+            this.$message.warning('该节点分组下暂无可选用户');
+          }
+        } catch (e) {
+          common.toastErr(this, e);
+        }
+      },
+      saveTransferOwner: async function () {
+        if (!this.ownerForm.userId) {
+          this.$message.warning('请选择权限所属人');
+          return;
+        }
+        this.ownerSaving = true;
+        try {
+          await common.api('/tasks/owner', {
+            method: 'PUT',
+            body: {
+              id: Number(this.ownerTask.id),
+              userId: Number(this.ownerForm.userId)
+            }
+          });
+          this.$message.success('权限所属人已更新');
+          this.ownerDlg = false;
+          this.load();
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.ownerSaving = false;
+        }
       }
     }
   };

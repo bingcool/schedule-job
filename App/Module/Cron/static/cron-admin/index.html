@@ -8,7 +8,7 @@
   <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=task-manage-auth-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=task-action-grid-1">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=menu-sort-1">
 </head>
 <body>
@@ -265,7 +265,7 @@
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="160"></el-table-column>
         <el-table-column prop="updatedAt" label="更新时间" width="160"></el-table-column>
-        <el-table-column label="操作" width="330" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template slot-scope="s">
             <div class="task-action-group">
               <el-button size="mini" class="task-action-btn btn-detail" @click="$router.push('/tasks/detail/'+s.row.id)">详情</el-button>
@@ -282,6 +282,12 @@
                 @click="runOnce(s.row)"
               >手动执行</el-button>
               <el-button size="mini" class="task-action-btn btn-log" @click="$router.push('/executions?taskId='+s.row.id)">查看日志</el-button>
+              <el-button
+                v-if="isViewerSuper()"
+                size="mini"
+                class="task-action-btn btn-transfer"
+                @click="openTransferOwner(s.row)"
+              >更改权限所属人</el-button>
               <!-- 复制功能临时隐藏，仅展示层下线，保留前端方法/后端接口便于恢复 -->
               <el-button
                 size="mini"
@@ -293,6 +299,29 @@
           </template>
         </el-table-column>
       </el-table>
+      <el-dialog title="更改权限所属人" :visible.sync="ownerDlg" width="480px" append-to-body>
+        <p style="margin:0 0 12px;color:var(--muted);font-size:13px">
+          任务「{{ ownerTask && ownerTask.name }}」的权限将转移给所选用户；仅可选择已授权节点分组「{{ groupNameOf(ownerTask || {}) }}」的用户。
+        </p>
+        <el-select
+          v-model="ownerForm.userId"
+          filterable
+          popper-append-to-body
+          placeholder="选择用户"
+          style="width:100%"
+        >
+          <el-option
+            v-for="u in ownerUserOptions"
+            :key="'owner-u-' + u.id"
+            :value="Number(u.id)"
+            :label="(u.userName || u.account) + '（' + u.account + '）'"
+          ></el-option>
+        </el-select>
+        <div slot="footer">
+          <el-button @click="ownerDlg = false">取消</el-button>
+          <el-button type="primary" :loading="ownerSaving" @click="saveTransferOwner">确定</el-button>
+        </div>
+      </el-dialog>
       <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
         <div>
           <el-button
@@ -1209,7 +1238,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-ui@2.15.14/lib/index.js'"></script>
 <script defer src="/cron-admin/assets/js/common.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js?v=dashboard-scope-1"></script>
-<script defer src="/cron-admin/assets/js/tasks.js?v=task-manage-auth-1"></script>
+<script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/executions.js"></script>

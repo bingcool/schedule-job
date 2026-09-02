@@ -12,6 +12,7 @@ use App\Module\Staff\Dto\StaffManager\SwitchUserStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateUserDto;
 use App\Module\Staff\Dto\StaffManager\UserIdDto;
 use App\Module\Staff\Request\StaffManager\ListUsersRequest;
+use App\Module\Staff\Request\StaffManager\StaffUserByNodeGroupRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserCreateRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserIdRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserNodeGroupsRequest;
@@ -19,6 +20,7 @@ use App\Module\Staff\Request\StaffManager\StaffUserRolesRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserStatusRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserUpdateRequest;
 use App\Module\Staff\Response\StaffManager\ListUsersResponse;
+use App\Module\Staff\Response\StaffManager\RoleOptionsResponse;
 use App\Module\Staff\Response\StaffManager\StaffDeleteAckResponse;
 use App\Module\Staff\Response\StaffManager\StaffUserRowResponse;
 use App\Module\Staff\Response\StaffManager\StaffUserStatusAckResponse;
@@ -171,5 +173,16 @@ class StaffUserController extends BController
         return new StaffUserRowResponse($this->staffUserService->grantNodeGroups(
             GrantUserNodeGroupsDto::of($request->getId(), $request->getNodeGroupIds())
         ));
+    }
+
+    /**
+     * Route: GET /api/v1/users/by-node-group?nodeGroupId=
+     */
+    #[ApiOperation('按节点分组查询可授权用户')]
+    public function listUsersByNodeGroup(StaffUserByNodeGroupRequest $request): RoleOptionsResponse
+    {
+        return new RoleOptionsResponse(
+            $this->staffUserService->listUsersByNodeGroup($request->getNodeGroupId())
+        );
     }
 }

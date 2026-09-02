@@ -8,6 +8,7 @@ use App\Module\Cron\Dto\CronTaskManager\AgentHeartbeatDto;
 use App\Module\Cron\Dto\CronTaskManager\AgentReportDto;
 use App\Module\Cron\Dto\CronTaskManager\AgentTasksQueryDto;
 use App\Module\Cron\Dto\CronTaskManager\BatchStatusDto;
+use App\Module\Cron\Dto\CronTaskManager\CronTaskRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CreateNodeDto;
 use App\Module\Cron\Dto\CronTaskManager\CreateNodeGroupDto;
 use App\Module\Cron\Dto\CronTaskManager\ExecutionDetailQueryDto;
@@ -44,6 +45,7 @@ use App\Module\Cron\Request\CronTaskManager\ExecutionDetailRequest;
 use App\Module\Cron\Request\CronTaskManager\ExpressionPreviewRequest;
 use App\Module\Cron\Request\CronTaskManager\ListTasksRequest;
 use App\Module\Cron\Request\CronTaskManager\TaskLogsQueryRequest;
+use App\Module\Cron\Request\CronTaskManager\TaskTransferOwnerRequest;
 use App\Module\Cron\Response\CronTaskManager\BatchStatusResponse;
 use App\Module\Cron\Response\CronTaskManager\CronAgentHeartbeatResponse;
 use App\Module\Cron\Response\CronTaskManager\CronAgentReportAckResponse;
@@ -704,5 +706,16 @@ class CronTaskManagerController extends BController
     public function runTaskOnce(CronTaskIdRequest $request): RunOnceQueuedResponse
     {
         return new RunOnceQueuedResponse($this->cronTaskManagerService->enqueueRunOnce(TaskIdDto::of($request->getId())));
+    }
+
+    /**
+     * Route: PUT /api/v1/tasks/owner
+     */
+    #[ApiOperation('变更任务权限所属人')]
+    public function transferTaskOwner(TaskTransferOwnerRequest $request): CronTaskRowResponse
+    {
+        $row = $this->cronTaskManagerService->transferTaskOwner($request->getId(), $request->getUserId());
+
+        return new CronTaskRowResponse(CronTaskRowDto::fromEntityRow($row));
     }
 }

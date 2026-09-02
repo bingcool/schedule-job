@@ -66,6 +66,9 @@ Route::group([
     Route::match(['POST', 'PUT'], '/users/node-groups', [
         'dispatch_route' => [StaffUserController::class, 'grantNodeGroups'],
     ]);
+    Route::get('/users/by-node-group', [
+        'dispatch_route' => [StaffUserController::class, 'listUsersByNodeGroup'],
+    ]);
 
     Route::get('/roles', [
         'dispatch_route' => [StaffRoleController::class, 'listRoles'],
