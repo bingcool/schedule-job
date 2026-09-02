@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Service;
 
+use App\Module\Staff\Dto\StaffManager\GrantRolePagesDto;
 use App\Module\Staff\Dto\StaffManager\CreateMenuDto;
 use App\Module\Staff\Dto\StaffManager\CreateRoleDto;
 use App\Module\Staff\Dto\StaffManager\ListRolesQueryDto;
@@ -11,6 +12,8 @@ use App\Module\Staff\Dto\StaffManager\MenuIdDto;
 use App\Module\Staff\Dto\StaffManager\RoleIdDto;
 use App\Module\Staff\Dto\StaffManager\StaffMenuRowDto;
 use App\Module\Staff\Dto\StaffManager\StaffRoleRowDto;
+use App\Module\Staff\Dto\StaffManager\SortMenusDto;
+use App\Module\Staff\Dto\StaffManager\SwitchMenuStatusDto;
 use App\Module\Staff\Dto\StaffManager\SwitchRoleStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateMenuDto;
 use App\Module\Staff\Dto\StaffManager\UpdateRoleDto;
@@ -165,11 +168,9 @@ class StaffRoleService
             'code' => $code,
             'desc' => $dto->getDesc(),
             'status' => $dto->getStatus(),
-            'is_super_role' => $dto->getIsSuperRole(),
+            'is_super_role' => 0,
         ]);
         $role->save();
-
-        $this->replaceRoleGrants((int) $role->id, $dto->getPageIds(), $dto->getApiPerIds(), $dto->getTaskPerIds());
 
         return $this->getRole(RoleIdDto::of((int) $role->id));
     }
@@ -195,14 +196,40 @@ class StaffRoleService
             'name' => $dto->getName(),
             'code' => $code,
             'desc' => $dto->getDesc(),
-            'status' => $dto->getStatus(),
-            'is_super_role' => $dto->getIsSuperRole(),
+            'status' => $role->isSuperRole() ? 1 : $dto->getStatus(),
         ]);
         $role->save();
 
-        $this->replaceRoleGrants($id, $dto->getPageIds(), $dto->getApiPerIds(), $dto->getTaskPerIds());
-
         return $this->getRole(RoleIdDto::of($id));
+    }
+
+    /**
+     * 独立配置角色的菜单页面权限（staff_role_page）。
+     *
+     * @return array<string, mixed>
+     */
+    public function grantRolePages(GrantRolePagesDto $dto): array
+    {
+        $role = $this->requireRole($dto->getId());
+        if ($role->isSuperRole()) {
+            throw StaffException::throw('超级管理员角色拥有全部菜单，无需配置', -1);
+        }
+
+        $pageIds = array_values(array_filter($dto->getPageIds(), static fn (int $id): bool => $id > 0));
+        if ($pageIds !== []) {
+            $rows = StaffMenuPageEntity::queryVisible()
+                ->where('app_id', StaffApp::appId())
+                ->whereIn('id', $pageIds)
+                ->select()
+                ->toArray();
+            if (count($rows) !== count(array_unique($pageIds))) {
+                throw StaffException::throw('菜单页面不存在或已失效', -1);
+            }
+        }
+
+        $this->replaceRolePages($dto->getId(), $pageIds);
+
+        return $this->getRole(RoleIdDto::of($dto->getId()));
     }
 
     /**
@@ -299,7 +326,7 @@ class StaffRoleService
             'parent_id' => $dto->getParentId(),
             'parent_prefix' => $parentPrefix,
             'sort' => $dto->getSort(),
-            'status' => $dto->getStatus(),
+            'status' => StaffApp::MENU_STATUS_ENABLED,
         ]);
         $menu->save();
 
@@ -328,11 +355,64 @@ class StaffRoleService
             'parent_id' => $dto->getParentId(),
             'parent_prefix' => $parentPrefix,
             'sort' => $dto->getSort(),
-            'status' => $dto->getStatus(),
         ]);
         $menu->save();
 
         return $menu->getAttributes();
+    }
+
+    public function switchMenuStatus(SwitchMenuStatusDto $dto): SwitchMenuStatusDto
+    {
+        $menu = $this->requireMenu($dto->getId());
+        $status = $dto->getStatus() === StaffApp::MENU_STATUS_ENABLED
+            ? StaffApp::MENU_STATUS_ENABLED
+            : StaffApp::MENU_STATUS_DISABLED;
+
+        $menu->setData(['status' => $status]);
+        $menu->save();
+
+        return SwitchMenuStatusDto::of((int) $menu->id, $status);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function sortMenus(SortMenusDto $dto): array
+    {
+        $parentId = $dto->getParentId();
+        $ids = array_values(array_filter($dto->getIds(), static fn (int $id): bool => $id > 0));
+        if ($ids === []) {
+            throw StaffException::throw('排序列表不能为空', -1);
+        }
+
+        $rows = StaffMenuPageEntity::queryVisible()
+            ->where('app_id', StaffApp::appId())
+            ->where('parent_id', $parentId)
+            ->select()
+            ->toArray();
+        $siblingIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
+        sort($siblingIds);
+
+        foreach ($ids as $id) {
+            if (!in_array($id, $siblingIds, true)) {
+                throw StaffException::throw('存在无效的菜单 ID', -1);
+            }
+        }
+
+        $checkIds = $ids;
+        sort($checkIds);
+        if ($siblingIds !== $checkIds) {
+            throw StaffException::throw('排序需包含全部同级菜单', -1);
+        }
+
+        $count = count($ids);
+        foreach ($ids as $index => $id) {
+            $menu = $this->requireMenu($id);
+            $menu->setData(['sort' => $count - $index]);
+            $menu->save();
+        }
+
+        return $ids;
     }
 
     /**
@@ -492,14 +572,11 @@ class StaffRoleService
 
     /**
      * @param array<int, int> $pageIds
-     * @param array<int, int> $apiPerIds
-     * @param array<int, int> $taskPerIds
      */
-    public function replaceRoleGrants(int $roleId, array $pageIds, array $apiPerIds, array $taskPerIds): void
+    public function replaceRolePages(int $roleId, array $pageIds): void
     {
         $appId = StaffApp::appId();
         StaffRolePageEntity::query()->where('app_id', $appId)->where('role_id', $roleId)->delete();
-        StaffRolePermissionEntity::query()->where('app_id', $appId)->where('role_id', $roleId)->delete();
 
         foreach (array_unique($pageIds) as $pageId) {
             if ($pageId <= 0) {
@@ -513,6 +590,16 @@ class StaffRoleService
             ]);
             $rel->save();
         }
+    }
+
+    /**
+     * @param array<int, int> $apiPerIds
+     * @param array<int, int> $taskPerIds
+     */
+    public function replaceRolePermissions(int $roleId, array $apiPerIds, array $taskPerIds): void
+    {
+        $appId = StaffApp::appId();
+        StaffRolePermissionEntity::query()->where('app_id', $appId)->where('role_id', $roleId)->delete();
 
         $this->insertPermissions($roleId, StaffApp::PERMISSION_TYPE_API, $apiPerIds);
         $this->insertPermissions($roleId, StaffApp::PERMISSION_TYPE_TASK, $taskPerIds);

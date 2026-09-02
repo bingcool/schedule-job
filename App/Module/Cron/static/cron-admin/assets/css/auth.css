@@ -169,27 +169,81 @@
   border-radius: 12px;
   padding: 16px 14px 20px;
   color: #cbd5e1;
-  max-width: 640px;
+  max-width: 680px;
+}
+
+.menu-nav-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  color: #64748b;
+  cursor: grab;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.menu-drag-handle:active {
+  cursor: grabbing;
+}
+
+.menu-drag-handle:hover {
+  color: #94a3b8;
+}
+
+.menu-sort-ghost {
+  opacity: 0.45;
 }
 
 .menu-nav-group + .menu-nav-group {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .menu-nav-section-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   padding: 16px 12px 8px;
 }
 
 .menu-nav-section-row .name {
+  flex: 1;
+  min-width: 0;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #475569;
   font-weight: 600;
+}
+
+.menu-nav-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.menu-nav-item-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 88px;
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.menu-nav-item-status .el-switch {
+  transform: scale(0.9);
+  transform-origin: left center;
 }
 
 .menu-nav-section-row .el-button--text {
@@ -200,8 +254,8 @@
 .menu-nav-item-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
+  gap: 8px;
+  padding: 11px 12px 11px 8px;
   margin: 4px 0;
   border-radius: 8px;
   color: #94a3b8;
@@ -229,6 +283,38 @@
 
 .menu-nav-item-row:hover .el-button--text {
   color: #fff;
+}
+
+.menu-nav-section-row.is-disabled .name,
+.menu-nav-item-row.is-disabled {
+  opacity: 0.72;
+}
+
+.menu-nav-section-row.is-disabled .name {
+  color: #64748b;
+}
+
+.menu-nav-item-row.is-disabled {
+  color: #64748b;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.menu-nav-item-row.is-disabled:hover {
+  background: rgba(15, 23, 42, 0.45);
+  color: #64748b;
+}
+
+.menu-nav-item-row.is-disabled > i:first-child,
+.menu-nav-item-row.is-disabled .label,
+.menu-nav-item-row.is-disabled .uri {
+  color: #64748b !important;
+}
+
+.menu-disabled-icon {
+  margin-left: 6px;
+  font-size: 13px;
+  color: #f87171;
+  vertical-align: -1px;
 }
 
 .menu-nav-empty {

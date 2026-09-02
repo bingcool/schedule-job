@@ -20,9 +20,9 @@
       { path: '/users', component: window.CronAdminUsers, meta: { title: '用户管理', subtitle: '管理系统登录用户及其角色分配', breadcrumb: '权限管理 / 用户管理' } },
       { path: '/users/create', component: window.CronAdminUserEditor, meta: { title: '新增用户', subtitle: '配置用户基本信息、密码及角色权限', breadcrumb: '权限管理 / 用户管理 / 新增用户' } },
       { path: '/users/edit/:id', component: window.CronAdminUserEditor, meta: { title: '编辑用户', subtitle: '配置用户基本信息、密码及角色权限', breadcrumb: '权限管理 / 用户管理 / 编辑用户' } },
-      { path: '/roles', component: window.CronAdminRoles, meta: { title: '角色管理', subtitle: '定义角色并配置菜单页面权限与 API 权限', breadcrumb: '权限管理 / 角色管理' } },
-      { path: '/roles/create', component: window.CronAdminRoleEditor, meta: { title: '新增角色', subtitle: '配置角色基本信息、菜单页面权限及 API 权限', breadcrumb: '权限管理 / 角色管理 / 新增角色' } },
-      { path: '/roles/edit/:id', component: window.CronAdminRoleEditor, meta: { title: '编辑角色', subtitle: '配置角色基本信息、菜单页面权限及 API 权限', breadcrumb: '权限管理 / 角色管理 / 编辑角色' } },
+      { path: '/roles', component: window.CronAdminRoles, meta: { title: '角色管理', subtitle: '定义角色并配置菜单页面权限', breadcrumb: '权限管理 / 角色管理' } },
+      { path: '/roles/create', component: window.CronAdminRoleEditor, meta: { title: '新增角色', subtitle: '配置角色基本信息', breadcrumb: '权限管理 / 角色管理 / 新增角色' } },
+      { path: '/roles/edit/:id', component: window.CronAdminRoleEditor, meta: { title: '编辑角色', subtitle: '配置角色基本信息', breadcrumb: '权限管理 / 角色管理 / 编辑角色' } },
       { path: '/menus', component: window.CronAdminMenus, meta: { title: '菜单管理', subtitle: '管理侧边栏菜单页面节点，对应 staff_menu_pages 表', breadcrumb: '权限管理 / 菜单管理' } }
     ]
   });
@@ -117,6 +117,16 @@
     },
     created: function () {
       this.refreshUser();
+    },
+    watch: {
+      '$route': function (to, from) {
+        var toPublic = !!(to.meta && to.meta.public);
+        var fromPublic = !!(from.meta && from.meta.public);
+        if (!toPublic && fromPublic && common.getToken()) {
+          this.currentUser = common.getUser();
+          this.refreshUser();
+        }
+      }
     },
     methods: {
       refreshUser: async function () {

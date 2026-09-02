@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=task-list-6">
-  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=settings-2">
+  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=menu-sort-1">
 </head>
 <body>
 <div id="app" v-cloak>
@@ -944,13 +944,15 @@
         <el-table-column prop="menuCount" label="菜单权限" width="90" align="center"></el-table-column>
         <el-table-column label="状态" width="140">
           <template slot-scope="s">
-            <div class="task-status-switch">
+            <div class="task-status-switch" v-if="s.row.isSuperRole">
+              <span class="status-mark status-enabled">启用</span>
+            </div>
+            <div class="task-status-switch" v-else>
               <el-switch
                 :key="'role-st-'+s.row.id+'-'+s.row.status"
                 :value="s.row.status"
                 :active-value="1"
                 :inactive-value="0"
-                :disabled="!!s.row.isSuperRole"
                 @change="value => onStatusChange(s.row, value)">
               </el-switch>
               <span>{{ s.row.status === 1 ? '启用' : '禁用' }}</span>
@@ -958,9 +960,10 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="170"></el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template slot-scope="s">
             <el-button type="text" size="small" @click="$router.push('/roles/edit/' + s.row.id)">编辑</el-button>
+            <el-button type="text" size="small" :disabled="!!s.row.isSuperRole" @click="openPages(s.row)">菜单权限</el-button>
             <el-button type="text" size="small" style="color:#f56c6c" :disabled="s.row.isSuperRole || s.row.userCount > 0" @click="remove(s.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -969,6 +972,34 @@
         <el-pagination background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
       </div>
     </div>
+    <el-dialog title="菜单页面权限" :visible.sync="pageDlg" width="560px" append-to-body>
+      <p style="margin:0 0 12px;color:var(--muted);font-size:13px">为「{{ pageRole.name }}」配置可访问的菜单页面，对应 staff_role_page。</p>
+      <div style="margin-bottom:12px">
+        <el-button size="mini" @click="checkAllMenu">全选</el-button>
+        <el-button size="mini" @click="uncheckAllMenu">取消全选</el-button>
+      </div>
+      <div class="perm-tree-panel">
+        <el-tree
+          ref="pageMenuTree"
+          :data="menuTree"
+          show-checkbox
+          node-key="id"
+          :default-checked-keys="pageIds"
+          :props="{ label: 'name', children: 'children' }"
+          :default-expand-all="true"
+        >
+          <span slot-scope="{ data }" style="display:flex;align-items:center;gap:8px">
+            <i v-if="data.parentId" :class="data.icon || 'el-icon-document'" class="menu-icon"></i>
+            <span :style="data.parentId ? '' : 'font-size:12px;color:#64748b;font-weight:600;letter-spacing:.04em'">{{ data.name }}</span>
+            <span v-if="data.parentId" class="mono" style="font-size:11px;color:var(--muted)">{{ data.uri }}</span>
+          </span>
+        </el-tree>
+      </div>
+      <div slot="footer">
+        <el-button @click="pageDlg = false">取消</el-button>
+        <el-button type="primary" :loading="pageSaving" @click="savePages">保存</el-button>
+      </div>
+    </el-dialog>
   </div>
 </script>
 
@@ -991,62 +1022,17 @@
           <div class="field full"><label>角色描述</label><input class="form-control" v-model="form.desc" placeholder="简要描述该角色的职责"></div>
           <div class="field">
             <label>状态</label>
-            <el-radio-group v-model="form.status">
+            <template v-if="isSuperRole">
+              <div style="line-height:32px;color:var(--green);font-weight:600">启用</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">超级管理员固定为启用状态，不可修改</div>
+            </template>
+            <el-radio-group v-else v-model="form.status">
               <el-radio :label="1">启用</el-radio>
               <el-radio :label="0">禁用</el-radio>
             </el-radio-group>
           </div>
-          <div class="field">
-            <label>超级管理员</label>
-            <el-switch v-model="form.isSuperRole" active-text="是" inactive-text="否"></el-switch>
-            <div style="font-size:12px;color:var(--muted);margin-top:4px">开启后拥有全部菜单和 API 权限</div>
-          </div>
         </div>
       </div>
-    </div>
-    <el-tabs v-model="activeTab" type="border-card" v-if="!form.isSuperRole">
-      <el-tab-pane label="菜单页面权限" name="menu">
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px">对应 staff_role_page，勾选该角色可访问的菜单</p>
-        <div style="margin-bottom:12px">
-          <el-button size="mini" @click="checkAllMenu">全选</el-button>
-          <el-button size="mini" @click="uncheckAllMenu">取消全选</el-button>
-        </div>
-        <div class="perm-tree-panel">
-          <el-tree ref="menuTree" :data="menuTree" show-checkbox node-key="id" :default-checked-keys="form.pageIds" :props="{ label: 'name', children: 'children' }" :default-expand-all="true">
-            <span slot-scope="{ data }" style="display:flex;align-items:center;gap:8px">
-              <i v-if="data.parentId" :class="data.icon || 'el-icon-document'" class="menu-icon"></i>
-              <span :style="data.parentId ? '' : 'font-size:12px;color:#64748b;font-weight:600;letter-spacing:.04em'">{{ data.name }}</span>
-              <span v-if="data.parentId" class="mono" style="font-size:11px;color:var(--muted)">{{ data.uri }}</span>
-            </span>
-          </el-tree>
-        </div>
-      </el-tab-pane>
-      <el-tab-pane label="API 权限" name="api">
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px">对应 staff_role_permission（type=1）</p>
-        <el-table :data="apiPermissions" size="small" @selection-change="onApiSelect">
-          <el-table-column type="selection" width="50"></el-table-column>
-          <el-table-column prop="name" label="接口名称" min-width="160"></el-table-column>
-          <el-table-column prop="method" label="方法" width="80">
-            <template slot-scope="s"><el-tag :type="methodType(s.row.method)" size="mini">{{ s.row.method }}</el-tag></template>
-          </el-table-column>
-          <el-table-column prop="path" label="路径" min-width="240"><template slot-scope="s"><span class="mono">{{ s.row.path }}</span></template></el-table-column>
-          <el-table-column prop="group" label="分组" width="120"></el-table-column>
-        </el-table>
-      </el-tab-pane>
-      <el-tab-pane label="任务接口权限" name="task">
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px">对应 staff_role_permission（type=2）</p>
-        <el-table :data="taskPermissions" size="small" @selection-change="onTaskSelect">
-          <el-table-column type="selection" width="50"></el-table-column>
-          <el-table-column prop="name" label="操作" min-width="160"></el-table-column>
-          <el-table-column prop="code" label="权限标识" min-width="200"><template slot-scope="s"><span class="mono">{{ s.row.code }}</span></template></el-table-column>
-          <el-table-column prop="desc" label="说明" min-width="240"></el-table-column>
-        </el-table>
-      </el-tab-pane>
-    </el-tabs>
-    <div class="panel" v-else style="text-align:center;padding:40px">
-      <i class="el-icon-success" style="font-size:48px;color:var(--green)"></i>
-      <p style="font-size:16px;font-weight:600;margin:16px 0 6px">超级管理员角色</p>
-      <p style="color:var(--muted);font-size:13px">该角色自动拥有所有菜单页面权限和 API 权限，无需单独配置。</p>
     </div>
   </div>
 </script>
@@ -1058,24 +1044,59 @@
       <div class="actions"><el-button type="primary" icon="el-icon-plus" @click="openDialog(null)">新增分组</el-button></div>
     </div>
     <div class="panel" v-loading="loading">
-      <p class="section-desc" style="margin-top:0">按侧栏结构展示：分组标题 + 菜单项，不含创建任务等页面节点</p>
+      <p class="section-desc" style="margin-top:0">按侧栏结构展示：分组标题 + 菜单项，不含创建任务等页面节点。拖动左侧手柄可调整同级排序。</p>
       <div class="menu-nav-board">
         <div v-if="!items.length" class="menu-nav-empty">暂无菜单，请先新增分组</div>
-        <div v-for="group in items" :key="group.id" class="menu-nav-group">
-          <div class="menu-nav-section-row">
-            <span class="name">{{ group.name }}</span>
-            <div>
-              <el-button type="text" size="mini" @click="openDialog(group, true)">新增菜单</el-button>
-              <el-button type="text" size="mini" @click="openDialog(group)">编辑</el-button>
-              <el-button type="text" size="mini" style="color:#f87171" @click="remove(group)">删除</el-button>
+        <div v-else class="menu-nav-groups" ref="groupList">
+          <div v-for="group in items" :key="group.id" class="menu-nav-group">
+            <div class="menu-nav-section-row" :class="{ 'is-disabled': isMenuDisabled(group) }">
+              <span class="menu-drag-handle menu-drag-handle--group" title="拖动排序"><i class="el-icon-rank"></i></span>
+              <span class="name">{{ group.name }}</span>
+              <div class="menu-nav-section-actions">
+                <div class="menu-nav-item-status">
+                  <el-switch
+                    :key="'menu-st-group-' + group.id + '-' + group.status"
+                    :value="group.status"
+                    :active-value="1"
+                    :inactive-value="0"
+                    @change="value => onStatusChange(group, value)"
+                  ></el-switch>
+                  <span>{{ group.status === 1 ? '启用' : '禁用' }}</span>
+                </div>
+                <el-button type="text" size="mini" @click="openDialog(group, true)">新增菜单</el-button>
+                <el-button type="text" size="mini" @click="openDialog(group)">编辑</el-button>
+                <el-button type="text" size="mini" style="color:#f87171" @click="remove(group)">删除</el-button>
+              </div>
             </div>
-          </div>
-          <div v-for="item in (group.children || [])" :key="item.id" class="menu-nav-item-row">
-            <i :class="item.icon || 'el-icon-document'"></i>
-            <span class="label">{{ item.name }}</span>
-            <span class="mono uri">{{ item.uri }}</span>
-            <el-button type="text" size="mini" @click="openDialog(item)">编辑</el-button>
-            <el-button type="text" size="mini" style="color:#f87171" @click="remove(item)">删除</el-button>
+            <div
+              class="menu-nav-items"
+              ref="itemLists"
+              :data-group-id="group.id"
+            >
+              <div
+                v-for="item in (group.children || [])"
+                :key="item.id"
+                class="menu-nav-item-row"
+                :class="{ 'is-disabled': isMenuDisabled(item) }"
+              >
+                <span class="menu-drag-handle menu-drag-handle--item" title="拖动排序"><i class="el-icon-rank"></i></span>
+                <i :class="item.icon || 'el-icon-document'"></i>
+                <span class="label">{{ item.name }}</span>
+                <span class="mono uri">{{ item.uri }}</span>
+                <div class="menu-nav-item-status">
+                  <el-switch
+                    :key="'menu-st-item-' + item.id + '-' + item.status"
+                    :value="item.status"
+                    :active-value="1"
+                    :inactive-value="0"
+                    @change="value => onStatusChange(item, value)"
+                  ></el-switch>
+                  <span>{{ item.status === 1 ? '启用' : '禁用' }}</span>
+                </div>
+                <el-button type="text" size="mini" @click="openDialog(item)">编辑</el-button>
+                <el-button type="text" size="mini" style="color:#f87171" @click="remove(item)">删除</el-button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1092,12 +1113,6 @@
         <el-form-item :label="isGroupForm ? '占位 URI' : 'URI'" :required="!isGroupForm"><el-input v-model="menuForm.uri" :placeholder="isGroupForm ? '/cron（分组占位，不进路由）' : '/tasks'"></el-input></el-form-item>
         <el-form-item label="图标" v-if="!isGroupForm"><el-input v-model="menuForm.icon" placeholder="el-icon-s-order"><template slot="prepend"><i :class="menuForm.icon || 'el-icon-picture'"></i></template></el-input></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="menuForm.sort" :min="0" :max="9999" style="width:160px"></el-input-number></el-form-item>
-        <el-form-item label="状态">
-          <el-radio-group v-model="menuForm.status">
-            <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">禁用</el-radio>
-          </el-radio-group>
-        </el-form-item>
       </el-form>
       <div slot="footer">
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -1110,7 +1125,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@2.7.16/dist/vue.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/vue-router@3.6.5/dist/vue-router.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue-router@3.6.5/dist/vue-router.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-ui@2.15.14/lib/index.js'"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=rbac-6"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=login-menu-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-list-6"></script>
 <script defer src="/cron-admin/assets/js/editor.js"></script>
@@ -1118,13 +1133,14 @@
 <script defer src="/cron-admin/assets/js/executions.js"></script>
 <script defer src="/cron-admin/assets/js/nodes.js"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
-<script defer src="/cron-admin/assets/js/login.js"></script>
-<script defer src="/cron-admin/assets/js/register.js"></script>
+<script defer src="/cron-admin/assets/js/login.js?v=login-menu-1"></script>
+<script defer src="/cron-admin/assets/js/register.js?v=login-menu-1"></script>
 <script defer src="/cron-admin/assets/js/users.js?v=roles-2"></script>
 <script defer src="/cron-admin/assets/js/user-editor.js?v=roles-1"></script>
-<script defer src="/cron-admin/assets/js/roles.js?v=status-1"></script>
-<script defer src="/cron-admin/assets/js/role-editor.js"></script>
-<script defer src="/cron-admin/assets/js/menus.js"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=menu-rbac-1"></script>
+<script defer src="/cron-admin/assets/js/roles.js?v=pages-dlg-2"></script>
+<script defer src="/cron-admin/assets/js/role-editor.js?v=basic-only-3"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/sortablejs@1.15.2/Sortable.min.js'"></script>
+<script defer src="/cron-admin/assets/js/menus.js?v=menu-sort-1"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=login-menu-1"></script>
 </body>
 </html>

@@ -27,9 +27,9 @@
             method: 'POST',
             body: this.form
           });
-          common.saveSession(data);
+          common.applySessionToRoot(this, data);
           this.$message.success('注册成功');
-          this.$router.replace('/dashboard');
+          this.$router.replace(common.firstAllowedRoute(data.user || common.getUser()));
         } catch (e) {
           common.toastErr(this, e);
         } finally {

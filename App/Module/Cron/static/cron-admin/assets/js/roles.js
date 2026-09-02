@@ -11,7 +11,12 @@
         total: 0,
         loading: false,
         stats: { total: 0, enabled: 0, disabled: 0, super: 0, userCount: 0 },
-        query: { page: 1, pageSize: 20, name: '', status: '' }
+        query: { page: 1, pageSize: 20, name: '', status: '' },
+        pageDlg: false,
+        pageSaving: false,
+        pageRole: {},
+        menuTree: [],
+        pageIds: []
       };
     },
     created: function () {
@@ -64,6 +69,65 @@
           row.status = prev;
           this.$forceUpdate();
           if (e !== 'cancel') common.toastErr(this, e);
+        }
+      },
+      openPages: async function (row) {
+        if (row.isSuperRole) {
+          this.$message.info('超级管理员拥有全部菜单，无需配置');
+          return;
+        }
+        this.pageRole = row;
+        this.pageDlg = true;
+        this.pageIds = [];
+        this.menuTree = [];
+        try {
+          var menus = await common.api('/menus');
+          this.menuTree = (menus && menus.list) || [];
+          var d = await common.api('/roles/detail?id=' + encodeURIComponent(row.id));
+          this.pageIds = d.pageIds || [];
+          if (d.menus && d.menus.length) this.menuTree = d.menus;
+          this.$nextTick(function () {
+            if (this.$refs.pageMenuTree) {
+              this.$refs.pageMenuTree.setCheckedKeys(this.pageIds);
+            }
+          }.bind(this));
+        } catch (e) {
+          common.toastErr(this, e);
+        }
+      },
+      checkAllMenu: function () {
+        var ids = [];
+        function walk(nodes) {
+          (nodes || []).forEach(function (n) {
+            ids.push(n.id);
+            if (n.children) walk(n.children);
+          });
+        }
+        walk(this.menuTree);
+        if (this.$refs.pageMenuTree) this.$refs.pageMenuTree.setCheckedKeys(ids);
+      },
+      uncheckAllMenu: function () {
+        if (this.$refs.pageMenuTree) this.$refs.pageMenuTree.setCheckedKeys([]);
+      },
+      collectPageIds: function () {
+        if (!this.$refs.pageMenuTree) return this.pageIds;
+        return this.$refs.pageMenuTree.getCheckedKeys().concat(this.$refs.pageMenuTree.getHalfCheckedKeys());
+      },
+      savePages: async function () {
+        if (!this.pageRole.id) return;
+        this.pageSaving = true;
+        try {
+          await common.api('/roles/pages', {
+            method: 'PUT',
+            body: { id: Number(this.pageRole.id), pageIds: this.collectPageIds() }
+          });
+          this.$message.success('菜单权限已保存');
+          this.pageDlg = false;
+          this.load();
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.pageSaving = false;
         }
       },
       remove: async function (row) {

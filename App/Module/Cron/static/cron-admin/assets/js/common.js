@@ -43,6 +43,14 @@
     if (data.user) setUser(data.user);
   }
 
+  function applySessionToRoot(vm, data) {
+    saveSession(data);
+    var root = vm && vm.$root;
+    if (root) {
+      root.currentUser = getUser();
+    }
+  }
+
   async function api(path, options) {
     options = options || {};
     var headers = Object.assign({ Accept: 'application/json' }, options.headers || {});
@@ -377,6 +385,7 @@
     setUser: setUser,
     clearAuth: clearAuth,
     saveSession: saveSession,
+    applySessionToRoot: applySessionToRoot,
     isAuthPublicPath: isAuthPublicPath,
     isViewerSuper: isViewerSuper,
     viewerNodeGroupIds: viewerNodeGroupIds,

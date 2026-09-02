@@ -57,10 +57,13 @@ class StaffMenuPermissionService
         '/api/v1/users' => '/users',
         '/api/v1/roles/stats' => '/roles',
         '/api/v1/roles/options' => '/users',
+        '/api/v1/roles/pages' => '/roles',
         '/api/v1/roles/status' => '/roles',
         '/api/v1/roles/detail' => '/roles',
         '/api/v1/roles' => '/roles',
         '/api/v1/menus/detail' => '/menus',
+        '/api/v1/menus/status' => '/menus',
+        '/api/v1/menus/sort' => '/menus',
         '/api/v1/menus' => '/menus',
     ];
 

@@ -4,20 +4,26 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Controller;
 
+use App\Module\Staff\Dto\StaffManager\GrantRolePagesDto;
 use App\Module\Staff\Dto\StaffManager\CreateMenuDto;
 use App\Module\Staff\Dto\StaffManager\CreateRoleDto;
 use App\Module\Staff\Dto\StaffManager\ListRolesQueryDto;
 use App\Module\Staff\Dto\StaffManager\MenuIdDto;
 use App\Module\Staff\Dto\StaffManager\RoleIdDto;
+use App\Module\Staff\Dto\StaffManager\SortMenusDto;
+use App\Module\Staff\Dto\StaffManager\SwitchMenuStatusDto;
 use App\Module\Staff\Dto\StaffManager\SwitchRoleStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateMenuDto;
 use App\Module\Staff\Dto\StaffManager\UpdateRoleDto;
 use App\Module\Staff\Request\StaffManager\ListRolesRequest;
 use App\Module\Staff\Request\StaffManager\StaffMenuCreateRequest;
 use App\Module\Staff\Request\StaffManager\StaffMenuIdRequest;
+use App\Module\Staff\Request\StaffManager\StaffMenuSortRequest;
+use App\Module\Staff\Request\StaffManager\StaffMenuStatusRequest;
 use App\Module\Staff\Request\StaffManager\StaffMenuUpdateRequest;
 use App\Module\Staff\Request\StaffManager\StaffRoleCreateRequest;
 use App\Module\Staff\Request\StaffManager\StaffRoleIdRequest;
+use App\Module\Staff\Request\StaffManager\StaffRolePagesRequest;
 use App\Module\Staff\Request\StaffManager\StaffRoleStatusRequest;
 use App\Module\Staff\Request\StaffManager\StaffRoleUpdateRequest;
 use App\Module\Staff\Response\StaffManager\ListRolesResponse;
@@ -25,6 +31,8 @@ use App\Module\Staff\Response\StaffManager\RoleOptionsResponse;
 use App\Module\Staff\Response\StaffManager\RoleStatsResponse;
 use App\Module\Staff\Response\StaffManager\StaffDeleteAckResponse;
 use App\Module\Staff\Response\StaffManager\StaffMenuRowResponse;
+use App\Module\Staff\Response\StaffManager\StaffMenuSortAckResponse;
+use App\Module\Staff\Response\StaffManager\StaffMenuStatusAckResponse;
 use App\Module\Staff\Response\StaffManager\StaffMenuTreeResponse;
 use App\Module\Staff\Response\StaffManager\StaffRoleRowResponse;
 use App\Module\Staff\Response\StaffManager\StaffRoleStatusAckResponse;
@@ -84,11 +92,7 @@ class StaffRoleController extends BController
             ->setName($request->getName())
             ->setCode($request->getCode())
             ->setDesc($request->getDesc())
-            ->setStatus($request->getStatus())
-            ->setIsSuperRole($request->getIsSuperRole())
-            ->setPageIds($request->getPageIds())
-            ->setApiPerIds($request->getApiPerIds())
-            ->setTaskPerIds($request->getTaskPerIds());
+            ->setStatus($request->getStatus());
 
         return new StaffRoleRowResponse($this->staffRoleService->createRole($dto));
     }
@@ -104,11 +108,7 @@ class StaffRoleController extends BController
             ->setName($request->getName())
             ->setCode($request->getCode())
             ->setDesc($request->getDesc())
-            ->setStatus($request->getStatus())
-            ->setIsSuperRole($request->getIsSuperRole())
-            ->setPageIds($request->getPageIds())
-            ->setApiPerIds($request->getApiPerIds())
-            ->setTaskPerIds($request->getTaskPerIds());
+            ->setStatus($request->getStatus());
 
         return new StaffRoleRowResponse($this->staffRoleService->updateRole($dto));
     }
@@ -154,6 +154,26 @@ class StaffRoleController extends BController
     }
 
     /**
+     * 独立配置角色菜单页面权限（staff_role_page）。
+     *
+     * Route: PUT /api/v1/roles/pages
+     *
+     ```bash
+     curl -X PUT 'http://127.0.0.1:9501/api/v1/roles/pages' \
+       -H 'Authorization: Bearer <jwt>' \
+       -H 'Content-Type: application/json' \
+       -d '{"id": 2, "pageIds": [1, 2, 3, 4, 5]}'
+     ```
+     */
+    #[ApiOperation('配置角色菜单页面权限')]
+    public function grantRolePages(StaffRolePagesRequest $request): StaffRoleRowResponse
+    {
+        return new StaffRoleRowResponse($this->staffRoleService->grantRolePages(
+            GrantRolePagesDto::of($request->getId(), $request->getPageIds())
+        ));
+    }
+
+    /**
      * Route: GET /api/v1/menus
      */
     #[ApiOperation('菜单树')]
@@ -174,8 +194,7 @@ class StaffRoleController extends BController
             ->setUri($request->getUri())
             ->setIcon($request->getIcon())
             ->setParentId($request->getParentId())
-            ->setSort($request->getSort())
-            ->setStatus($request->getStatus());
+            ->setSort($request->getSort());
 
         return new StaffMenuRowResponse($this->staffRoleService->createMenu($dto));
     }
@@ -193,10 +212,35 @@ class StaffRoleController extends BController
             ->setUri($request->getUri())
             ->setIcon($request->getIcon())
             ->setParentId($request->getParentId())
-            ->setSort($request->getSort())
-            ->setStatus($request->getStatus());
+            ->setSort($request->getSort());
 
         return new StaffMenuRowResponse($this->staffRoleService->updateMenu($dto));
+    }
+
+    /**
+     * Route: PUT /api/v1/menus/status
+     */
+    #[ApiOperation('启用或禁用菜单')]
+    public function switchMenuStatus(StaffMenuStatusRequest $request): StaffMenuStatusAckResponse
+    {
+        $ack = $this->staffRoleService->switchMenuStatus(
+            SwitchMenuStatusDto::of($request->getId(), $request->getStatus())
+        );
+
+        return new StaffMenuStatusAckResponse($ack->getId(), $ack->getStatus());
+    }
+
+    /**
+     * Route: PUT /api/v1/menus/sort
+     */
+    #[ApiOperation('同级菜单排序')]
+    public function sortMenus(StaffMenuSortRequest $request): StaffMenuSortAckResponse
+    {
+        $ids = $this->staffRoleService->sortMenus(
+            SortMenusDto::of($request->getParentId(), $request->getIds())
+        );
+
+        return new StaffMenuSortAckResponse($request->getParentId(), $ids);
     }
 
     /**

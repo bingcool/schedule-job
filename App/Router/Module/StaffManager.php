@@ -91,6 +91,9 @@ Route::group([
     Route::match(['POST', 'PUT'], '/roles/status', [
         'dispatch_route' => [StaffRoleController::class, 'switchStatus'],
     ]);
+    Route::match(['POST', 'PUT'], '/roles/pages', [
+        'dispatch_route' => [StaffRoleController::class, 'grantRolePages'],
+    ]);
 
     Route::get('/menus', [
         'dispatch_route' => [StaffRoleController::class, 'listMenus'],
@@ -100,6 +103,12 @@ Route::group([
     ]);
     Route::put('/menus', [
         'dispatch_route' => [StaffRoleController::class, 'updateMenu'],
+    ]);
+    Route::match(['POST', 'PUT'], '/menus/status', [
+        'dispatch_route' => [StaffRoleController::class, 'switchMenuStatus'],
+    ]);
+    Route::match(['POST', 'PUT'], '/menus/sort', [
+        'dispatch_route' => [StaffRoleController::class, 'sortMenus'],
     ]);
     Route::get('/menus/detail', [
         'dispatch_route' => [StaffRoleController::class, 'getMenu'],

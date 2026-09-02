@@ -23,7 +23,7 @@
             method: 'POST',
             body: { account: this.form.account, password: this.form.password }
           });
-          common.saveSession(data);
+          common.applySessionToRoot(this, data);
           this.$message.success('登录成功');
           this.$router.replace(common.firstAllowedRoute(data.user || common.getUser()));
         } catch (e) {
