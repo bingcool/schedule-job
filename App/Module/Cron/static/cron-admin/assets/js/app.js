@@ -23,7 +23,7 @@
       { path: '/roles', component: window.CronAdminRoles, meta: { title: '角色管理', subtitle: '定义角色并配置菜单页面权限', breadcrumb: '权限管理 / 角色管理' } },
       { path: '/roles/create', component: window.CronAdminRoleEditor, meta: { title: '新增角色', subtitle: '配置角色基本信息', breadcrumb: '权限管理 / 角色管理 / 新增角色' } },
       { path: '/roles/edit/:id', component: window.CronAdminRoleEditor, meta: { title: '编辑角色', subtitle: '配置角色基本信息', breadcrumb: '权限管理 / 角色管理 / 编辑角色' } },
-      { path: '/menus', component: window.CronAdminMenus, meta: { title: '菜单管理', subtitle: '管理侧边栏菜单页面节点，对应 staff_menu_pages 表', breadcrumb: '权限管理 / 菜单管理' } }
+      { path: '/menus', component: window.CronAdminMenus, meta: { title: '菜单管理', subtitle: '管理侧边栏菜单页面节点', breadcrumb: '权限管理 / 菜单管理' } }
     ]
   });
 

@@ -19,6 +19,41 @@
   margin-bottom: 18px;
 }
 
+.dashboard-scope {
+  margin-bottom: 16px;
+}
+
+.dashboard-scope-panel {
+  padding: 14px 16px;
+}
+
+.dashboard-scope-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dashboard-scope-desc {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dashboard-scope-tags .el-tag {
+  margin: 0 8px 8px 0;
+}
+
+.user-grant-dialog .el-dialog__body {
+  overflow: visible;
+}
+
+.user-grant-select-dropdown {
+  max-height: 240px;
+}
+
 .stat-card h2 {
   margin: 8px 0 4px;
   font-size: 28px;

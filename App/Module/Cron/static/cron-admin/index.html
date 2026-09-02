@@ -8,7 +8,7 @@
   <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=task-list-6">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=user-grant-dialog-1">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=menu-sort-1">
 </head>
 <body>
@@ -99,6 +99,22 @@
 
 <script type="text/x-template" id="tpl-dashboard">
   <div>
+    <div class="dashboard-scope" v-loading="scopeLoading">
+      <div v-if="scopeGroups.length" class="panel dashboard-scope-panel">
+        <div class="dashboard-scope-title"><i class="el-icon-collection-tag"></i> 数据聚合范围</div>
+        <p class="dashboard-scope-desc">以下 Dashboard 数据基于您有权限的节点分组聚合统计：</p>
+        <div class="dashboard-scope-tags">
+          <el-tag v-for="g in scopeGroups" :key="'scope-group-' + g.id" size="small" type="info">{{ g.groupName }}</el-tag>
+        </div>
+      </div>
+      <el-alert
+        v-else-if="showNoGroupAssigned"
+        title="暂无分配节点分组"
+        type="warning"
+        :closable="false"
+        show-icon
+      ></el-alert>
+    </div>
     <div class="stat-row">
       <div class="panel stat-card"><div>任务总数</div><h2>{{ overview.tasks.total }}</h2><div class="meta"><span class="status-mark status-enabled">启用 {{ overview.tasks.enabled }}</span> / <span class="status-mark status-disabled">禁用 {{ overview.tasks.disabled }}</span></div></div>
       <div class="panel stat-card"><div>今日执行</div><h2>{{ overview.executions.today }}</h2><div class="meta"><span class="status-mark status-success">成功 {{ overview.executions.success }}</span> / <span class="status-mark status-failed">失败 {{ overview.executions.failed }}</span> / <span class="status-mark status-timeout">超时 {{ overview.executions.timeout || 0 }}</span></div></div>
@@ -352,7 +368,7 @@
               <label>Command <span class="required-mark">*</span></label>
               <textarea class="form-textarea mono" v-model="form.command" placeholder="/bin/bash /opt/scripts/task.sh"></textarea>
               <div class="help-stack">
-                <div class="help">Shell Command 将由目标 Cron Node 执行，请确认命令来源可信。</div>
+                <div class="help">Shell Command 将由目标 Agent Cron Node 执行，请确认命令来源可信。</div>
                 <div class="help">支持java、python、go，php</div>
               </div>
             </div>
@@ -541,7 +557,7 @@
           <el-select v-model="query.execType" clearable placeholder="全部" style="width:130px">
             <el-option :value="''" label="全部"></el-option>
             <el-option :value="1" label="GLUE模式"></el-option>
-            <el-option :value="2" label="http"></el-option>
+            <el-option :value="2" label="HTTP"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="触发类型">
@@ -845,13 +861,22 @@
         <el-pagination background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
       </div>
     </div>
-    <el-dialog title="角色分配" :visible.sync="roleDlg" width="520px">
+    <el-dialog title="角色分配" :visible.sync="roleDlg" width="520px" append-to-body custom-class="user-grant-dialog">
       <p style="margin:0 0 12px;color:var(--muted);font-size:13px">为「{{ roleUser.userName || roleUser.account }}」分配角色，一个用户可拥有多个角色。</p>
       <div style="margin-bottom:10px">
         <el-button size="mini" @click="selectAllRoles">全部勾选</el-button>
         <el-button size="mini" @click="clearAllRoles">清空</el-button>
       </div>
-      <el-select v-model="roleForm.roleIds" multiple filterable collapse-tags placeholder="下拉多选角色" style="width:100%">
+      <el-select
+        v-model="roleForm.roleIds"
+        multiple
+        filterable
+        collapse-tags
+        popper-append-to-body
+        popper-class="user-grant-select-dropdown"
+        placeholder="下拉多选角色"
+        style="width:100%"
+      >
         <el-option v-for="r in roleOptions" :key="r.id" :value="Number(r.id)" :label="r.name">
           <span>{{ r.name }}</span>
           <span v-if="r.isSuper" class="tag-super" style="margin-left:6px">超管</span>
@@ -862,13 +887,22 @@
         <el-button type="primary" :loading="roleSaving" @click="saveRoles">保存</el-button>
       </div>
     </el-dialog>
-    <el-dialog title="节点组授权" :visible.sync="grantDlg" width="520px">
+    <el-dialog title="节点组授权" :visible.sync="grantDlg" width="520px" append-to-body custom-class="user-grant-dialog">
       <p style="margin:0 0 12px;color:var(--muted);font-size:13px">为「{{ grantUser.userName || grantUser.account }}」授权可管理的节点组，未授权的节点组任务对其不可见。</p>
       <div style="margin-bottom:10px">
         <el-button size="mini" @click="selectAllGroups">全部勾选</el-button>
         <el-button size="mini" @click="clearAllGroups">清空</el-button>
       </div>
-      <el-select v-model="grantForm.nodeGroupIds" multiple filterable collapse-tags placeholder="下拉多选节点组" style="width:100%">
+      <el-select
+        v-model="grantForm.nodeGroupIds"
+        multiple
+        filterable
+        collapse-tags
+        popper-append-to-body
+        popper-class="user-grant-select-dropdown"
+        placeholder="下拉多选节点组"
+        style="width:100%"
+      >
         <el-option v-for="g in grantGroupOptions" :key="g.id" :value="Number(g.id)" :label="g.groupName || g.name"></el-option>
       </el-select>
       <div slot="footer">
@@ -892,7 +926,6 @@
       <div class="panel task-editor-page">
         <div class="section">
           <h3 class="section-title">基本信息</h3>
-          <p class="section-desc">对应 staff_user 表字段</p>
           <div class="grid">
             <div class="field"><label>账号 <span class="req">*</span></label><input class="form-control" v-model="form.account" placeholder="建议使用邮箱"></div>
             <div class="field"><label>用户名称 <span class="req">*</span></label><input class="form-control" v-model="form.userName" placeholder="显示名称"></div>
@@ -1126,7 +1159,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/vue-router@3.6.5/dist/vue-router.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue-router@3.6.5/dist/vue-router.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-ui@2.15.14/lib/index.js'"></script>
 <script defer src="/cron-admin/assets/js/common.js?v=login-menu-1"></script>
-<script defer src="/cron-admin/assets/js/dashboard.js"></script>
+<script defer src="/cron-admin/assets/js/dashboard.js?v=dashboard-scope-1"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-list-6"></script>
 <script defer src="/cron-admin/assets/js/editor.js"></script>
 <script defer src="/cron-admin/assets/js/detail.js"></script>
