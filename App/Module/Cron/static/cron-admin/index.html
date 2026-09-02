@@ -8,7 +8,7 @@
   <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=user-grant-dialog-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=task-manage-auth-1">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=menu-sort-1">
 </head>
 <body>
@@ -218,9 +218,16 @@
         <el-table-column prop="groupName" label="节点分组" width="120" show-overflow-tooltip>
           <template slot-scope="s"><span :class="groupNameOf(s.row) !== '-' ? '' : 'text-muted'">{{ groupNameOf(s.row) }}</span></template>
         </el-table-column>
-        <el-table-column label="节点名称" min-width="130" show-overflow-tooltip>
+        <el-table-column label="节点名称" min-width="180">
           <template slot-scope="s">
-            <span :class="nodeNameOf(s.row) !== '-' ? '' : 'text-muted'">{{ nodeNameOf(s.row) }}</span>
+            <div class="task-node-cell">
+              <span :class="nodeNameOf(s.row) !== '-' ? '' : 'text-muted'">{{ nodeNameOf(s.row) }}</span>
+              <span
+                v-if="nodeStatusOf(s.row)"
+                class="status-pill"
+                :class="nodeStatusOf(s.row) === 'online' ? 'status-online' : 'status-offline'"
+              >{{ nodeStatusOf(s.row) === 'online' ? 'online' : 'offline' }}</span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="Type" width="110">
@@ -228,8 +235,19 @@
         </el-table-column>
         <el-table-column label="Status" width="120">
           <template slot-scope="s">
-            <div class="task-status-switch">
-              <el-switch :key="'st-'+s.row.id+'-'+s.row.status" :value="s.row.status" :active-value="1" :inactive-value="0" @change="value => toggle(s.row, value)"></el-switch>
+            <div
+              class="task-status-switch"
+              :class="{ 'is-forbidden': !canManageTask(s.row) }"
+              @click="onStatusSwitchClick(s.row)"
+            >
+              <el-switch
+                :key="'st-'+s.row.id+'-'+s.row.status"
+                :value="s.row.status"
+                :active-value="1"
+                :inactive-value="0"
+                :disabled="!canManageTask(s.row)"
+                @change="value => toggle(s.row, value)"
+              ></el-switch>
               <span>{{ s.row.status===1?'启用':'禁用' }}</span>
             </div>
           </template>
@@ -240,24 +258,55 @@
             <span class="next-run-at" :class="{ 'text-muted': formatNextRun(s.row) === '-' }">{{ formatNextRun(s.row) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="updatedAt" label="Updated" width="160"></el-table-column>
+        <el-table-column label="创建人" width="110" show-overflow-tooltip>
+          <template slot-scope="s">
+            <span :class="creatorNameOf(s.row) !== '-' ? '' : 'text-muted'">{{ creatorNameOf(s.row) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="创建时间" width="160"></el-table-column>
+        <el-table-column prop="updatedAt" label="更新时间" width="160"></el-table-column>
         <el-table-column label="操作" width="330" fixed="right">
           <template slot-scope="s">
             <div class="task-action-group">
               <el-button size="mini" class="task-action-btn btn-detail" @click="$router.push('/tasks/detail/'+s.row.id)">详情</el-button>
-              <el-button size="mini" class="task-action-btn btn-edit" @click="$router.push('/tasks/edit/'+s.row.id)">编辑</el-button>
-              <el-button size="mini" class="task-action-btn btn-run" @click="runOnce(s.row)">手动执行</el-button>
+              <el-button
+                size="mini"
+                class="task-action-btn btn-edit"
+                :class="{ 'is-forbidden': !canManageTask(s.row) }"
+                @click="guardEdit(s.row)"
+              >编辑</el-button>
+              <el-button
+                size="mini"
+                class="task-action-btn btn-run"
+                :class="{ 'is-forbidden': !canManageTask(s.row) }"
+                @click="runOnce(s.row)"
+              >手动执行</el-button>
               <el-button size="mini" class="task-action-btn btn-log" @click="$router.push('/executions?taskId='+s.row.id)">查看日志</el-button>
               <!-- 复制功能临时隐藏，仅展示层下线，保留前端方法/后端接口便于恢复 -->
-              <el-button size="mini" class="task-action-btn btn-delete" @click="remove(s.row)">删除</el-button>
+              <el-button
+                size="mini"
+                class="task-action-btn btn-delete"
+                :class="{ 'is-forbidden': !canManageTask(s.row) }"
+                @click="remove(s.row)"
+              >删除</el-button>
             </div>
           </template>
         </el-table-column>
       </el-table>
       <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
         <div>
-          <el-button size="mini" :disabled="!sel.length" @click="batch(1)">批量启用</el-button>
-          <el-button size="mini" :disabled="!sel.length" @click="batch(0)">批量停用</el-button>
+          <el-button
+            size="mini"
+            :class="{ 'is-forbidden': !canBatchManage() }"
+            :disabled="!sel.length"
+            @click="guardBatch(1)"
+          >批量启用</el-button>
+          <el-button
+            size="mini"
+            :class="{ 'is-forbidden': sel.length && !canBatchManage() }"
+            :disabled="!sel.length"
+            @click="guardBatch(0)"
+          >批量停用</el-button>
         </div>
         <el-pagination background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
       </div>
@@ -276,7 +325,7 @@
       <div></div>
       <div class="actions">
         <el-button @click="cancel">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存任务</el-button>
+        <el-button type="primary" :loading="saving" :disabled="readOnly" @click="save">保存任务</el-button>
       </div>
     </div>
     <div class="editor-layout">
@@ -495,8 +544,8 @@
     <div class="page-head">
       <div></div>
       <div class="actions">
-        <el-button @click="$router.push('/tasks/edit/'+id)">编辑</el-button>
-        <el-button type="primary" @click="runOnce">执行一次</el-button>
+        <el-button :class="{ 'is-forbidden': !canManageTask(row) }" @click="guardEdit">编辑</el-button>
+        <el-button type="primary" :class="{ 'is-forbidden': !canManageTask(row) }" @click="runOnce">执行一次</el-button>
       </div>
     </div>
     <div class="panel" v-loading="loading">
@@ -1158,11 +1207,11 @@
 <script defer src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@2.7.16/dist/vue.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/vue-router@3.6.5/dist/vue-router.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue-router@3.6.5/dist/vue-router.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-ui@2.15.14/lib/index.js'"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=login-menu-1"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js?v=dashboard-scope-1"></script>
-<script defer src="/cron-admin/assets/js/tasks.js?v=task-list-6"></script>
-<script defer src="/cron-admin/assets/js/editor.js"></script>
-<script defer src="/cron-admin/assets/js/detail.js"></script>
+<script defer src="/cron-admin/assets/js/tasks.js?v=task-manage-auth-1"></script>
+<script defer src="/cron-admin/assets/js/editor.js?v=task-manage-auth-1"></script>
+<script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/executions.js"></script>
 <script defer src="/cron-admin/assets/js/nodes.js"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>

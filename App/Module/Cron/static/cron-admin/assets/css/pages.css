@@ -626,6 +626,21 @@
   opacity: 0.92;
 }
 
+.task-action-btn.is-forbidden,
+.el-button.is-forbidden {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.task-action-btn.is-forbidden:hover {
+  opacity: 0.45;
+}
+
+.task-status-switch.is-forbidden {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -710,6 +725,20 @@
 .next-run-at {
   color: var(--green);
   font-weight: 600;
+}
+
+.task-node-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.task-node-cell > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .text-muted {

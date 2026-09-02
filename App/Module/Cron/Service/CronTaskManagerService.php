@@ -19,6 +19,7 @@ use App\Module\Cron\Dto\CronTaskManager\BatchStatusDto;
 use App\Module\Cron\Dto\CronTaskManager\BatchStatusResultDto;
 use App\Module\Cron\Dto\CronTaskManager\CreateNodeDto;
 use App\Module\Cron\Dto\CronTaskManager\CreateNodeGroupDto;
+use App\Module\Cron\Dto\CronTaskManager\CronAgentNodeRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskLogRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskPayloadDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskRowDto;
@@ -52,7 +53,9 @@ use App\Module\Cron\Entity\CronTaskRunRequestEntity;
 use App\Module\Cron\Exception\CronTaskException;
 use App\Module\Cron\Response\CronTaskManager\ListTasksPageResult;
 use App\Module\Cron\Response\CronTaskManager\TaskLogsPageResult;
+use App\Module\Staff\Entity\StaffUserEntity;
 use App\Module\Staff\Service\StaffUserService;
+use Swoolefy\Support\FrameworkContext;
 
 /**
  * Cron 任务管理业务服务。
@@ -154,6 +157,7 @@ class CronTaskManagerService
             'http_body',
             'http_headers',
             'http_request_time_out',
+            'created_by',
             'created_at',
             'updated_at',
         ]);
@@ -205,6 +209,11 @@ class CronTaskManagerService
             throw CronTaskException::throw('任务名称必须唯一', -1);
         }
 
+        $userId = $this->currentUserId();
+        if ($userId > 0) {
+            $entityData['created_by'] = $userId;
+        }
+
         $task = new CronTaskEntity();
         $task->setData($entityData);
         $task->save();
@@ -231,6 +240,7 @@ class CronTaskManagerService
         if (!$task) {
             throw CronTaskException::throw('任务不存在', -1);
         }
+        $this->assertTaskManageAllowed($task);
 
         $result = $this->payloadBuilder->build($command->getPayload()->toPayloadArray(), false);
         if ($result->hasError()) {
@@ -273,6 +283,7 @@ class CronTaskManagerService
         if (!$task) {
             throw CronTaskException::throw('任务不存在', -1);
         }
+        $this->assertTaskManageAllowed($task);
 
         $task->delete();
 
@@ -296,6 +307,7 @@ class CronTaskManagerService
         if (!$task) {
             throw CronTaskException::throw('任务不存在', -1);
         }
+        $this->assertTaskManageAllowed($task);
 
         $task->status = $status;
         $task->save();
@@ -1093,12 +1105,18 @@ class CronTaskManagerService
         try {
             $existsRows = CronTaskEntity::queryNotDeleted()
                 ->whereIn('id', $ids)
-                ->field(['id'])
                 ->select()
                 ->toArray();
             $exists = [];
             foreach ($existsRows as $row) {
-                $exists[(int) ($row['id'] ?? 0)] = true;
+                $taskId = (int) ($row['id'] ?? 0);
+                if ($taskId <= 0) {
+                    continue;
+                }
+                $exists[$taskId] = true;
+                $task = new CronTaskEntity();
+                $task->setData(is_array($row) ? $row : $row->getAttributes());
+                $this->assertTaskManageAllowed($task);
             }
             foreach ($ids as $id) {
                 if (!isset($exists[$id])) {
@@ -1138,6 +1156,11 @@ class CronTaskManagerService
         $attrs['status'] = 0;
         // 副本必须是未删除行，否则列表 select() 能看见、loadById 因 SoftDelete 找不到
         $attrs['deleted_at'] = null;
+        unset($attrs['created_by'], $attrs['createdBy']);
+        $userId = $this->currentUserId();
+        if ($userId > 0) {
+            $attrs['created_by'] = $userId;
+        }
         $copy = new CronTaskEntity();
         $copy->setData($attrs);
         $copy->save();
@@ -1150,7 +1173,9 @@ class CronTaskManagerService
      */
     public function enqueueRunOnce(TaskIdDto $dto): RunOnceQueuedDto
     {
-        $this->requireTask($dto->getId());
+        $task = $this->requireTask($dto->getId());
+        $this->assertTaskManageAllowed($task);
+        $this->assertTaskNodeOnline($task);
         $requestedAt = date('Y-m-d H:i:s');
         CronTaskRunRequestEntity::query()->insert([
             'cron_id' => $dto->getId(),
@@ -1420,12 +1445,12 @@ class CronTaskManagerService
             }
         }
 
-        /** @var array<int, array{group_id: int, node_name: string}> $nodeMeta */
+        /** @var array<int, array{group_id: int, node_name: string, node_status: string}> $nodeMeta */
         $nodeMeta = [];
         if ($nodeIds !== []) {
             $nodes = CronAgentNodeEntity::query()
                 ->whereIn('id', array_values($nodeIds))
-                ->field(['id', 'group_id', 'node_name'])
+                ->field(['id', 'group_id', 'node_name', 'last_heartbeat_at', 'heartbeat_interval'])
                 ->select()
                 ->toArray();
             foreach ($nodes as $node) {
@@ -1433,23 +1458,134 @@ class CronTaskManagerService
                 $nodeMeta[$id] = [
                     'group_id' => self::rowInt($node, 'group_id', 'groupId'),
                     'node_name' => (string) ($node['node_name'] ?? $node['nodeName'] ?? ''),
+                    'node_status' => CronAgentNodeRowDto::deriveHeartbeatStatus(
+                        (string) ($node['last_heartbeat_at'] ?? ''),
+                        time(),
+                        (int) ($node['heartbeat_interval'] ?? 0),
+                    ),
                 ];
             }
         }
 
         foreach ($list as &$row) {
             $nodeId = self::rowInt($row, 'node_id', 'nodeId');
-            $meta = $nodeMeta[$nodeId] ?? ['group_id' => 0, 'node_name' => ''];
+            $meta = $nodeMeta[$nodeId] ?? ['group_id' => 0, 'node_name' => '', 'node_status' => CronNodeLiveness::STATUS_OFFLINE];
             $groupId = $meta['group_id'];
             $nodeName = $meta['node_name'];
+            $nodeStatus = $meta['node_status'];
             $row['group_id'] = $groupId;
             $row['groupId'] = $groupId;
             $row['node_name'] = $nodeName;
             $row['nodeName'] = $nodeName;
+            $row['node_status'] = $nodeStatus;
+            $row['nodeStatus'] = $nodeStatus;
         }
         unset($row);
 
-        return $this->attachNodeGroupInfo($list);
+        return $this->attachTaskCreatorInfo($this->attachNodeGroupInfo($list));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $list
+     * @return list<array<string, mixed>>
+     */
+    protected function attachTaskCreatorInfo(array $list): array
+    {
+        if ($list === []) {
+            return $list;
+        }
+
+        $userIds = [];
+        foreach ($list as $row) {
+            $userId = self::rowInt($row, 'created_by', 'createdBy');
+            if ($userId > 0) {
+                $userIds[$userId] = $userId;
+            }
+        }
+
+        /** @var array<int, array{account: string, user_name: string}> $users */
+        $users = [];
+        if ($userIds !== []) {
+            $rows = StaffUserEntity::query()
+                ->whereIn('id', array_values($userIds))
+                ->field(['id', 'account', 'user_name'])
+                ->select()
+                ->toArray();
+            foreach ($rows as $user) {
+                $id = (int) ($user['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $users[$id] = [
+                    'account' => (string) ($user['account'] ?? ''),
+                    'user_name' => (string) ($user['user_name'] ?? $user['userName'] ?? ''),
+                ];
+            }
+        }
+
+        foreach ($list as &$row) {
+            $userId = self::rowInt($row, 'created_by', 'createdBy');
+            $row['created_by'] = $userId;
+            $row['createdBy'] = $userId;
+            $creatorName = '';
+            if ($userId > 0 && isset($users[$userId])) {
+                $creatorName = trim($users[$userId]['user_name']) !== ''
+                    ? $users[$userId]['user_name']
+                    : $users[$userId]['account'];
+            }
+            $row['created_by_name'] = $creatorName;
+            $row['createdByName'] = $creatorName;
+        }
+        unset($row);
+
+        return $list;
+    }
+
+    protected function currentUserId(): int
+    {
+        return max(0, (int) (FrameworkContext::getUserId() ?? 0));
+    }
+
+    protected function assertTaskNodeOnline(CronTaskEntity $task): void
+    {
+        $nodeId = (int) ($task->node_id ?? 0);
+        if ($nodeId <= 0) {
+            throw CronTaskException::throw('节点已下线，无法执行', -1);
+        }
+
+        $node = CronAgentNodeEntity::query()
+            ->where('id', $nodeId)
+            ->field(['last_heartbeat_at', 'heartbeat_interval'])
+            ->find();
+        if (!$node) {
+            throw CronTaskException::throw('节点已下线，无法执行', -1);
+        }
+
+        $attrs = is_array($node) ? $node : $node->getAttributes();
+        $status = CronAgentNodeRowDto::deriveHeartbeatStatus(
+            (string) ($attrs['last_heartbeat_at'] ?? ''),
+            time(),
+            (int) ($attrs['heartbeat_interval'] ?? 0),
+        );
+        if ($status !== CronNodeLiveness::STATUS_ONLINE) {
+            throw CronTaskException::throw('节点已下线，无法执行', -1);
+        }
+    }
+
+    protected function assertTaskManageAllowed(CronTaskEntity $task): void
+    {
+        $userId = $this->currentUserId();
+        if ($userId <= 0) {
+            throw CronTaskException::throw('无权限操作', -1);
+        }
+        if ($this->staffUserService->isSuperUser($userId)) {
+            return;
+        }
+
+        $createdBy = (int) ($task->created_by ?? 0);
+        if ($createdBy <= 0 || $createdBy !== $userId) {
+            throw CronTaskException::throw('无权限操作', -1);
+        }
     }
 
     /**

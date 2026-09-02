@@ -15,6 +15,7 @@ CREATE TABLE `cron_task` (
     `http_body` json DEFAULT NULL COMMENT 'http请求体',
     `http_headers` json DEFAULT NULL COMMENT 'http请求头',
     `http_request_time_out` int NOT NULL DEFAULT '0' COMMENT 'http请求超时时间，单位：秒',
+    `created_by` int unsigned NOT NULL DEFAULT '0' COMMENT '创建人 staff_user.id',
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     `deleted_at` datetime DEFAULT NULL COMMENT '删除时间',

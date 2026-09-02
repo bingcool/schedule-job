@@ -307,6 +307,21 @@
     return !!user.isSuper;
   }
 
+  function viewerUserId() {
+    return Number((getUser() || {}).id || 0);
+  }
+
+  function canManageTask(row) {
+    if (isViewerSuper()) return true;
+    var userId = viewerUserId();
+    var createdBy = Number((row && (row.createdBy || row.created_by)) || 0);
+    return userId > 0 && createdBy > 0 && userId === createdBy;
+  }
+
+  function toastNoTaskPermission(vm) {
+    vm.$message.warning('无权限操作');
+  }
+
   function viewerNodeGroupIds() {
     var user = getUser() || {};
     return Array.isArray(user.nodeGroupIds) ? user.nodeGroupIds.map(Number) : [];
@@ -388,6 +403,9 @@
     applySessionToRoot: applySessionToRoot,
     isAuthPublicPath: isAuthPublicPath,
     isViewerSuper: isViewerSuper,
+    viewerUserId: viewerUserId,
+    canManageTask: canManageTask,
+    toastNoTaskPermission: toastNoTaskPermission,
     viewerNodeGroupIds: viewerNodeGroupIds,
     filterGroupsForViewer: filterGroupsForViewer,
     toastErr: toastErr,

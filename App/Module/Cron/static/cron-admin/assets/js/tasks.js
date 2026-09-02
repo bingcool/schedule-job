@@ -92,6 +92,13 @@
             if ((row.nodeId === undefined || row.nodeId === null) && row.node_id != null) {
               row.nodeId = row.node_id;
             }
+            if ((row.createdBy === undefined || row.createdBy === null) && row.created_by != null) {
+              row.createdBy = row.created_by;
+            }
+            if (!row.createdByName && row.created_by_name) row.createdByName = row.created_by_name;
+            if (!row.createdAt && row.created_at) row.createdAt = row.created_at;
+            if (!row.updatedAt && row.updated_at) row.updatedAt = row.updated_at;
+            if (!row.nodeStatus && row.node_status) row.nodeStatus = row.node_status;
             if (row.command == null || row.command === '') {
               row.command = row.Command || row.cron_command || '';
             }
@@ -113,6 +120,11 @@
         this.load();
       },
       toggle: async function (row, nextStatus) {
+        if (!common.canManageTask(row)) {
+          common.toastNoTaskPermission(this);
+          this.$forceUpdate();
+          return;
+        }
         var status = nextStatus === undefined ? (row.status === 1 ? 0 : 1) : Number(nextStatus);
         try {
           await common.confirmTaskStatusChange(this, status, row.name);
@@ -126,6 +138,14 @@
       },
       runOnce: async function (row) {
         try {
+          if (!common.canManageTask(row)) {
+            common.toastNoTaskPermission(this);
+            return;
+          }
+          if (this.nodeStatusOf(row) !== 'online') {
+            this.$message.warning('节点已下线，无法执行');
+            return;
+          }
           await common.confirmRunOnce(this, row.name);
           var d = await common.api('/tasks/run', { method: 'POST', body: { id: row.id } });
           this.$message.success((d && d.message) || '已入队');
@@ -144,6 +164,10 @@
       },
       remove: async function (row) {
         try {
+          if (!common.canManageTask(row)) {
+            common.toastNoTaskPermission(this);
+            return;
+          }
           await common.confirmDelete(this, '确认删除 ' + row.name + '？');
           await common.api('/tasks?id=' + encodeURIComponent(row.id), {
             method: 'DELETE',
@@ -157,6 +181,13 @@
       },
       batch: async function (status) {
         try {
+          var denied = this.sel.some(function (row) {
+            return !common.canManageTask(row);
+          });
+          if (denied) {
+            common.toastNoTaskPermission(this);
+            return;
+          }
           await common.confirmTaskStatusChange(this, status, this.sel.map(function (x) { return x.name; }));
           await common.api('/tasks/batch-status', {
             method: 'PUT',
@@ -244,6 +275,55 @@
           }
         }
         return nid ? String(nid) : '-';
+      },
+      nodeStatusOf: function (row) {
+        if (!row) return '';
+        var status = row.nodeStatus || row.node_status;
+        if (status) return status;
+        var nid = Number(row.nodeId || row.node_id || 0);
+        if (!nid) return '';
+        var nodes = this.nodes || [];
+        for (var i = 0; i < nodes.length; i++) {
+          if (Number(nodes[i].id) === nid) {
+            return nodes[i].status || 'offline';
+          }
+        }
+        return 'offline';
+      },
+      creatorNameOf: function (row) {
+        if (!row) return '-';
+        var name = row.createdByName || row.created_by_name;
+        if (name) return name;
+        var id = Number(row.createdBy || row.created_by || 0);
+        return id > 0 ? ('#' + id) : '-';
+      },
+      canManageTask: function (row) {
+        return common.canManageTask(row);
+      },
+      guardEdit: function (row) {
+        if (!common.canManageTask(row)) {
+          common.toastNoTaskPermission(this);
+          return;
+        }
+        this.$router.push('/tasks/edit/' + row.id);
+      },
+      onStatusSwitchClick: function (row) {
+        if (!common.canManageTask(row)) {
+          common.toastNoTaskPermission(this);
+        }
+      },
+      canBatchManage: function () {
+        if (!this.sel.length) return false;
+        return this.sel.every(function (row) {
+          return common.canManageTask(row);
+        });
+      },
+      guardBatch: function (status) {
+        if (!this.canBatchManage()) {
+          common.toastNoTaskPermission(this);
+          return;
+        }
+        this.batch(status);
       }
     }
   };

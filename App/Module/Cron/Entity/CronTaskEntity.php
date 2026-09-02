@@ -23,6 +23,7 @@ use App\Model\ClientModel;
  * @property string http_body json类型-http请求体
  * @property string http_headers json类型-http请求头
  * @property int http_request_time_out http请求超时时间，单位：秒
+ * @property int created_by 创建人 staff_user.id
  * @property string created_at 创建时间
  * @property string updated_at 修改时间
  * @property string deleted_at 删除时间

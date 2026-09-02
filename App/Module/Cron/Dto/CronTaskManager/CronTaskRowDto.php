@@ -48,6 +48,9 @@ class CronTaskRowDto extends AbstractDto
     #[ApiProperty(description: '绑定节点所属分组名称；未分组时为空')]
     protected string $groupName = '';
 
+    #[ApiProperty(description: '绑定节点状态：online / offline')]
+    protected string $nodeStatus = 'offline';
+
     #[ApiProperty(description: '任务名称')]
     protected string $name = '';
 
@@ -113,6 +116,12 @@ class CronTaskRowDto extends AbstractDto
     #[ApiProperty(description: 'HTTP 请求超时时间（秒）')]
     protected int $httpRequestTimeOut = 30;
 
+    #[ApiProperty(description: '创建人 staff_user.id')]
+    protected int $createdBy = 0;
+
+    #[ApiProperty(description: '创建人名称')]
+    protected string $createdByName = '';
+
     #[ApiProperty(description: '下次合法执行 unix 秒；禁用或非法表达式为 null（暂停，无下次调度）')]
     protected ?int $nextRunAt = null;
 
@@ -144,6 +153,7 @@ class CronTaskRowDto extends AbstractDto
         $dto->setNodeName((string) self::pick($row, 'node_name', 'nodeName', ''));
         $dto->setGroupId((int) self::pick($row, 'group_id', 'groupId', 0));
         $dto->setGroupName((string) self::pick($row, 'group_name', 'groupName', ''));
+        $dto->setNodeStatus((string) self::pick($row, 'node_status', 'nodeStatus', 'offline'));
         // 表列为 cron_name，兼容误用 name 的查询结果
         $dto->setName((string)($row['name'] ?? $row['cron_name'] ?? ''));
         $dto->setExpression((string)($row['expression'] ?? ''));
@@ -164,6 +174,8 @@ class CronTaskRowDto extends AbstractDto
         $hh = $row['http_headers'] ?? null;
         $dto->setHttpHeaders(self::maskSensitiveHeaders(is_array($hh) ? $hh : null));
         $dto->setHttpRequestTimeOut((int)($row['http_request_time_out'] ?? 30));
+        $dto->setCreatedBy((int) self::pick($row, 'created_by', 'createdBy', 0));
+        $dto->setCreatedByName((string) self::pick($row, 'created_by_name', 'createdByName', ''));
         $dto->setCreatedAt((string)($row['created_at'] ?? ''));
         $dto->setUpdatedAt((string)($row['updated_at'] ?? ''));
 
@@ -192,6 +204,11 @@ class CronTaskRowDto extends AbstractDto
         $out['nodeName'] = $this->getNodeName();
         $out['groupId'] = $this->getGroupId();
         $out['groupName'] = $this->getGroupName();
+        $out['nodeStatus'] = $this->getNodeStatus();
+        $out['createdBy'] = $this->getCreatedBy();
+        $out['createdByName'] = $this->getCreatedByName();
+        $out['createdAt'] = $this->getCreatedAt();
+        $out['updatedAt'] = $this->getUpdatedAt();
 
         return $out;
     }
@@ -277,6 +294,20 @@ class CronTaskRowDto extends AbstractDto
     public function setGroupName(string $groupName): static
     {
         $this->groupName = $groupName;
+
+        return $this;
+    }
+
+    /** 获取绑定节点状态 */
+    public function getNodeStatus(): string
+    {
+        return $this->nodeStatus;
+    }
+
+    /** 设置绑定节点状态 */
+    public function setNodeStatus(string $nodeStatus): static
+    {
+        $this->nodeStatus = $nodeStatus;
 
         return $this;
     }
@@ -558,6 +589,34 @@ class CronTaskRowDto extends AbstractDto
     public function setHttpRequestTimeOut(int $httpRequestTimeOut): static
     {
         $this->httpRequestTimeOut = $httpRequestTimeOut;
+
+        return $this;
+    }
+
+    /** 获取创建人 ID */
+    public function getCreatedBy(): int
+    {
+        return $this->createdBy;
+    }
+
+    /** 设置创建人 ID */
+    public function setCreatedBy(int $createdBy): static
+    {
+        $this->createdBy = $createdBy;
+
+        return $this;
+    }
+
+    /** 获取创建人名称 */
+    public function getCreatedByName(): string
+    {
+        return $this->createdByName;
+    }
+
+    /** 设置创建人名称 */
+    public function setCreatedByName(string $createdByName): static
+    {
+        $this->createdByName = $createdByName;
 
         return $this;
     }

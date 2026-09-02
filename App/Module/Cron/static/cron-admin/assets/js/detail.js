@@ -23,6 +23,16 @@
       this.load();
     },
     methods: {
+      canManageTask: function (row) {
+        return common.canManageTask(row);
+      },
+      guardEdit: function () {
+        if (!common.canManageTask(this.row)) {
+          common.toastNoTaskPermission(this);
+          return;
+        }
+        this.$router.push('/tasks/edit/' + this.id);
+      },
       parseRangeSource: function (source) {
         if (source === null || source === undefined || source === '') return [];
         if (Array.isArray(source)) return source;
@@ -76,7 +86,10 @@
             common.api('/tasks/detail?id=' + this.id),
             common.api('/tasks/stats?taskId=' + this.id)
           ]);
-          this.row = detailAndStats[0];
+          this.row = detailAndStats[0] || {};
+          if ((this.row.createdBy === undefined || this.row.createdBy === null) && this.row.created_by != null) {
+            this.row.createdBy = this.row.created_by;
+          }
           this.cronBetweenItems = this.normalizeRangeItems(
             this.row.cronBetween != null ? this.row.cronBetween : this.row.cron_between
           );
@@ -92,6 +105,10 @@
       },
       runOnce: async function () {
         try {
+          if (!common.canManageTask(this.row)) {
+            common.toastNoTaskPermission(this);
+            return;
+          }
           await common.confirmRunOnce(this, this.row && this.row.name);
           var d = await common.api('/tasks/run', { method: 'POST', body: { id: Number(this.id) } });
           this.$message.success((d && d.message) || '已入队');

@@ -11,6 +11,7 @@
         groups: [],
         selectedGroupId: null,
         saving: false,
+        readOnly: false,
         exprType: 'interval',
         intervalSec: 15,
         cronExpr: '*/5 * * * *',
@@ -109,6 +110,9 @@
               row = await common.api('/tasks/detail?id=' + this.$route.params.id);
             }
             this.form = Object.assign(this.form, row);
+            if ((this.form.createdBy === undefined || this.form.createdBy === null) && row.created_by != null) {
+              this.form.createdBy = row.created_by;
+            }
             this.exprType = row.expressionType || common.detectExprType(row.expression);
             if (this.exprType === 'interval') {
               this.intervalSec = parseInt(row.expression, 10) || 15;
@@ -126,6 +130,10 @@
               'cron_skip'
             );
             this.applySelectedGroup(this.form.nodeId);
+            if (!common.canManageTask(row)) {
+              this.readOnly = true;
+              this.$message.warning('无权限操作，仅可查看');
+            }
           } catch (e) {
             common.toastErr(this, e);
           }
@@ -227,6 +235,10 @@
         }
       },
       save: async function () {
+        if (this.readOnly || (this.isEdit && !common.canManageTask(this.form))) {
+          common.toastNoTaskPermission(this);
+          return;
+        }
         this.syncExpr();
         if (!this.form.name || !this.form.command || !this.form.nodeId) {
           this.$message.warning('请填写名称、节点与 Command/URL');
@@ -263,6 +275,10 @@
       },
       remove: async function () {
         try {
+          if (!common.canManageTask(this.form)) {
+            common.toastNoTaskPermission(this);
+            return;
+          }
           await common.confirmDelete(this, '确认删除任务？');
           await common.api('/tasks?id=' + encodeURIComponent(this.form.id), {
             method: 'DELETE',
