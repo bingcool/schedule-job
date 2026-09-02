@@ -7,6 +7,7 @@ use Swoolefy\Http\Middleware\CorsMiddleware;
 use Swoolefy\Http\Route;
 use App\Module\Cron\Controller\CronAdminController;
 use App\Module\Cron\Controller\CronTaskManagerController;
+use App\Module\Staff\Middleware\MenuPagePermissionMiddleware;
 
 Route::get('/cron-admin', [
     'dispatch_route' => [CronAdminController::class, 'index'],
@@ -86,6 +87,7 @@ Route::group([
     'middleware' => [
         CorsMiddleware::class,
         AuthenticateMiddleware::class,
+        MenuPagePermissionMiddleware::class,
     ]
 ], function () {
     // 任务管理

@@ -32,12 +32,22 @@
     var token = common.getToken();
     if (isPublic) {
       if (token && (to.path === '/login' || to.path === '/register')) {
-        return next('/dashboard');
+        var loggedIn = common.getUser();
+        return next(loggedIn ? common.firstAllowedRoute(loggedIn) : '/dashboard');
       }
       return next();
     }
     if (!token) {
       return next('/login');
+    }
+    var user = common.getUser();
+    if (user && Array.isArray(user.menus) && !common.canAccessRoute(to.path, user)) {
+      var fallback = common.firstAllowedRoute(user);
+      if (to.path === fallback || !common.canAccessRoute(fallback, user)) {
+        common.clearAuth();
+        return next('/login');
+      }
+      return next(fallback);
     }
     next();
   });
@@ -92,6 +102,9 @@
       isAuthPage: function () {
         return !!(this.$route.meta && this.$route.meta.public);
       },
+      navMenus: function () {
+        return common.sidebarMenus(this.currentUser);
+      },
       breadcrumbPath: function () {
         return (this.$route.meta && this.$route.meta.breadcrumb) || '';
       },
@@ -115,9 +128,15 @@
           var user = await common.api('/auth/me');
           common.setUser(user);
           this.currentUser = user;
+          if (!this.isAuthPage && user && !common.canAccessRoute(this.$route.path, user)) {
+            this.$router.replace(common.firstAllowedRoute(user));
+          }
         } catch (e) {
           this.currentUser = common.getUser();
         }
+      },
+      menuLink: function (uri) {
+        return common.normalizeMenuPath(uri);
       },
       logout: function () {
         common.clearAuth();

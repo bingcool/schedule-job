@@ -321,6 +321,53 @@
     return list;
   }
 
+  function normalizeMenuPath(uri) {
+    var path = String(uri || '').split('?')[0].split('#')[0];
+    if (!path) return '/';
+    if (path.charAt(0) !== '/') path = '/' + path;
+    return path.replace(/\/+$/, '') || '/';
+  }
+
+  function collectMenuPaths(menus) {
+    var paths = [];
+    (menus || []).forEach(function (group) {
+      (group.children || []).forEach(function (item) {
+        if (item && item.uri) paths.push(normalizeMenuPath(item.uri));
+      });
+    });
+    return paths;
+  }
+
+  function canAccessRoute(path, user) {
+    if (!user) return false;
+    if (user.isSuper) return true;
+    var target = normalizeMenuPath(path);
+    var allowed = collectMenuPaths(user.menus || []);
+    return allowed.some(function (uri) {
+      return target === uri || target.indexOf(uri + '/') === 0;
+    });
+  }
+
+  function firstAllowedRoute(user) {
+    var menus = (user && user.menus) || [];
+    for (var i = 0; i < menus.length; i++) {
+      var children = menus[i].children || [];
+      for (var j = 0; j < children.length; j++) {
+        if (children[j] && children[j].uri) {
+          return normalizeMenuPath(children[j].uri);
+        }
+      }
+    }
+    return '/dashboard';
+  }
+
+  function sidebarMenus(user) {
+    var menus = (user && user.menus) || [];
+    return menus.filter(function (group) {
+      return (group.children || []).length > 0;
+    });
+  }
+
   window.CronAdminCommon = {
     API: API,
     api: api,
@@ -352,6 +399,11 @@
     extractListRows: extractListRows,
     extractListTotal: extractListTotal,
     filterNodesByGroupId: filterNodesByGroupId,
-    buildGroupOptions: buildGroupOptions
+    buildGroupOptions: buildGroupOptions,
+    normalizeMenuPath: normalizeMenuPath,
+    collectMenuPaths: collectMenuPaths,
+    canAccessRoute: canAccessRoute,
+    firstAllowedRoute: firstAllowedRoute,
+    sidebarMenus: sidebarMenus
   };
 })(window);

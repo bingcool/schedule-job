@@ -465,8 +465,27 @@ class StaffRoleService
             static fn (array $row): int => (int) $row['page_id'],
             StaffRolePageEntity::query()->where('app_id', StaffApp::appId())->whereIn('role_id', $roleIds)->select()->toArray()
         );
-        $pageIds = array_flip($pageIds);
-        $allowed = array_values(array_filter($all, static fn (array $row): bool => isset($pageIds[(int) $row['id']])));
+        $byId = [];
+        foreach ($all as $row) {
+            $byId[(int) $row['id']] = $row;
+        }
+        $pageIdSet = [];
+        foreach (array_unique($pageIds) as $pageId) {
+            if ($pageId <= 0) {
+                continue;
+            }
+            $pageIdSet[$pageId] = true;
+            $current = $pageId;
+            while (isset($byId[$current])) {
+                $parentId = (int) ($byId[$current]['parent_id'] ?? 0);
+                if ($parentId <= 0 || isset($pageIdSet[$parentId])) {
+                    break;
+                }
+                $pageIdSet[$parentId] = true;
+                $current = $parentId;
+            }
+        }
+        $allowed = array_values(array_filter($all, static fn (array $row): bool => isset($pageIdSet[(int) $row['id']])));
 
         return $this->menuDtosToArray($this->buildMenuTree($allowed));
     }
@@ -679,6 +698,19 @@ class StaffRoleService
             ->toArray();
 
         return array_values(array_map(static fn (array $row): int => (int) $row['per_id'], $rows));
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function enabledRoleIdsForUser(int $userId): array
+    {
+        $roleIds = array_map(
+            static fn (array $row): int => (int) $row['role_id'],
+            StaffUserRoleEntity::query()->where('app_id', StaffApp::appId())->where('user_id', $userId)->select()->toArray()
+        );
+
+        return $this->enabledRoleIds($roleIds);
     }
 
     /**

@@ -25,7 +25,7 @@
           });
           common.saveSession(data);
           this.$message.success('登录成功');
-          this.$router.replace('/dashboard');
+          this.$router.replace(common.firstAllowedRoute(data.user || common.getUser()));
         } catch (e) {
           common.toastErr(this, e);
         } finally {

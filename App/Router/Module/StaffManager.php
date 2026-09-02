@@ -5,6 +5,7 @@ namespace App\Router;
 use App\Module\Staff\Controller\StaffAuthController;
 use App\Module\Staff\Controller\StaffRoleController;
 use App\Module\Staff\Controller\StaffUserController;
+use App\Module\Staff\Middleware\MenuPagePermissionMiddleware;
 use Swoolefy\Http\Middleware\AuthenticateMiddleware;
 use Swoolefy\Http\Middleware\CorsMiddleware;
 use Swoolefy\Http\Route;
@@ -28,6 +29,7 @@ Route::group([
     'middleware' => [
         CorsMiddleware::class,
         AuthenticateMiddleware::class,
+        MenuPagePermissionMiddleware::class,
     ],
 ], function () {
     Route::get('/auth/me', [

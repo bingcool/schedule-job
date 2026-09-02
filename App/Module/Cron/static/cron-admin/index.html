@@ -20,16 +20,16 @@
     <aside class="sidebar">
       <div class="brand">Schedule Job<small>Production Admin</small></div>
       <nav class="nav">
-        <div class="nav-section">Cron 管理</div>
-        <router-link to="/dashboard"><i class="el-icon-data-line"></i> Dashboard</router-link>
-        <router-link to="/tasks"><i class="el-icon-s-order"></i> 计划任务</router-link>
-        <router-link to="/executions"><i class="el-icon-time"></i> 执行记录</router-link>
-        <router-link to="/nodes"><i class="el-icon-monitor"></i> Cron Nodes</router-link>
-        <router-link to="/runtime"><i class="el-icon-odometer"></i> Runtime</router-link>
-        <div class="nav-section">权限管理</div>
-        <router-link to="/users"><i class="el-icon-user"></i> 用户管理</router-link>
-        <router-link to="/roles"><i class="el-icon-s-custom"></i> 角色管理</router-link>
-        <router-link to="/menus"><i class="el-icon-menu"></i> 菜单管理</router-link>
+        <div v-for="group in navMenus" :key="'nav-group-' + group.id">
+          <div class="nav-section">{{ group.name }}</div>
+          <router-link
+            v-for="item in (group.children || [])"
+            :key="'nav-item-' + item.id"
+            :to="menuLink(item.uri)"
+          >
+            <i :class="item.icon || 'el-icon-document'"></i> {{ item.name }}
+          </router-link>
+        </div>
       </nav>
     </aside>
     <main class="main">
@@ -1110,7 +1110,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue@2.7.16/dist/vue.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/vue-router@3.6.5/dist/vue-router.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/vue-router@3.6.5/dist/vue-router.min.js'"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js" onerror="this.onerror=null;this.src='https://unpkg.com/element-ui@2.15.14/lib/index.js'"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=rbac-5"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=rbac-6"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-list-6"></script>
 <script defer src="/cron-admin/assets/js/editor.js"></script>
@@ -1125,6 +1125,6 @@
 <script defer src="/cron-admin/assets/js/roles.js?v=status-1"></script>
 <script defer src="/cron-admin/assets/js/role-editor.js"></script>
 <script defer src="/cron-admin/assets/js/menus.js"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=settings-4"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=menu-rbac-1"></script>
 </body>
 </html>
