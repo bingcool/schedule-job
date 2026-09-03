@@ -637,6 +637,27 @@ class CronTaskManagerService
     }
 
     /**
+     * 硬删除早于保留天数的 cron_task_log 行（含已软删行）。
+     *
+     * 保留天数来自环境变量 CRON_TASK_LOG_DELETE_DAY，默认 7；≤0 时不删除。
+     *
+     * @return int 实际删除行数
+     */
+    public function purgeExpiredTaskLogs(?int $days = null): int
+    {
+        $days = $days ?? (int) env('CRON_TASK_LOG_DELETE_DAY', 7);
+        if ($days <= 0) {
+            return 0;
+        }
+
+        $cutoff = date('Y-m-d H:i:s', strtotime('-' . $days . ' days'));
+
+        return CronTaskLogEntity::withoutTrashed()
+            ->where('created_at', '<', $cutoff)
+            ->delete();
+    }
+
+    /**
      * 分页查询计划任务操作审计日志。
      */
     public function taskOperationLogs(TaskOperationLogsQueryDto $query): TaskOperationLogsPageResult
