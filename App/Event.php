@@ -12,6 +12,7 @@
 namespace App;
 
 use Swoolefy\Core\EventHandler;
+use Swoolefy\Core\Process\ProcessManager;
 use Swoolefy\Core\SystemEnv;
 
 class Event extends EventHandler
@@ -22,7 +23,8 @@ class Event extends EventHandler
     public function onInit() {
 
         if (!SystemEnv::isWorkerService()) {
-            // todo refer to Test Demo
+            // 创建一个定时器处理进程清理执行日志
+            ProcessManager::getInstance()->addProcess('tick', \App\Process\Tick::class);
         }
     }
 
