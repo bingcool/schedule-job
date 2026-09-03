@@ -96,20 +96,19 @@ CREATE TABLE IF NOT EXISTS `staff_user_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户与角色关联表';
 
 -- 初始化插入菜单栏
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (1, 1, 'Dashboard', '12', 12, '/dashboard', 'cron:dashboard', 'el-icon-data-line', 100, 1, '2026-08-31 15:31:24', '2026-08-31 16:30:54', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (2, 1, '计划任务', '12', 12, '/tasks', 'cron:tasks', 'el-icon-s-order', 90, 1, '2026-08-31 15:31:24', '2026-08-31 16:30:54', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (3, 1, '创建任务', '2', 2, '/tasks/create', 'cron:tasks:create', 'el-icon-plus', 0, 2, '2026-08-31 15:31:24', '2026-08-31 16:30:54', '2026-09-01 00:30:54');
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (4, 1, '执行记录', '12', 12, '/executions', 'cron:executions', 'el-icon-time', 80, 1, '2026-08-31 15:31:24', '2026-08-31 16:30:54', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (5, 1, '执行日志', '4', 4, '/executions/log', 'cron:executions:log', 'el-icon-notebook-2', 0, 2, '2026-08-31 15:31:24', '2026-08-31 16:30:54', '2026-09-01 00:30:54');
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (6, 1, 'Cron Nodes', '12', 12, '/nodes', 'cron:nodes', 'el-icon-monitor', 70, 1, '2026-08-31 15:31:24', '2026-08-31 16:30:54', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (7, 1, 'Runtime', '12', 12, '/runtime', 'cron:runtime', 'el-icon-odometer', 60, 1, '2026-08-31 15:31:24', '2026-09-02 14:42:38', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (8, 1, '权限管理', '', 0, '/auth', 'auth', 'el-icon-lock', 50, 1, '2026-08-31 15:31:24', '2026-09-02 14:51:04', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (9, 1, '用户管理', '8', 8, '/users', 'auth:users', 'el-icon-user', 0, 1, '2026-08-31 15:31:24', '2026-08-31 15:31:24', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (10, 1, '角色管理', '8', 8, '/roles', 'auth:roles', 'el-icon-s-custom', 0, 1, '2026-08-31 15:31:24', '2026-08-31 15:31:24', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (11, 1, '菜单管理', '8', 8, '/menus', 'auth:menus', 'el-icon-menu', 0, 1, '2026-08-31 15:31:24', '2026-08-31 15:31:24', null);
-INSERT INTO bingcool.staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (12, 1, 'Cron 管理', '', 0, '/cron', 'cron', '', 100, 1, '2026-08-31 16:30:54', '2026-08-31 16:30:54', null);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (1, 1, 'Dashboard', '12', 12, '/dashboard', 'cron:dashboard', 'el-icon-data-line', 100, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (2, 1, '计划任务', '12', 12, '/tasks', 'cron:tasks', 'el-icon-s-order', 90, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (4, 1, '执行记录', '12', 12, '/executions', 'cron:executions', 'el-icon-time', 80, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (6, 1, 'Cron Nodes', '12', 12, '/nodes', 'cron:nodes', 'el-icon-monitor', 70, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (8, 1, '权限管理', '', 0, '/auth', 'auth', 'el-icon-lock', 50, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (9, 1, '用户管理', '8', 8, '/users', 'auth:users', 'el-icon-user', 0, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (10, 1, '角色管理', '8', 8, '/roles', 'auth:roles', 'el-icon-s-custom', 0, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (11, 1, '菜单管理', '8', 8, '/menus', 'auth:menus', 'el-icon-menu', 0, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status, created_at, updated_at, delete_at) VALUES (12, 1, 'Cron 管理', '', 0, '/cron', 'cron', '', 100, 1);
 
 
--- 初始化插入超级管理员角色
-INSERT INTO bingcool.staff_roles (id, app_id, is_super_role, name, code, `desc`, status, created_at, updated_at) VALUES (1, 1, 1, '超级管理员', 'super_admin', '拥有系统全部权限', 1, '2026-08-31 15:31:24', '2026-08-31 15:31:24');
+-- 系统默认角色：初始化插入超级管理员角色和编辑任务角色组
+INSERT INTO staff_roles (id, app_id, is_super_role, name, code, `desc`, status, created_at, updated_at) VALUES (1, 1, 1, '超级管理员', 'super_admin', '拥有系统全部权限', 1);
+INSERT INTO staff_roles (id, app_id, is_super_role, name, code, `desc`, status, created_at, updated_at) VALUES (2, 1, 0, '编辑任务角色组', 'editer_task_group', '登录的用户拥有该角色时，可以编辑不属于他创建的计划任务', 1);
+
 

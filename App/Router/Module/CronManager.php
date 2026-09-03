@@ -94,6 +94,9 @@ Route::group([
     Route::get('/tasks', [
         'dispatch_route' => [CronTaskManagerController::class, 'listTasks'],
     ]);
+    Route::get('/tasks/creators', [
+        'dispatch_route' => [CronTaskManagerController::class, 'listTaskCreators'],
+    ]);
     Route::post('/tasks', [
         'dispatch_route' => [CronTaskManagerController::class, 'createTask'],
     ]);

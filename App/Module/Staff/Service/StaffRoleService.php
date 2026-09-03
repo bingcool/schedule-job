@@ -25,6 +25,7 @@ use App\Module\Staff\Entity\StaffUserRoleEntity;
 use App\Module\Staff\Exception\StaffException;
 use App\Module\Staff\Response\StaffManager\ListRolesPageResult;
 use App\Module\Staff\StaffApp;
+use App\Module\Staff\StaffRoleCode;
 
 class StaffRoleService
 {
@@ -62,6 +63,13 @@ class StaffRoleService
 
     public function listRoles(ListRolesQueryDto $query): ListRolesPageResult
     {
+        $this->ensureSystemRole(
+            StaffRoleCode::EDITOR_TASK_GROUP,
+            '任务编辑组',
+            '可编辑计划任务（含他人创建的任务），适用于同事离职后的任务维护',
+            false,
+        );
+
         $name = trim((string) ($query->getName() ?? ''));
         $status = $query->getStatus();
         $appId = StaffApp::appId();
@@ -160,6 +168,9 @@ class StaffRoleService
         if ((new StaffRoleEntity())->loadByCode($code)) {
             throw StaffException::throw('角色标识已存在', -1);
         }
+        if (StaffRoleCode::isSystem($code)) {
+            throw StaffException::throw('不能使用系统保留的角色标识', -1);
+        }
 
         $role = new StaffRoleEntity();
         $role->setData([
@@ -186,15 +197,12 @@ class StaffRoleService
         if ($dto->getName() === '' || $code === '') {
             throw StaffException::throw('角色名称和唯一标识不能为空', -1);
         }
-
-        $exist = StaffRoleEntity::query()->where('code', $code)->where('id', '<>', $id)->find();
-        if ($exist) {
-            throw StaffException::throw('角色标识已存在', -1);
+        if ($code !== (string) $role->code) {
+            throw StaffException::throw('角色唯一标识创建后不可修改', -1);
         }
 
         $role->setData([
             'name' => $dto->getName(),
-            'code' => $code,
             'desc' => $dto->getDesc(),
             'status' => $role->isSuperRole() ? 1 : $dto->getStatus(),
         ]);
@@ -254,8 +262,8 @@ class StaffRoleService
     public function deleteRole(RoleIdDto $dto): int
     {
         $role = $this->requireRole($dto->getId());
-        if ($role->isSuperRole()) {
-            throw StaffException::throw('超级管理员角色不能删除', -1);
+        if ($role->isSuperRole() || StaffRoleCode::isSystem((string) $role->code)) {
+            throw StaffException::throw('系统角色不能删除', -1);
         }
         $userCount = $this->countUsersByRoleIds([(int) $role->id])[(int) $role->id] ?? 0;
         if ($userCount > 0) {
@@ -448,8 +456,25 @@ class StaffRoleService
     {
         $this->ensureDefaultMenus();
         $this->reconcileNavMenus();
+        $this->ensureSystemRole(
+            StaffRoleCode::SUPER_ADMIN,
+            '超级管理员',
+            '拥有系统全部权限',
+            true,
+        );
+        $this->ensureSystemRole(
+            StaffRoleCode::EDITOR_TASK_GROUP,
+            '任务编辑组',
+            '可编辑计划任务（含他人创建的任务），适用于同事离职后的任务维护',
+            false,
+        );
 
-        $role = (new StaffRoleEntity())->loadByCode('super_admin');
+        return (new StaffRoleEntity())->loadByCode(StaffRoleCode::SUPER_ADMIN);
+    }
+
+    private function ensureSystemRole(string $code, string $name, string $desc, bool $isSuper): StaffRoleEntity
+    {
+        $role = (new StaffRoleEntity())->loadByCode($code);
         if ($role) {
             return $role;
         }
@@ -457,11 +482,11 @@ class StaffRoleService
         $role = new StaffRoleEntity();
         $role->setData([
             'app_id' => StaffApp::appId(),
-            'name' => '超级管理员',
-            'code' => 'super_admin',
-            'desc' => '拥有系统全部权限',
+            'name' => $name,
+            'code' => $code,
+            'desc' => $desc,
             'status' => 1,
-            'is_super_role' => 1,
+            'is_super_role' => $isSuper ? 1 : 0,
         ]);
         $role->save();
 
@@ -487,7 +512,7 @@ class StaffRoleService
         $roleIds = array_values(array_unique(array_map(static fn (array $row): int => (int) $row['role_id'], $rels)));
         $roles = [];
         if ($roleIds !== []) {
-            foreach (StaffRoleEntity::query()->whereIn('id', $roleIds)->select()->toArray() as $row) {
+            foreach (StaffRoleEntity::query()->whereIn('id', $roleIds)->where('status', 1)->select()->toArray() as $row) {
                 $roles[(int) $row['id']] = [
                     'id' => (int) $row['id'],
                     'name' => (string) $row['name'],

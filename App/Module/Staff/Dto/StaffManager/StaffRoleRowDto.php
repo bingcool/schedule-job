@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Dto\StaffManager;
 
+use App\Module\Staff\StaffRoleCode;
 use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Core\Dto\AbstractDto;
 
@@ -23,6 +24,9 @@ class StaffRoleRowDto extends AbstractDto
 
     #[ApiProperty(description: '是否超管')]
     protected bool $isSuperRole = false;
+
+    #[ApiProperty(description: '是否系统内置角色')]
+    protected bool $isSystemRole = false;
 
     #[ApiProperty(description: '状态')]
     protected int $status = 1;
@@ -65,6 +69,7 @@ class StaffRoleRowDto extends AbstractDto
         $dto->code = (string) ($row['code'] ?? '');
         $dto->desc = (string) ($row['desc'] ?? '');
         $dto->isSuperRole = (int) ($row['is_super_role'] ?? $row['isSuperRole'] ?? 0) === 1;
+        $dto->isSystemRole = StaffRoleCode::isSystem($dto->code);
         $dto->status = (int) ($row['status'] ?? 1);
         $dto->userCount = (int) ($row['user_count'] ?? $row['userCount'] ?? 0);
         $dto->menuCount = (int) ($row['menu_count'] ?? $row['menuCount'] ?? 0);

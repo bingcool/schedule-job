@@ -131,8 +131,8 @@
         }
       },
       remove: async function (row) {
-        if (row.isSuperRole) {
-          this.$message.warning('超级管理员角色不能删除');
+        if (row.isSuperRole || row.isSystemRole || row.code === 'super_admin' || row.code === 'editer_task_group') {
+          this.$message.warning('系统角色不能删除');
           return;
         }
         var used = Number(row.userCount || 0);

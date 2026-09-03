@@ -38,6 +38,11 @@ class ListTasksRequest extends BasePageRequest
     #[StringToInt]
     protected ?int $execType = null;
 
+    #[ApiProperty(description: '创建人 staff_user.id')]
+    #[ValidationRule(rule: 'nullable|int', message: 'createdBy 必须是整数')]
+    #[StringToInt]
+    protected ?int $createdBy = null;
+
     public function getKeyword(): ?string
     {
         return $this->keyword;
@@ -94,6 +99,18 @@ class ListTasksRequest extends BasePageRequest
     public function setExecType(?int $execType): static
     {
         $this->execType = $execType;
+
+        return $this;
+    }
+
+    public function getCreatedBy(): ?int
+    {
+        return $this->createdBy;
+    }
+
+    public function setCreatedBy(?int $createdBy): static
+    {
+        $this->createdBy = $createdBy;
 
         return $this;
     }

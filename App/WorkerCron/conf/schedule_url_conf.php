@@ -9,8 +9,8 @@ return [
         'handler' => \Swoolefy\Worker\Cron\CronUrlProcess::class,
         'worker_num' => 1, // 默认动态进程数量
         'max_handle' => 100, //消费达到10000后reboot进程
-        'life_time'  => 3600, // 每隔3600s重启进程
-        'limit_run_coroutine_num' => 10, // 当前进程的实时协程数量，如果协程数量超过此设置的数量，则禁止继续消费队列处理业务，而是在等待
+        'life_time'  => 3600 * 24, // 每隔3600s重启进程
+        'limit_run_coroutine_num' => 100, // 当前进程的实时协程数量，如果协程数量超过此设置的数量，则禁止继续消费队列处理业务，而是在等待
         'extend_data' => [],
         'args' => [
             // CronManager 唯一调度：配置轮询间隔（秒）。
@@ -29,7 +29,11 @@ return [
             // 动态定时任务列表
             'task_list' => function () {
                 $taskList = (new \App\Module\Cron\Service\CronTaskService())
-                    ->fetchCronTask(CronProcess::EXEC_URL_TYPE, env('CRON_NODE_ID'));
+                    ->fetchCronTask(
+                        CronProcess::EXEC_URL_TYPE,
+                        env('CRON_NODE_ID'),
+                        (string) env('CRON_NODE_API_KEY', ''),
+                    );
                 if (!empty($taskList)) {
                     return $taskList;
                 } else {

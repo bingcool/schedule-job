@@ -13,8 +13,8 @@ return [
         'description' => '系统fork模式任务调度',
         'worker_num' => 1, // 默认动态进程数量
         'max_handle' => 100, //消费达到10000后reboot进程
-        'life_time'  => 3600, // 每隔3600s重启进程
-        'limit_run_coroutine_num' => 10, // 当前进程的实时协程数量，如果协程数量超过此设置的数量，则禁止继续消费队列处理业务，而是在等待
+        'life_time'  => 3600 * 24, // 每隔3600s重启进程
+        'limit_run_coroutine_num' => 200, // 当前进程的实时协程数量，如果协程数量超过此设置的数量，则禁止继续消费队列处理业务，而是在等待
         'extend_data' => [],
         'args' => [
             // CronManager 唯一调度：配置轮询间隔（秒）。fetcher 抛异常时保留 Last Known Good Runtime。
@@ -35,7 +35,11 @@ return [
             'task_list' => function () {
                 // 读取数据库cronTask配置模式
                 $taskList = (new \App\Module\Cron\Service\CronTaskService())
-                    ->fetchCronTask(CronProcess::EXEC_FORK_TYPE, env('CRON_NODE_ID'));
+                    ->fetchCronTask(
+                        CronProcess::EXEC_FORK_TYPE,
+                        env('CRON_NODE_ID'),
+                        (string) env('CRON_NODE_API_KEY', ''),
+                    );
                 // 返回taskList
                 if (!empty($taskList)) {
                     return $taskList;

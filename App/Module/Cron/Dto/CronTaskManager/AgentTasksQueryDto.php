@@ -21,12 +21,16 @@ use Swoolefy\Core\Dto\AbstractDto;
  *
  * **关键字段语义**：
  * - nodeId：Agent 绑定的节点 ID，必须 >0
+ * - apiKey：与 cron_agent_node.api_key 一致，用于鉴权
  * - execType：1=仅 shell，2=仅 http；null 或非法值时同时返回 shell + http 两类任务
  */
 class AgentTasksQueryDto extends AbstractDto
 {
     #[ApiProperty(description: 'Agent 节点 ID（cron_agent_node 主键）')]
     protected int $nodeId = 0;
+
+    #[ApiProperty(description: '节点 API Key')]
+    protected string $apiKey = '';
 
     #[ApiProperty(description: '执行类型过滤：1=shell，2=http；null 表示不过滤')]
     protected ?int $execType = null;
@@ -41,6 +45,18 @@ class AgentTasksQueryDto extends AbstractDto
     public function setNodeId(int $nodeId): static
     {
         $this->nodeId = $nodeId;
+
+        return $this;
+    }
+
+    public function getApiKey(): string
+    {
+        return $this->apiKey;
+    }
+
+    public function setApiKey(string $apiKey): static
+    {
+        $this->apiKey = $apiKey;
 
         return $this;
     }

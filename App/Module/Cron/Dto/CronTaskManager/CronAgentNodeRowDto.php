@@ -67,6 +67,9 @@ class CronAgentNodeRowDto extends AbstractDto
     #[ApiProperty(description: '更新时间')]
     protected string $updatedAt = '';
 
+    #[ApiProperty(description: 'Agent API Key；仅创建节点时返回一次')]
+    protected string $apiKey = '';
+
     /**
      * 从数据库实体行（snake_case）映射为 DTO。
      *
@@ -93,6 +96,16 @@ class CronAgentNodeRowDto extends AbstractDto
         $dto->setUpdatedAt((string)($row['updated_at'] ?? ''));
 
         return $dto;
+    }
+
+    public function toDeepArray(): array
+    {
+        $arr = parent::toDeepArray();
+        if (($arr['apiKey'] ?? '') === '') {
+            unset($arr['apiKey']);
+        }
+
+        return $arr;
     }
 
     /**
@@ -279,6 +292,18 @@ class CronAgentNodeRowDto extends AbstractDto
     public function setUpdatedAt(string $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function getApiKey(): string
+    {
+        return $this->apiKey;
+    }
+
+    public function setApiKey(string $apiKey): static
+    {
+        $this->apiKey = $apiKey;
 
         return $this;
     }

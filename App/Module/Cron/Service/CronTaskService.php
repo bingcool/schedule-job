@@ -30,16 +30,23 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
      * - execType = {@see CronProcess::EXEC_URL_TYPE}（http）→ {@see fetchHttpCronTask}
      * - 其它类型抛 Exception
      *
-     * 查询条件：status=1、node_id、exec_type。
+     * 查询条件：node_id + api_key 鉴权通过后，按 exec_type 拉取未软删任务。
      *
      * @param int $execType 执行类型（与 CronProcess / CronTaskPayloadDto 常量对齐）
      * @param int|string $nodeId Agent 节点 ID
+     * @param string $apiKey 与 cron_agent_node.api_key 一致
      * @return list<array<string, mixed>> ScheduleEvent / CronUrlTaskMeta 的 toArray()
      * @throws \Swoolefy\Library\Exception\DbException
-     * @throws \Exception exec_type 非法时
+     * @throws \Exception exec_type 非法或节点凭证无效时
      */
-    public function fetchCronTask(int $execType, $nodeId)
+    public function fetchCronTask(int $execType, $nodeId, string $apiKey = '')
     {
+        $nodeIdInt = (int) $nodeId;
+        if ($nodeIdInt <= 0) {
+            throw new \Exception('nodeId不能为空');
+        }
+        self::verifyNodeApiKey($nodeIdInt, $apiKey);
+
         // 文档查询范围：node_id + 未软删。status 交给 Runtime Diff 做 ENABLE/DISABLE，
         // 不可在此处只取启用任务，否则 DISABLE 会被误当成 DELETE。
         $list = CronTaskEntity::queryNotDeleted()->field('*')->where([
@@ -273,6 +280,25 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
     public function ackRunOnce(int $requestId): void
     {
         (new CronTaskManagerService())->ackRunOnce($requestId);
+    }
+
+    /**
+     * 校验节点 ID 与 api_key；失败时抛 InvalidArgumentException。
+     */
+    public static function verifyNodeApiKey(int $nodeId, string $apiKey): void
+    {
+        $apiKey = trim($apiKey);
+        if ($apiKey === '') {
+            throw new \InvalidArgumentException('apiKey不能为空');
+        }
+        $node = (new CronAgentNodeEntity())->loadById($nodeId);
+        if (!$node) {
+            throw new \InvalidArgumentException('节点不存在或凭证无效');
+        }
+        $storedApiKey = $node->api_key ?? '';
+        if ($storedApiKey === '' || !hash_equals($storedApiKey, $apiKey)) {
+            throw new \InvalidArgumentException('节点不存在或凭证无效');
+        }
     }
 
     /**

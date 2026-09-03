@@ -50,8 +50,14 @@
   overflow: visible;
 }
 
+/* 下拉右缘对齐「取消」按钮左侧，避免展开列表挡住底部操作 */
+.user-grant-dialog .user-grant-select {
+  width: calc(100% - 168px);
+  max-width: 100%;
+}
+
 .user-grant-select-dropdown {
-  max-height: 240px;
+  max-height: 220px;
 }
 
 .stat-card h2 {

@@ -25,6 +25,7 @@ use Swoolefy\Core\Dto\AbstractDto;
  * - nodeId：绑定 Agent 节点 ID；null 表示不过滤
  * - groupId：节点所属分组 ID；-1 表示仅未分组节点；null 表示不过滤
  * - execType：1=shell，2=http；null 表示不过滤
+ * - createdBy：创建人 staff_user.id；null 表示不过滤
  */
 class ListTasksQueryDto extends AbstractDto
 {
@@ -48,6 +49,9 @@ class ListTasksQueryDto extends AbstractDto
 
     #[ApiProperty(description: '执行类型：1=shell，2=http；null 表示不过滤')]
     protected ?int $execType = null;
+
+    #[ApiProperty(description: '创建人 staff_user.id；null 表示不过滤')]
+    protected ?int $createdBy = null;
 
     /** 获取当前页码 */
     public function getPage(): int
@@ -147,6 +151,18 @@ class ListTasksQueryDto extends AbstractDto
     public function setExecType(?int $execType): static
     {
         $this->execType = $execType;
+
+        return $this;
+    }
+
+    public function getCreatedBy(): ?int
+    {
+        return $this->createdBy;
+    }
+
+    public function setCreatedBy(?int $createdBy): static
+    {
+        $this->createdBy = $createdBy;
 
         return $this;
     }

@@ -16,6 +16,10 @@ class CronAgentTasksQueryRequest extends BaseRequest
     #[StringToInt]
     protected int $nodeId = 0;
 
+    #[ApiProperty(description: '节点 API Key')]
+    #[ValidationRule(rule: 'required|string', message: 'apiKey 不能为空')]
+    protected string $apiKey = '';
+
     #[ApiProperty(description: '执行类型：1 shell，2 http；省略则返回全部')]
     protected ?int $execType = null;
 
@@ -27,6 +31,18 @@ class CronAgentTasksQueryRequest extends BaseRequest
     public function setNodeId(int $nodeId): static
     {
         $this->nodeId = $nodeId;
+
+        return $this;
+    }
+
+    public function getApiKey(): string
+    {
+        return $this->apiKey;
+    }
+
+    public function setApiKey(string $apiKey): static
+    {
+        $this->apiKey = $apiKey;
 
         return $this;
     }

@@ -45,6 +45,13 @@
   border-radius: 8px;
 }
 
+.auth-field-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .auth-submit {
   width: 100%;
   height: 42px;

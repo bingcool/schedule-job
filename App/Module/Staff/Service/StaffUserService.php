@@ -19,6 +19,7 @@ use App\Module\Staff\Entity\StaffUserRoleEntity;
 use App\Module\Staff\Exception\StaffException;
 use App\Module\Staff\Response\StaffManager\ListUsersPageResult;
 use App\Module\Staff\StaffApp;
+use App\Module\Staff\StaffRoleCode;
 use Swoolefy\Support\FrameworkContext;
 
 class StaffUserService
@@ -274,6 +275,41 @@ class StaffUserService
         return $this->hasSuperRole($roles);
     }
 
+    public function hasRoleCode(int $userId, string $roleCode): bool
+    {
+        if ($userId <= 0 || $roleCode === '') {
+            return false;
+        }
+        $roles = $this->staffRoleService->rolesGroupedByUserIds([$userId])[$userId] ?? [];
+        foreach ($roles as $role) {
+            if (($role['code'] ?? '') === $roleCode) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function isEditorTaskGroupUser(int $userId): bool
+    {
+        return $this->hasRoleCode($userId, StaffRoleCode::EDITOR_TASK_GROUP);
+    }
+
+    public function canManageCronTask(int $userId, int $createdBy): bool
+    {
+        if ($userId <= 0) {
+            return false;
+        }
+        if ($this->isSuperUser($userId)) {
+            return true;
+        }
+        if ($this->isEditorTaskGroupUser($userId)) {
+            return true;
+        }
+
+        return $createdBy > 0 && $createdBy === $userId;
+    }
+
     /**
      * 当前登录者可查看的节点组。null=超级管理员不限制；[]=未授权任何节点组。
      *
@@ -343,6 +379,30 @@ class StaffUserService
         }
     }
 
+    /**
+     * 账号格式：含 @ 时按邮箱校验；否则仅允许大小写字母与数字。
+     */
+    public static function assertAccount(string $account): void
+    {
+        $account = trim($account);
+        if ($account === '') {
+            throw StaffException::throw('账号不能为空', -1);
+        }
+        if (strlen($account) > 128) {
+            throw StaffException::throw('账号长度不能超过128个字符', -1);
+        }
+        if (str_contains($account, '@')) {
+            if (filter_var($account, FILTER_VALIDATE_EMAIL) === false) {
+                throw StaffException::throw('请输入有效的邮箱地址', -1);
+            }
+
+            return;
+        }
+        if (!preg_match('/^[A-Za-z0-9]+$/', $account)) {
+            throw StaffException::throw('账号仅支持大小写字母和数字，或使用有效邮箱', -1);
+        }
+    }
+
     public function requireUser(int $id): StaffUserEntity
     {
         if ($id <= 0) {
@@ -398,9 +458,10 @@ class StaffUserService
 
     private function assertAccountAndName(string $account, string $userName): void
     {
-        if ($account === '' || $userName === '') {
-            throw StaffException::throw('账号和用户名称不能为空', -1);
+        if ($userName === '') {
+            throw StaffException::throw('用户名称不能为空', -1);
         }
+        self::assertAccount($account);
     }
 
     /**

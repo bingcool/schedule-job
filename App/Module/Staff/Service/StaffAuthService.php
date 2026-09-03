@@ -42,14 +42,15 @@ class StaffAuthService
 
     public function register(RegisterDto $dto): AuthSessionDto
     {
-        $account = $dto->getAccount();
-        $userName = $dto->getUserName();
+        $account = trim($dto->getAccount());
+        $userName = trim($dto->getUserName());
         if ($account === '' || $userName === '') {
             throw StaffException::throw('账号和用户名称不能为空', -1);
         }
         if ($dto->getPassword() !== $dto->getPasswordConfirm()) {
             throw StaffException::throw('两次输入的密码不一致', -1);
         }
+        StaffUserService::assertAccount($account);
         StaffUserService::assertPassword($dto->getPassword());
         if ((new StaffUserEntity())->loadByAccount($account)) {
             throw StaffException::throw('账号已存在', -1);
@@ -197,6 +198,7 @@ class StaffAuthService
             'account' => (string) $user->account,
             'userName' => (string) $user->user_name,
             'isSuper' => $isSuper,
+            'isEditorTaskGroup' => $this->staffUserService->isEditorTaskGroupUser((int) $user->id),
             'roles' => $roles,
             'nodeGroupIds' => $this->staffUserService->nodeGroupIdsOfUser((int) $user->id),
             'menus' => $this->staffRoleService->menusForUser((int) $user->id, $isSuper),

@@ -54,6 +54,7 @@ use App\Module\Cron\Response\CronTaskManager\CronDeleteAckResponse;
 use App\Module\Cron\Response\CronTaskManager\CronNodeGroupListResponse;
 use App\Module\Cron\Response\CronTaskManager\CronNodeGroupRowResponse;
 use App\Module\Cron\Response\CronTaskManager\CronNodeListResponse;
+use App\Module\Cron\Response\CronTaskManager\CronNodeCreateResponse;
 use App\Module\Cron\Response\CronTaskManager\CronNodeRowResponse;
 use App\Module\Cron\Response\CronTaskManager\CronTaskRowResponse;
 use App\Module\Cron\Response\CronTaskManager\CronTaskStatsResponse;
@@ -65,6 +66,7 @@ use App\Module\Cron\Response\CronTaskManager\ExpressionPreviewResponse;
 use App\Module\Cron\Response\CronTaskManager\ListTasksResponse;
 use App\Module\Cron\Response\CronTaskManager\RunOnceQueuedResponse;
 use App\Module\Cron\Response\CronTaskManager\RuntimeOverviewResponse;
+use App\Module\Cron\Response\CronTaskManager\TaskCreatorOptionsResponse;
 use App\Module\Cron\Response\CronTaskManager\TaskLogsResponse;
 use App\Module\Cron\Service\CronTaskManagerService;
 
@@ -103,9 +105,23 @@ class CronTaskManagerController extends BController
             ->setStatus($request->getStatus())
             ->setNodeId($request->getNodeId())
             ->setGroupId($request->getGroupId())
-            ->setExecType($request->getExecType());
+            ->setExecType($request->getExecType())
+            ->setCreatedBy($request->getCreatedBy());
 
         return new ListTasksResponse($this->cronTaskManagerService->listTasks($query));
+    }
+
+    /**
+     * 计划任务列表创建人下拉选项（当前可见任务 GROUP BY created_by）。
+     *
+     * Route: GET /api/v1/tasks/creators
+     */
+    #[ApiOperation(
+        "计划任务创建人下拉选项"
+    )]
+    public function listTaskCreators(): TaskCreatorOptionsResponse
+    {
+        return new TaskCreatorOptionsResponse($this->cronTaskManagerService->listTaskCreators());
     }
 
     /**
@@ -273,7 +289,7 @@ class CronTaskManagerController extends BController
     #[ApiOperation(
         "创建 Cron Agent 节点"
     )]
-    public function createNode(CronNodeCreateRequest $request): CronNodeRowResponse
+    public function createNode(CronNodeCreateRequest $request): CronNodeCreateResponse
     {
         $dto = (new CreateNodeDto())
             ->setNodeName($request->getNodeName())
@@ -281,7 +297,7 @@ class CronTaskManagerController extends BController
             ->setGroupId($request->getGroupId())
             ->setRemark($request->getRemark());
 
-        return new CronNodeRowResponse($this->cronTaskManagerService->createNode($dto));
+        return new CronNodeCreateResponse($this->cronTaskManagerService->createNode($dto));
     }
 
     /**
@@ -368,15 +384,15 @@ class CronTaskManagerController extends BController
      *
      ```bash
      # 拉取全部类型（shell + http）
-     curl -X GET 'http://127.0.0.1:9501/api/v1/agent/tasks?nodeId=1' \
+     curl -X GET 'http://127.0.0.1:9501/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY' \
        -H 'Accept: application/json'
 
      # 仅 shell（execType=1）
-     curl -X GET 'http://127.0.0.1:9501/api/v1/agent/tasks?nodeId=1&execType=1' \
+     curl -X GET 'http://127.0.0.1:9501/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&execType=1' \
        -H 'Accept: application/json'
 
      # 仅 http（execType=2）
-     curl -X GET 'http://127.0.0.1:9501/api/v1/agent/tasks?nodeId=1&execType=2' \
+     curl -X GET 'http://127.0.0.1:9501/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&execType=2' \
        -H 'Accept: application/json'
      ```
      */
@@ -387,6 +403,7 @@ class CronTaskManagerController extends BController
     {
         $query = (new AgentTasksQueryDto())
             ->setNodeId($request->getNodeId())
+            ->setApiKey($request->getApiKey())
             ->setExecType($request->getExecType());
         $result = $this->cronTaskManagerService->agentTasks($query);
 

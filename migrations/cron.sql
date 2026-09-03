@@ -46,6 +46,7 @@ CREATE TABLE `cron_agent_node` (
     `group_id` int unsigned DEFAULT NULL COMMENT '所属分组ID（cron_agent_node_group.id）；历史数据可空',
     `node_name` varchar(128) NOT NULL DEFAULT '' COMMENT '节点名称',
     `node_ip` varchar(64) NOT NULL DEFAULT '' COMMENT '节点IP',
+    `api_key` varchar(64) NOT NULL DEFAULT '' COMMENT 'api_key',
     `remark` varchar(256) NOT NULL DEFAULT '' COMMENT '备注',
     `last_heartbeat_at` datetime DEFAULT NULL COMMENT '最近一次 Agent 心跳时间',
     `heartbeat_interval` int unsigned NOT NULL DEFAULT '15' COMMENT '该节点心跳间隔（秒）；Ack 时由 Worker 写入，Admin 按节点自身间隔判定存活',

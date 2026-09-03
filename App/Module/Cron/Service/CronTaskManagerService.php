@@ -37,6 +37,7 @@ use App\Module\Cron\Dto\CronTaskManager\NodeIdDto;
 use App\Module\Cron\Dto\CronTaskManager\RunOnceQueuedDto;
 use App\Module\Cron\Dto\CronTaskManager\RuntimeOverviewDto;
 use App\Module\Cron\Dto\CronTaskManager\SwitchTaskStatusDto;
+use App\Module\Cron\Dto\CronTaskManager\TaskCreatorOptionDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskIdDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskLogsQueryDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskPayloadInputDto;
@@ -128,6 +129,7 @@ class CronTaskManagerService
         $nodeId = $query->getNodeId();
         $groupId = $query->getGroupId();
         $execType = $query->getExecType();
+        $createdBy = $query->getCreatedBy();
 
         $pageResult = new ListTasksPageResult();
         $pageResult->setPage($query->getPage());
@@ -176,6 +178,9 @@ class CronTaskManagerService
         if ($execType !== null) {
             $qb->where('exec_type', $execType);
         }
+        if ($createdBy !== null && $createdBy > 0) {
+            $qb->where('created_by', $createdBy);
+        }
 
         $total = $qb->clone()->count();
         $list = $qb->order('id', 'desc')->limit($query->getOffset(), $query->getPageSize())->select()->toArray();
@@ -187,6 +192,75 @@ class CronTaskManagerService
         }
 
         return $pageResult;
+    }
+
+    /**
+     * 当前可见计划任务的去重创建人（GROUP BY created_by），供列表筛选用。
+     *
+     * @return list<TaskCreatorOptionDto>
+     */
+    public function listTaskCreators(): array
+    {
+        $nodeIds = $this->scopedTaskNodeIds(null);
+        if ($nodeIds !== null && $nodeIds === []) {
+            return [];
+        }
+
+        $qb = CronTaskEntity::queryNotDeleted()
+            ->field([new Raw('created_by')])
+            ->where('created_by', '>', 0)
+            ->group('created_by');
+        if ($nodeIds !== null) {
+            $qb->whereIn('node_id', $nodeIds);
+        }
+        $creatorRows = $qb->order('created_by', 'asc')->select()->toArray();
+        if ($creatorRows === []) {
+            return [];
+        }
+
+        $userIds = [];
+        foreach ($creatorRows as $row) {
+            $id = (int) ($row['created_by'] ?? 0);
+            if ($id > 0) {
+                $userIds[$id] = $id;
+            }
+        }
+        if ($userIds === []) {
+            return [];
+        }
+
+        $users = StaffUserEntity::query()
+            ->whereIn('id', array_values($userIds))
+            ->field(['id', 'account', 'user_name'])
+            ->select()
+            ->toArray();
+        $userMap = [];
+        foreach ($users as $user) {
+            $id = (int) ($user['id'] ?? 0);
+            if ($id > 0) {
+                $userMap[$id] = $user;
+            }
+        }
+
+        $list = [];
+        foreach ($userIds as $userId) {
+            $user = $userMap[$userId] ?? null;
+            $list[] = TaskCreatorOptionDto::fromRow(
+                $userId,
+                (string) ($user['user_name'] ?? $user['userName'] ?? ''),
+                (string) ($user['account'] ?? ''),
+            );
+        }
+
+        usort(
+            $list,
+            static fn (TaskCreatorOptionDto $a, TaskCreatorOptionDto $b): int => strcmp(
+                $a->getStaffUserName(),
+                $b->getStaffUserName(),
+            ),
+        );
+
+        return $list;
     }
 
     /**
@@ -418,6 +492,7 @@ class CronTaskManagerService
             'node_name' => $nodeName,
             'node_ip' => $nodeIp,
             'remark' => $dto->getRemark(),
+            'api_key' => self::generateNodeApiKey(),
         ]);
         $node->save();
 
@@ -572,19 +647,21 @@ class CronTaskManagerService
     public function agentTasks(AgentTasksQueryDto $query): AgentTasksResultDto
     {
         $nodeId = $query->getNodeId();
+        $apiKey = trim($query->getApiKey());
         $execType = (int)($query->getExecType() ?? 0);
         if ($nodeId <= 0) {
             throw CronTaskException::throw('nodeId不能为空', -1, []);
         }
+        $this->assertAgentNodeCredential($nodeId, $apiKey);
 
         if (in_array($execType, [CronTaskPayloadDto::EXEC_TYPE_SHELL, CronTaskPayloadDto::EXEC_TYPE_HTTP], true)) {
-            $list = $this->cronTaskService->fetchCronTask($execType, $nodeId);
+            $list = $this->cronTaskService->fetchCronTask($execType, $nodeId, $apiKey);
 
             return AgentTasksResultDto::forExecType($nodeId, $execType, $list);
         }
 
-        $shellTasks = $this->cronTaskService->fetchCronTask(CronTaskPayloadDto::EXEC_TYPE_SHELL, $nodeId);
-        $httpTasks = $this->cronTaskService->fetchCronTask(CronTaskPayloadDto::EXEC_TYPE_HTTP, $nodeId);
+        $shellTasks = $this->cronTaskService->fetchCronTask(CronTaskPayloadDto::EXEC_TYPE_SHELL, $nodeId, $apiKey);
+        $httpTasks = $this->cronTaskService->fetchCronTask(CronTaskPayloadDto::EXEC_TYPE_HTTP, $nodeId, $apiKey);
 
         return AgentTasksResultDto::forAllTypes($nodeId, $shellTasks, $httpTasks);
     }
@@ -1397,6 +1474,33 @@ class CronTaskManagerService
         return $node;
     }
 
+    /**
+     * 校验 Agent 节点 ID 与 api_key；失败时使用统一文案，避免泄露节点是否存在。
+     */
+    protected function assertAgentNodeCredential(int $nodeId, string $apiKey): void
+    {
+        try {
+            CronTaskService::verifyNodeApiKey($nodeId, $apiKey);
+        } catch (\InvalidArgumentException $e) {
+            throw CronTaskException::throw($e->getMessage(), -1);
+        }
+    }
+
+    /**
+     * 新建节点时生成 32 位大小写英文字母 API Key。
+     */
+    protected static function generateNodeApiKey(): string
+    {
+        $alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $maxIndex = strlen($alphabet) - 1;
+        $key = '';
+        for ($i = 0; $i < 32; $i++) {
+            $key .= $alphabet[random_int(0, $maxIndex)];
+        }
+
+        return $key;
+    }
+
     protected function requireNodeGroup(int $id): CronAgentNodeGroupEntity
     {
         if ($id <= 0) {
@@ -1559,9 +1663,10 @@ class CronTaskManagerService
             $row['createdBy'] = $userId;
             $creatorName = '';
             if ($userId > 0 && isset($users[$userId])) {
-                $creatorName = trim($users[$userId]['user_name']) !== ''
-                    ? $users[$userId]['user_name']
-                    : $users[$userId]['account'];
+                $creatorName = TaskCreatorOptionDto::formatStaffUserName(
+                    $users[$userId]['user_name'],
+                    $users[$userId]['account'],
+                );
             }
             $row['created_by_name'] = $creatorName;
             $row['createdByName'] = $creatorName;
@@ -1611,11 +1716,11 @@ class CronTaskManagerService
         if ($this->staffUserService->isSuperUser($userId)) {
             return;
         }
-
-        $createdBy = (int) ($task->created_by ?? 0);
-        if ($createdBy <= 0 || $createdBy !== $userId) {
-            throw CronTaskException::throw('无权限操作', -1);
+        if ($this->staffUserService->canManageCronTask($userId, (int) ($task->created_by ?? 0))) {
+            return;
         }
+
+        throw CronTaskException::throw('无权限操作', -1);
     }
 
     protected function assertSuperViewer(): void

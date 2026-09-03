@@ -307,12 +307,21 @@
     return !!user.isSuper;
   }
 
+  function isViewerEditorTaskGroup() {
+    var user = getUser() || {};
+    if (user.isEditorTaskGroup) return true;
+    return (user.roles || []).some(function (r) {
+      return r && r.code === 'editer_task_group';
+    });
+  }
+
   function viewerUserId() {
     return Number((getUser() || {}).id || 0);
   }
 
   function canManageTask(row) {
     if (isViewerSuper()) return true;
+    if (isViewerEditorTaskGroup()) return true;
     var userId = viewerUserId();
     var createdBy = Number((row && (row.createdBy || row.created_by)) || 0);
     return userId > 0 && createdBy > 0 && userId === createdBy;
@@ -403,6 +412,7 @@
     applySessionToRoot: applySessionToRoot,
     isAuthPublicPath: isAuthPublicPath,
     isViewerSuper: isViewerSuper,
+    isViewerEditorTaskGroup: isViewerEditorTaskGroup,
     viewerUserId: viewerUserId,
     canManageTask: canManageTask,
     toastNoTaskPermission: toastNoTaskPermission,

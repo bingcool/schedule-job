@@ -13,7 +13,8 @@
         nodes: [],
         groups: [],
         sel: [],
-        query: { page: 1, pageSize: 20, keyword: '', status: '', groupId: '', nodeId: '', execType: '' },
+        query: { page: 1, pageSize: 20, keyword: '', status: '', groupId: '', nodeId: '', execType: '', createdBy: '' },
+        creatorOptions: [],
         commandTip: { visible: false, text: '', x: 0, y: 0, flipX: false },
         ownerDlg: false,
         ownerSaving: false,
@@ -25,6 +26,7 @@
     created: function () {
       this.loadNodes();
       this.loadGroups();
+      this.loadCreators();
       this.load();
     },
     mounted: function () {
@@ -70,6 +72,14 @@
         try {
           var d = await common.api('/node-groups');
           this.groups = (d && d.list) || [];
+        } catch (e) {
+          common.toastErr(this, e);
+        }
+      },
+      loadCreators: async function () {
+        try {
+          var d = await common.api('/tasks/creators');
+          this.creatorOptions = (d && d.list) || [];
         } catch (e) {
           common.toastErr(this, e);
         }

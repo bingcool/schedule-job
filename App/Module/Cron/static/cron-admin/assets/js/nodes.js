@@ -104,7 +104,14 @@
           if (this.form.id) {
             await common.api('/nodes', { method: 'PUT', body: payload });
           } else {
-            await common.api('/nodes', { method: 'POST', body: payload });
+            var created = await common.api('/nodes', { method: 'POST', body: payload });
+            if (created && created.apiKey) {
+              this.$alert(
+                '请立即复制并写入 Agent 的 CRON_NODE_API_KEY（仅显示一次）：\n\n' + created.apiKey,
+                '节点 API Key',
+                { confirmButtonText: '已复制保存' }
+              );
+            }
           }
           this.dlg = false;
           this.$message.success('已保存');

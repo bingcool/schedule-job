@@ -187,6 +187,16 @@
             <el-option :value="2" label="HTTP"></el-option>
           </el-select>
         </el-form-item>
+        <el-form-item label="创建人">
+          <el-select v-model="query.createdBy" clearable filterable placeholder="全部" style="width:180px">
+            <el-option
+              v-for="c in creatorOptions"
+              :key="c.staffUserId"
+              :value="Number(c.staffUserId)"
+              :label="c.staffUserName"
+            ></el-option>
+          </el-select>
+        </el-form-item>
         <el-form-item><el-button type="primary" @click="search">查询</el-button></el-form-item>
       </el-form>
       <el-table
@@ -855,7 +865,8 @@
     </div>
     <el-form class="auth-form" label-position="top" @submit.native.prevent="submit">
       <el-form-item label="账号">
-        <el-input v-model="form.account" placeholder="建议使用邮箱作为账号" prefix-icon="el-icon-message"></el-input>
+        <el-input v-model="form.account" placeholder="邮箱或字母数字账号" prefix-icon="el-icon-message"></el-input>
+        <p class="auth-field-hint">可使用邮箱；不含 @ 时仅支持大小写字母与数字</p>
       </el-form-item>
       <el-form-item label="用户名称">
         <el-input v-model="form.userName" placeholder="请输入显示名称" prefix-icon="el-icon-user"></el-input>
@@ -952,8 +963,8 @@
         collapse-tags
         popper-append-to-body
         popper-class="user-grant-select-dropdown"
+        class="user-grant-select"
         placeholder="下拉多选角色"
-        style="width:100%"
       >
         <el-option v-for="r in roleOptions" :key="r.id" :value="Number(r.id)" :label="r.name">
           <span>{{ r.name }}</span>
@@ -978,8 +989,8 @@
         collapse-tags
         popper-append-to-body
         popper-class="user-grant-select-dropdown"
+        class="user-grant-select"
         placeholder="下拉多选节点组"
-        style="width:100%"
       >
         <el-option v-for="g in grantGroupOptions" :key="g.id" :value="Number(g.id)" :label="g.groupName || g.name"></el-option>
       </el-select>
@@ -1005,7 +1016,7 @@
         <div class="section">
           <h3 class="section-title">基本信息</h3>
           <div class="grid">
-            <div class="field"><label>账号 <span class="req">*</span></label><input class="form-control" v-model="form.account" placeholder="建议使用邮箱"></div>
+            <div class="field"><label>账号 <span class="req">*</span></label><input class="form-control" v-model="form.account" placeholder="邮箱或字母数字账号"><p class="auth-field-hint">可使用邮箱；不含 @ 时仅支持大小写字母与数字</p></div>
             <div class="field"><label>用户名称 <span class="req">*</span></label><input class="form-control" v-model="form.userName" placeholder="显示名称"></div>
             <div class="field" v-if="!isEdit"><label>密码 <span class="req">*</span></label><input class="form-control" type="password" v-model="form.password" placeholder="至少 8 位"></div>
             <div class="field" v-if="!isEdit"><label>确认密码</label><input class="form-control" type="password" v-model="form.passwordConfirm" placeholder="再次输入密码"></div>
@@ -1129,7 +1140,11 @@
         <p class="section-desc">对应 staff_roles 表字段</p>
         <div class="grid">
           <div class="field"><label>角色名称 <span class="req">*</span></label><input class="form-control" v-model="form.name" placeholder="如：运维人员"></div>
-          <div class="field"><label>唯一标识 <span class="req">*</span></label><input class="form-control mono" v-model="form.code" placeholder="如：ops"></div>
+          <div class="field">
+            <label>唯一标识 <span class="req">*</span></label>
+            <input class="form-control mono" v-model="form.code" :disabled="isEdit" placeholder="如：ops">
+            <p v-if="isEdit" class="auth-field-hint">唯一标识创建后不可修改</p>
+          </div>
           <div class="field full"><label>角色描述</label><input class="form-control" v-model="form.desc" placeholder="简要描述该角色的职责"></div>
           <div class="field">
             <label>状态</label>
