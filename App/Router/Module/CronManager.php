@@ -78,7 +78,7 @@ Route::get('/cron-admin/assets/js/roles.js', [
 Route::get('/cron-admin/assets/js/role-editor.js', [
     'dispatch_route' => [CronAdminController::class, 'assets'],
 ]);
-Route::get('/cron-admin/assets/js/menus.js', [
+Route::get('/cron-admin/assets/js/task-operation-logs.js', [
     'dispatch_route' => [CronAdminController::class, 'assets'],
 ]);
 
@@ -168,6 +168,12 @@ Route::group([
     // 日志监控
     Route::get('/tasks/logs', [
         'dispatch_route' => [CronTaskManagerController::class, 'taskLogs'],
+    ]);
+    Route::get('/tasks/operation-logs/operators', [
+        'dispatch_route' => [CronTaskManagerController::class, 'listTaskOperationOperators'],
+    ]);
+    Route::get('/tasks/operation-logs', [
+        'dispatch_route' => [CronTaskManagerController::class, 'taskOperationLogs'],
     ]);
     Route::get('/tasks/stats', [
         'dispatch_route' => [CronTaskManagerController::class, 'taskStats'],

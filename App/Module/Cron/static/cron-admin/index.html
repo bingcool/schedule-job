@@ -154,7 +154,10 @@
   <div>
     <div class="page-head">
       <div></div>
-      <div class="actions"><el-button type="primary" icon="el-icon-plus" @click="$router.push('/tasks/create')">创建任务</el-button></div>
+      <div class="actions">
+        <el-button type="primary" icon="el-icon-plus" @click="$router.push('/tasks/create')">创建任务</el-button>
+        <el-button icon="el-icon-document" @click="$router.push('/tasks/operation-logs')">操作记录</el-button>
+      </div>
     </div>
     <div class="panel">
       <el-form :inline="true" size="small" @submit.native.prevent="search">
@@ -620,6 +623,65 @@
       <h3 style="margin-top:0">执行统计</h3>
       总计 {{ stats.total }} · 成功 {{ stats.success }} · 失败 {{ stats.failed }} · 跳过 {{ stats.skipped }} · 超时 {{ stats.timeout || 0 }} · 取消 {{ stats.cancelled || 0 }} · 成功率 {{ stats.successRate }}% · 平均 {{ stats.avgDurationMs }}ms
     </div>
+  </div>
+</script>
+
+<script type="text/x-template" id="tpl-task-operation-logs">
+  <div>
+    <div class="page-head">
+      <div><el-button size="small" icon="el-icon-arrow-left" @click="$router.push('/tasks')">返回任务列表</el-button></div>
+    </div>
+    <div class="panel">
+      <el-form :inline="true" size="small" @submit.native.prevent="search">
+        <el-form-item label="任务名称"><el-input v-model="query.taskName" clearable placeholder="支持模糊搜索"></el-input></el-form-item>
+        <el-form-item label="操作类型">
+          <el-select v-model="query.actionType" clearable placeholder="全部" style="width:130px">
+            <el-option v-for="opt in [{value:1,label:'启用任务'},{value:2,label:'禁用任务'},{value:3,label:'删除任务'},{value:4,label:'执行任务'},{value:5,label:'编辑任务'}]" :key="opt.value" :value="opt.value" :label="opt.label"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="操作人">
+          <el-select v-model="query.operatorId" clearable filterable placeholder="全部" style="width:180px">
+            <el-option v-for="o in operatorOptions" :key="o.operatorId" :value="Number(o.operatorId)" :label="o.operatorName"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="操作时间">
+          <el-date-picker
+            v-model="query.operationTimeRange"
+            type="datetimerange"
+            value-format="yyyy-MM-dd HH:mm:ss"
+            format="yyyy-MM-dd HH:mm:ss"
+            clearable
+            range-separator="→"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间">
+          </el-date-picker>
+        </el-form-item>
+        <el-form-item><el-button type="primary" @click="search">查询</el-button></el-form-item>
+      </el-form>
+      <el-table :data="items" v-loading="loading" empty-text="暂无操作记录">
+        <el-table-column prop="cronId" label="任务ID" width="80"></el-table-column>
+        <el-table-column prop="taskName" label="任务名称" min-width="150"></el-table-column>
+        <el-table-column label="操作类型" width="110">
+          <template slot-scope="s">
+            <span class="status-pill" :class="actionTypeClass(s.row)">{{ actionTypeText(s.row) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="operatorName" label="操作人" min-width="160"></el-table-column>
+        <el-table-column prop="createdAt" label="操作时间" width="170"></el-table-column>
+        <el-table-column label="操作" width="100">
+          <template slot-scope="s">
+            <el-button type="text" @click="showDetail(s.row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination style="margin-top:12px" background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
+    </div>
+    <el-dialog title="操作详情" :visible.sync="detailDlg" width="760px" append-to-body>
+      <div v-if="detailRow" style="margin-bottom:10px;color:var(--muted);font-size:13px">
+        {{ detailRow.taskName }} · {{ actionTypeText(detailRow) }} · {{ detailRow.operatorName }} · {{ detailRow.createdAt }}
+      </div>
+      <pre class="mono" style="white-space:pre-wrap;max-height:480px;overflow:auto">{{ detailPayload() }}</pre>
+    </el-dialog>
   </div>
 </script>
 
@@ -1256,6 +1318,7 @@
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
+<script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
 <script defer src="/cron-admin/assets/js/executions.js"></script>
 <script defer src="/cron-admin/assets/js/nodes.js"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>

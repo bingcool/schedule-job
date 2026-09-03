@@ -20,6 +20,7 @@ use App\Module\Cron\Dto\CronTaskManager\NodeIdDto;
 use App\Module\Cron\Dto\CronTaskManager\SwitchTaskStatusDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskIdDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskLogsQueryDto;
+use App\Module\Cron\Dto\CronTaskManager\TaskOperationLogsQueryDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskPayloadInputDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskStatsQueryDto;
 use App\Module\Cron\Dto\CronTaskManager\UpdateNodeDto;
@@ -44,6 +45,7 @@ use App\Module\Cron\Request\CronTaskManager\DashboardTrendRequest;
 use App\Module\Cron\Request\CronTaskManager\ExecutionDetailRequest;
 use App\Module\Cron\Request\CronTaskManager\ExpressionPreviewRequest;
 use App\Module\Cron\Request\CronTaskManager\ListTasksRequest;
+use App\Module\Cron\Request\CronTaskManager\TaskOperationLogsQueryRequest;
 use App\Module\Cron\Request\CronTaskManager\TaskLogsQueryRequest;
 use App\Module\Cron\Request\CronTaskManager\TaskTransferOwnerRequest;
 use App\Module\Cron\Response\CronTaskManager\BatchStatusResponse;
@@ -67,6 +69,8 @@ use App\Module\Cron\Response\CronTaskManager\ListTasksResponse;
 use App\Module\Cron\Response\CronTaskManager\RunOnceQueuedResponse;
 use App\Module\Cron\Response\CronTaskManager\RuntimeOverviewResponse;
 use App\Module\Cron\Response\CronTaskManager\TaskCreatorOptionsResponse;
+use App\Module\Cron\Response\CronTaskManager\TaskOperationLogsResponse;
+use App\Module\Cron\Response\CronTaskManager\TaskOperationOperatorOptionsResponse;
 use App\Module\Cron\Response\CronTaskManager\TaskLogsResponse;
 use App\Module\Cron\Service\CronTaskManagerService;
 
@@ -350,6 +354,43 @@ class CronTaskManagerController extends BController
             ->setEndTime($request->getEndTime());
 
         return new TaskLogsResponse($this->cronTaskManagerService->taskLogs($query));
+    }
+
+    /**
+     * 分页查询计划任务操作审计日志。
+     *
+     * Route: GET /api/v1/tasks/operation-logs
+     */
+    #[ApiOperation(
+        "分页查询计划任务操作记录"
+    )]
+    public function taskOperationLogs(TaskOperationLogsQueryRequest $request): TaskOperationLogsResponse
+    {
+        $query = (new TaskOperationLogsQueryDto())
+            ->setPage($request->getPage())
+            ->setPageSize($request->getPageSize())
+            ->setTaskName($request->getTaskName())
+            ->setActionType($request->getActionType())
+            ->setOperatorId($request->getOperatorId())
+            ->setStartTime($request->getStartTime())
+            ->setEndTime($request->getEndTime());
+
+        return new TaskOperationLogsResponse($this->cronTaskManagerService->taskOperationLogs($query));
+    }
+
+    /**
+     * 操作记录中的去重操作人列表。
+     *
+     * Route: GET /api/v1/tasks/operation-logs/operators
+     */
+    #[ApiOperation(
+        "计划任务操作记录操作人选项"
+    )]
+    public function listTaskOperationOperators(): TaskOperationOperatorOptionsResponse
+    {
+        return new TaskOperationOperatorOptionsResponse(
+            $this->cronTaskManagerService->listTaskOperationOperators(),
+        );
     }
 
     /**

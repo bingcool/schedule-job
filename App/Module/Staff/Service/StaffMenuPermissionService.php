@@ -36,6 +36,8 @@ class StaffMenuPermissionService
         '/api/v1/dashboard/overview' => '/dashboard',
         '/api/v1/dashboard/execution-trend' => '/dashboard',
         '/api/v1/tasks/logs' => '/executions',
+        '/api/v1/tasks/operation-logs/operators' => '/tasks',
+        '/api/v1/tasks/operation-logs' => '/tasks',
         '/api/v1/tasks/execution' => '/executions',
         '/api/v1/tasks/stats' => ['/tasks', '/executions'],
         '/api/v1/tasks/expression/preview' => '/tasks',

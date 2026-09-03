@@ -10,6 +10,7 @@ use Swoolefy\Library\Db\Raw;
 use Swoolefy\Worker\Cron\CronNodeLiveness;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 use Swoolefy\Worker\Cron\ExpressionParser;
+use App\Module\Cron\CronTaskOperationType;
 use App\Module\Cron\Dto\CronTaskManager\AgentHeartbeatDto;
 use App\Module\Cron\Dto\CronTaskManager\AgentHeartbeatResultDto;
 use App\Module\Cron\Dto\CronTaskManager\AgentReportDto;
@@ -20,6 +21,7 @@ use App\Module\Cron\Dto\CronTaskManager\BatchStatusResultDto;
 use App\Module\Cron\Dto\CronTaskManager\CreateNodeDto;
 use App\Module\Cron\Dto\CronTaskManager\CreateNodeGroupDto;
 use App\Module\Cron\Dto\CronTaskManager\CronAgentNodeRowDto;
+use App\Module\Cron\Dto\CronTaskManager\CronTaskOperationLogRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskLogRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskPayloadDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskRowDto;
@@ -40,6 +42,8 @@ use App\Module\Cron\Dto\CronTaskManager\SwitchTaskStatusDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskCreatorOptionDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskIdDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskLogsQueryDto;
+use App\Module\Cron\Dto\CronTaskManager\TaskOperationLogsQueryDto;
+use App\Module\Cron\Dto\CronTaskManager\TaskOperationOperatorOptionDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskPayloadInputDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskStatsQueryDto;
 use App\Module\Cron\Dto\CronTaskManager\TaskStatusAckDto;
@@ -50,9 +54,11 @@ use App\Module\Cron\Entity\CronAgentNodeEntity;
 use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
 use App\Module\Cron\Entity\CronTaskEntity;
 use App\Module\Cron\Entity\CronTaskLogEntity;
+use App\Module\Cron\Entity\CronTaskOperationLogEntity;
 use App\Module\Cron\Entity\CronTaskRunRequestEntity;
 use App\Module\Cron\Exception\CronTaskException;
 use App\Module\Cron\Response\CronTaskManager\ListTasksPageResult;
+use App\Module\Cron\Response\CronTaskManager\TaskOperationLogsPageResult;
 use App\Module\Cron\Response\CronTaskManager\TaskLogsPageResult;
 use App\Module\Staff\Entity\StaffUserEntity;
 use App\Module\Staff\Service\StaffUserService;
@@ -332,8 +338,15 @@ class CronTaskManagerService
             throw CronTaskException::throw('任务名称必须唯一', -1);
         }
 
+        $beforeSnapshot = $this->snapshotTaskForOperationLog($task);
         $task->setData($entityData);
         $task->save();
+        $this->recordTaskOperationLog(
+            $task,
+            CronTaskOperationType::EDIT,
+            $beforeSnapshot,
+            $this->snapshotTaskForOperationLog($task),
+        );
 
         return $this->attachTaskNodeGroupInfo([$task->getAttributes()])[0];
     }
@@ -389,7 +402,14 @@ class CronTaskManagerService
         }
         $this->assertTaskManageAllowed($task);
 
+        $beforeSnapshot = $this->snapshotTaskForOperationLog($task);
         $task->delete();
+        $this->recordTaskOperationLog(
+            $task,
+            CronTaskOperationType::DELETE,
+            $beforeSnapshot,
+            null,
+        );
 
         return $id;
     }
@@ -413,8 +433,15 @@ class CronTaskManagerService
         }
         $this->assertTaskManageAllowed($task);
 
+        $beforeSnapshot = $this->snapshotTaskForOperationLog($task);
         $task->status = $status;
         $task->save();
+        $this->recordTaskOperationLog(
+            $task,
+            $status === 1 ? CronTaskOperationType::ENABLE : CronTaskOperationType::DISABLE,
+            $beforeSnapshot,
+            $this->snapshotTaskForOperationLog($task),
+        );
 
         return TaskStatusAckDto::of($id, $status);
     }
@@ -607,6 +634,112 @@ class CronTaskManagerService
         $pageResult->setTotal($total);
 
         return $pageResult;
+    }
+
+    /**
+     * 分页查询计划任务操作审计日志。
+     */
+    public function taskOperationLogs(TaskOperationLogsQueryDto $query): TaskOperationLogsPageResult
+    {
+        $pageResult = new TaskOperationLogsPageResult();
+        $qb = CronTaskOperationLogEntity::query();
+        if (!$this->applyOperationLogNodeScope($qb)) {
+            $pageResult->setTotal(0);
+
+            return $pageResult;
+        }
+
+        $taskName = $query->getTaskName();
+        if ($taskName !== null) {
+            $qb->where('task_name', 'like', '%' . $taskName . '%');
+        }
+        $actionType = $query->getActionType();
+        if ($actionType !== null && CronTaskOperationType::isValid($actionType)) {
+            $qb->where('action_type', $actionType);
+        }
+        $operatorId = $query->getOperatorId();
+        if ($operatorId !== null && $operatorId > 0) {
+            $qb->where('operator_id', $operatorId);
+        }
+        if ($query->getStartTime() !== null) {
+            $qb->where('created_at', '>=', $query->getStartTime());
+        }
+        if ($query->getEndTime() !== null) {
+            $qb->where('created_at', '<=', $query->getEndTime());
+        }
+
+        $total = $qb->clone()->count();
+        $list = $qb->order('id', 'desc')->limit($query->getOffset(), $query->getPageSize())->select()->toArray();
+        $pageResult->setTotal($total);
+        foreach ($list as $row) {
+            $pageResult->addListItem(CronTaskOperationLogRowDto::fromEntityRow($row));
+        }
+
+        return $pageResult;
+    }
+
+    /**
+     * 操作审计日志中的去重操作人，供筛选用。
+     *
+     * @return list<TaskOperationOperatorOptionDto>
+     */
+    public function listTaskOperationOperators(): array
+    {
+        $qb = CronTaskOperationLogEntity::query()
+            ->field([new Raw('DISTINCT operator_id AS operator_id')])
+            ->where('operator_id', '>', 0)
+            ->group('operator_id');
+        if (!$this->applyOperationLogNodeScope($qb)) {
+            return [];
+        }
+        $rows = $qb->order('operator_id', 'asc')->select()->toArray();
+        if ($rows === []) {
+            return [];
+        }
+
+        $operatorIds = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['operator_id'] ?? 0);
+            if ($id > 0) {
+                $operatorIds[$id] = $id;
+            }
+        }
+        if ($operatorIds === []) {
+            return [];
+        }
+
+        $users = StaffUserEntity::query()
+            ->whereIn('id', array_values($operatorIds))
+            ->field(['id', 'account', 'user_name'])
+            ->select()
+            ->toArray();
+        $userMap = [];
+        foreach ($users as $user) {
+            $id = (int) ($user['id'] ?? 0);
+            if ($id > 0) {
+                $userMap[$id] = $user;
+            }
+        }
+
+        $list = [];
+        foreach ($operatorIds as $operatorId) {
+            $user = $userMap[$operatorId] ?? null;
+            $list[] = TaskOperationOperatorOptionDto::fromRow(
+                $operatorId,
+                (string) ($user['user_name'] ?? $user['userName'] ?? ''),
+                (string) ($user['account'] ?? ''),
+            );
+        }
+
+        usort(
+            $list,
+            static fn (TaskOperationOperatorOptionDto $a, TaskOperationOperatorOptionDto $b): int => strcmp(
+                $a->getOperatorName(),
+                $b->getOperatorName(),
+            ),
+        );
+
+        return $list;
     }
 
     /**
@@ -1244,6 +1377,20 @@ class CronTaskManagerService
             throw $e;
         }
 
+        foreach ($existsRows as $row) {
+            $task = new CronTaskEntity();
+            $task->setData(is_array($row) ? $row : $row->getAttributes());
+            $this->recordTaskOperationLog(
+                $task,
+                $status === 1 ? CronTaskOperationType::ENABLE : CronTaskOperationType::DISABLE,
+                $this->snapshotTaskAttributes(is_array($row) ? $row : $row->getAttributes()),
+                array_merge(
+                    $this->snapshotTaskAttributes(is_array($row) ? $row : $row->getAttributes()),
+                    ['status' => $status],
+                ),
+            );
+        }
+
         return BatchStatusResultDto::of($ids, $status);
     }
 
@@ -1289,6 +1436,12 @@ class CronTaskManagerService
             'requested_at' => $requestedAt,
             'consumed_at' => null,
         ]);
+        $this->recordTaskOperationLog(
+            $task,
+            CronTaskOperationType::RUN,
+            null,
+            $this->snapshotTaskForOperationLog($task),
+        );
 
         return RunOnceQueuedDto::of($dto->getId(), $requestedAt);
     }
@@ -1729,6 +1882,103 @@ class CronTaskManagerService
         if ($userId <= 0 || !$this->staffUserService->isSuperUser($userId)) {
             throw CronTaskException::throw('无权限操作', -1);
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function snapshotTaskForOperationLog(CronTaskEntity $task): array
+    {
+        return $this->snapshotTaskAttributes($task->getAttributes());
+    }
+
+    /**
+     * @param array<string, mixed> $attrs
+     * @return array<string, mixed>
+     */
+    protected function snapshotTaskAttributes(array $attrs): array
+    {
+        unset($attrs['deleted_at']);
+
+        return $attrs;
+    }
+
+    protected function recordTaskOperationLog(
+        CronTaskEntity $task,
+        int $actionType,
+        ?array $before = null,
+        ?array $after = null,
+    ): void {
+        if (!CronTaskOperationType::isValid($actionType)) {
+            return;
+        }
+
+        $attrs = $task->getAttributes();
+        $cronId = (int) ($attrs['id'] ?? 0);
+        $nodeId = (int) ($attrs['node_id'] ?? 0);
+        $taskName = (string) ($attrs['cron_name'] ?? $attrs['name'] ?? '');
+        if ($taskName === '' && is_array($before)) {
+            $taskName = (string) ($before['cron_name'] ?? $before['name'] ?? '');
+        }
+        if ($cronId <= 0 && is_array($before)) {
+            $cronId = (int) ($before['id'] ?? 0);
+        }
+        if ($nodeId <= 0 && is_array($before)) {
+            $nodeId = (int) ($before['node_id'] ?? 0);
+        }
+        if ($nodeId <= 0 && is_array($after)) {
+            $nodeId = (int) ($after['node_id'] ?? 0);
+        }
+
+        $operator = $this->resolveOperatorSnapshot();
+        CronTaskOperationLogEntity::query()->insert([
+            'cron_id' => $cronId,
+            'node_id' => $nodeId,
+            'task_name' => $taskName,
+            'action_type' => $actionType,
+            'operator_id' => $operator['operator_id'],
+            'operator_name' => $operator['operator_name'],
+            'content_before' => $before !== null ? json_encode($before, JSON_UNESCAPED_UNICODE) : null,
+            'content_after' => $after !== null ? json_encode($after, JSON_UNESCAPED_UNICODE) : null,
+        ]);
+    }
+
+    /**
+     * @return array{operator_id:int, operator_name:string}
+     */
+    protected function resolveOperatorSnapshot(): array
+    {
+        $userId = $this->currentUserId();
+        if ($userId <= 0) {
+            return ['operator_id' => 0, 'operator_name' => ''];
+        }
+
+        $user = (new StaffUserEntity())->loadById($userId);
+        if (!$user) {
+            return ['operator_id' => $userId, 'operator_name' => ''];
+        }
+
+        return [
+            'operator_id' => $userId,
+            'operator_name' => TaskCreatorOptionDto::formatStaffUserName(
+                (string) ($user->user_name ?? ''),
+                (string) ($user->account ?? ''),
+            ),
+        ];
+    }
+
+    protected function applyOperationLogNodeScope(Query $qb): bool
+    {
+        $nodeIds = $this->scopedTaskNodeIds(null);
+        if ($nodeIds === null) {
+            return true;
+        }
+        if ($nodeIds === []) {
+            return false;
+        }
+        $qb->whereIn('node_id', $nodeIds);
+
+        return true;
     }
 
     protected function resolveTaskNodeGroupId(CronTaskEntity $task): int

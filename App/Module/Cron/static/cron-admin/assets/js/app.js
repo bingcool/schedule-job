@@ -13,6 +13,7 @@
       { path: '/tasks/create', component: window.CronAdminEditor, meta: { title: '创建计划任务', subtitle: '配置任务调度规则、执行方式以及运行策略', breadcrumb: '计划任务 / 创建任务' } },
       { path: '/tasks/edit/:id', component: window.CronAdminEditor, meta: { title: '编辑计划任务', subtitle: '配置任务调度规则、执行方式以及运行策略', breadcrumb: '计划任务 / 编辑任务' } },
       { path: '/tasks/detail/:id', component: window.CronAdminDetail, meta: { title: '任务详情', subtitle: '', breadcrumb: '计划任务 / 任务详情' } },
+      { path: '/tasks/operation-logs', component: window.CronAdminTaskOperationLogs, meta: { title: '操作记录', subtitle: '计划任务的启用、禁用、删除、执行与编辑审计', breadcrumb: '计划任务 / 操作记录' } },
       { path: '/executions', component: window.CronAdminExecutions, meta: { title: '执行记录', subtitle: '按任务、流水状态、批次过滤', breadcrumb: '执行记录' } },
       { path: '/executions/log', component: window.CronAdminExecutionLog, meta: { title: '执行日志', subtitle: '单次执行详情、stdout/stderr 与下载', breadcrumb: '执行记录 / 执行日志' } },
       { path: '/nodes', component: window.CronAdminNodes, meta: { title: 'Cron Nodes', subtitle: 'Agent 节点管理与心跳状态', breadcrumb: 'Cron Nodes' } },
