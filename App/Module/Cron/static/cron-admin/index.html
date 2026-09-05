@@ -1122,7 +1122,7 @@
         <el-table-column prop="menuCount" label="菜单权限" width="90" align="center"></el-table-column>
         <el-table-column label="状态" width="140">
           <template slot-scope="s">
-            <div class="task-status-switch" v-if="s.row.isSuperRole">
+            <div class="task-status-switch" v-if="s.row.isSuperRole || s.row.isSystemRole">
               <span class="status-mark status-enabled">启用</span>
             </div>
             <div class="task-status-switch" v-else>
@@ -1204,9 +1204,9 @@
           <div class="field full"><label>角色描述</label><input class="form-control" v-model="form.desc" placeholder="简要描述该角色的职责"></div>
           <div class="field">
             <label>状态</label>
-            <template v-if="isSuperRole">
+            <template v-if="isStatusLocked">
               <div style="line-height:32px;color:var(--green);font-weight:600">启用</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:4px">超级管理员固定为启用状态，不可修改</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">系统内置角色固定为启用状态，不可修改</div>
             </template>
             <el-radio-group v-else v-model="form.status">
               <el-radio :label="1">启用</el-radio>

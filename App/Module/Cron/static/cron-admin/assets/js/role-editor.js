@@ -9,12 +9,16 @@
       return {
         saving: false,
         isSuperRole: false,
+        isSystemRole: false,
         form: { name: '', code: '', desc: '', status: 1 }
       };
     },
     computed: {
       isEdit: function () {
         return !!this.$route.params.id;
+      },
+      isStatusLocked: function () {
+        return this.isSuperRole || this.isSystemRole;
       }
     },
     created: function () {
@@ -26,11 +30,12 @@
         try {
           var d = await common.api('/roles/detail?id=' + this.$route.params.id);
           this.isSuperRole = !!d.isSuperRole;
+          this.isSystemRole = !!d.isSystemRole;
           this.form = {
             name: d.name || '',
             code: d.code || '',
             desc: d.desc || '',
-            status: this.isSuperRole ? 1 : (d.status === 0 ? 0 : 1)
+            status: this.isStatusLocked ? 1 : (d.status === 0 ? 0 : 1)
           };
         } catch (e) {
           common.toastErr(this, e);
@@ -47,7 +52,7 @@
             name: this.form.name,
             code: this.form.code,
             desc: this.form.desc,
-            status: this.isSuperRole ? 1 : this.form.status
+            status: this.isStatusLocked ? 1 : this.form.status
           };
           if (this.isEdit) {
             body.id = Number(this.$route.params.id);

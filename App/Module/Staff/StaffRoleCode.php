@@ -19,6 +19,12 @@ final class StaffRoleCode
         return in_array($code, self::all(), true);
     }
 
+    /** 系统内置角色状态固定为启用，不可禁用。 */
+    public static function isStatusLocked(string $code): bool
+    {
+        return self::isSystem($code);
+    }
+
     /**
      * @return list<string>
      */

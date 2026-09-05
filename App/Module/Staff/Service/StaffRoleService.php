@@ -204,7 +204,7 @@ class StaffRoleService
         $role->setData([
             'name' => $dto->getName(),
             'desc' => $dto->getDesc(),
-            'status' => $role->isSuperRole() ? 1 : $dto->getStatus(),
+            'status' => $this->isStatusLockedRole($role) ? 1 : $dto->getStatus(),
         ]);
         $role->save();
 
@@ -281,8 +281,8 @@ class StaffRoleService
     {
         $role = $this->requireRole($dto->getId());
         $status = $dto->getStatus();
-        if ($status === 0 && $role->isSuperRole()) {
-            throw StaffException::throw('超级管理员角色不能禁用', -1);
+        if ($status === 0 && $this->isStatusLockedRole($role)) {
+            throw StaffException::throw('系统角色不能禁用', -1);
         }
 
         $role->setData(['status' => $status]);
@@ -1022,5 +1022,10 @@ class StaffRoleService
         }
 
         return (new StaffMenuPageEntity())->loadById((int) $row['id']);
+    }
+
+    private function isStatusLockedRole(StaffRoleEntity $role): bool
+    {
+        return $role->isSuperRole() || StaffRoleCode::isStatusLocked((string) $role->code);
     }
 }

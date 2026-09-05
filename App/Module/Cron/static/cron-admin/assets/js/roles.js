@@ -55,8 +55,8 @@
       onStatusChange: async function (row, next) {
         var prev = next === 1 ? 0 : 1;
         try {
-          if (row.isSuperRole && next === 0) {
-            throw new Error('超级管理员角色不能禁用');
+          if ((row.isSuperRole || row.isSystemRole) && next === 0) {
+            throw new Error('系统角色不能禁用');
           }
           if (next === 0) {
             await common.confirmRoleDisable(this, row.name);
