@@ -182,6 +182,32 @@ cd schedule-job
 composer install
 ```
 
+依赖版本需配对使用（**不要**把 `bingcool/library` 写成 `dev-swoolefy-6.2-x`）：
+
+| 包 | 分支 |
+|---|---|
+| `bingcool/swoolefy` | `dev-swoolefy-6.2-x` |
+| `bingcool/library` | `dev-library-6.x` |
+
+若安装或升级报错，请一次性指定两个包：
+
+```bash
+composer require bingcool/swoolefy:dev-swoolefy-6.2-x bingcool/library:dev-library-6.x
+```
+
+或手动确认 `composer.json` 中 `require` 为：
+
+```json
+"bingcool/swoolefy": "dev-swoolefy-6.2-x",
+"bingcool/library": "dev-library-6.x"
+```
+
+然后执行：
+
+```bash
+composer update bingcool/swoolefy bingcool/library
+```
+
 ### 2. 配置环境变量
 
 ```bash

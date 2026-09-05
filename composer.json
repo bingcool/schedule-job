@@ -19,8 +19,8 @@
   ],
   "prefer-stable": true,
   "require": {
-    "bingcool/swoolefy": "dev-swoolefy-6.2-x",
-    "bingcool/library": "dev-library-6.x"
+    "bingcool/swoolefy": "~6.3.3",
+    "bingcool/library": "^6.0.1"
   },
   "require-dev": {
     "kwn/php-rdkafka-stubs": "dev-master",
