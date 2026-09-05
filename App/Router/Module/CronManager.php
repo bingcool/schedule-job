@@ -75,6 +75,9 @@ Route::get('/cron-admin/assets/js/roles.js', [
 Route::get('/cron-admin/assets/js/role-editor.js', [
     'dispatch_route' => [CronAdminController::class, 'assets'],
 ]);
+Route::get('/cron-admin/assets/js/menus.js', [
+    'dispatch_route' => [CronAdminController::class, 'assets'],
+]);
 Route::get('/cron-admin/assets/js/task-operation-logs.js', [
     'dispatch_route' => [CronAdminController::class, 'assets'],
 ]);

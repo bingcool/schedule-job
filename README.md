@@ -1,6 +1,6 @@
 # Schedule Job
 
-基于 [Swoolefy](https://github.com/bingcool/swoolefy) 的 **Cron 任务调度管理平台 + Agent 执行体**。提供 Web 管理控制台、REST API、多节点 Agent 拉取执行、执行日志与操作审计，适用于 PHP 生态下的分布式定时任务场景。
+基于 [Swoolefy](https://github.com/bingcool/swoolefy) 的 **Cron 任务调度管理平台 + Agent 执行体**。提供 Web 管理控制台、REST API、多节点 Agent 拉取执行、执行日志与操作审计，适用于 PHP 、Python, Java, Go、Shell等生态下的分布式定时任务场景。
 
 ---
 

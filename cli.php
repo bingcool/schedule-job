@@ -36,7 +36,7 @@ define('PHP_BIN_FILE', '/usr/bin/php');
 
 define('WORKER_START_SCRIPT_FILE', str_contains($_SERVER['SCRIPT_FILENAME'], $_SERVER['PWD']) ? $_SERVER['SCRIPT_FILENAME'] : $_SERVER['PWD'] . '/' . $_SERVER['SCRIPT_FILENAME']);
 define('WORKER_SERVICE_NAME', makeServerName($appName));
-define('WORKER_PID_FILE_ROOT', '/tmp/workerfy/log/' . WORKER_SERVICE_NAME);
+define('WORKER_PID_FILE_ROOT', '/tmp/schedule-job/log/' . WORKER_SERVICE_NAME);
 define('WORKER_CTL_LOG_FILE', WORKER_PID_FILE_ROOT . '/ctl.log');
 define('CLI_TO_WORKER_PIPE', WORKER_PID_FILE_ROOT . '/cli.pipe');
 define('WORKER_TO_CLI_PIPE', WORKER_PID_FILE_ROOT . '/ctl.pipe');
