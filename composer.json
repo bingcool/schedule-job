@@ -1,9 +1,23 @@
 {
   "name": "bingcool/schudule-job",
-  "description": "schudule-job is cron task admin manager platform and agent",
+  "description": "schudule-job is cron task admin manager platform and agent base on swoolefy",
   "minimum-stability": "dev",
+  "keywords": [
+    "schedule cron job",
+    "swoolefy",
+    "php",
+    "cron agent"
+  ],
+  "license": "MIT",
+  "type": "project",
+  "authors": [
+    {
+      "name": "bingcool",
+      "email": "2437667702@qq.com",
+      "role": "Engineer of swoolefy"
+    }
+  ],
   "prefer-stable": true,
-  "license": "proprietary",
   "require": {
     "bingcool/swoolefy": "dev-swoolefy-6.2-x",
     "bingcool/library": "dev-library-6.x"

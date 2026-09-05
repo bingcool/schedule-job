@@ -16,9 +16,6 @@ Route::group([
         CorsMiddleware::class,
     ],
 ], function () {
-    Route::post('/auth/register', [
-        'dispatch_route' => [StaffAuthController::class, 'register'],
-    ]);
     Route::post('/auth/login', [
         'dispatch_route' => [StaffAuthController::class, 'login'],
     ]);
@@ -59,6 +56,9 @@ Route::group([
     ]);
     Route::match(['POST', 'PUT'], '/users/status', [
         'dispatch_route' => [StaffUserController::class, 'switchStatus'],
+    ]);
+    Route::match(['POST', 'PUT'], '/users/reset-password', [
+        'dispatch_route' => [StaffUserController::class, 'resetPassword'],
     ]);
     Route::match(['POST', 'PUT'], '/users/roles', [
         'dispatch_route' => [StaffUserController::class, 'grantRoles'],

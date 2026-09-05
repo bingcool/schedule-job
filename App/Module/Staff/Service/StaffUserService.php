@@ -9,6 +9,7 @@ use App\Module\Staff\Dto\StaffManager\CreateUserDto;
 use App\Module\Staff\Dto\StaffManager\GrantUserNodeGroupsDto;
 use App\Module\Staff\Dto\StaffManager\GrantUserRolesDto;
 use App\Module\Staff\Dto\StaffManager\ListUsersQueryDto;
+use App\Module\Staff\Dto\StaffManager\ResetUserPasswordDto;
 use App\Module\Staff\Dto\StaffManager\StaffUserRowDto;
 use App\Module\Staff\Dto\StaffManager\SwitchUserStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateUserDto;
@@ -365,6 +366,36 @@ class StaffUserService
         $user->save();
 
         return SwitchUserStatusDto::of((int) $user->id, $status);
+    }
+
+    /**
+     * 超级管理员重置其他用户密码。
+     */
+    public function resetPasswordBySuperAdmin(ResetUserPasswordDto $dto): int
+    {
+        $this->assertSuperViewer();
+
+        $targetId = $dto->getId();
+        if ($targetId <= 0) {
+            throw StaffException::throw('用户不存在', -1);
+        }
+        $this->assertNotSelf($targetId, '请使用「修改密码」功能修改自己的密码');
+
+        if ($dto->getNewPassword() === '') {
+            throw StaffException::throw('新密码不能为空', -1);
+        }
+        if ($dto->getNewPassword() !== $dto->getNewPasswordConfirm()) {
+            throw StaffException::throw('两次输入的新密码不一致', -1);
+        }
+        self::assertPassword($dto->getNewPassword());
+
+        $user = $this->requireUser($targetId);
+        $user->setData([
+            'password' => self::hashPassword($dto->getNewPassword()),
+        ]);
+        $user->save();
+
+        return (int) $user->id;
     }
 
     public static function hashPassword(string $password): string

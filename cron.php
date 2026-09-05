@@ -60,9 +60,4 @@ define('WORKER_CONF_FILE', APP_PATH.'/WorkerCron/worker_cron_conf.php');
 $nacosFilePath = getenv('NACOS_FILE_PATH');
 define('NACOS_FILE_PATH', (false !== $nacosFilePath && '' !== $nacosFilePath) ? $nacosFilePath : APP_PATH . '/nacos.yaml');
 
-// 当使用nacos管理配置时，启动获取最新配置保存到.env
-// $beforeFunc = function () {
-//   \Swoolefy\Support\Nacos\NacosFactory::fetchConfigToEnv();
-//};
-
 include dirname(SRC_DIR_ROOT).'/swoolefy';

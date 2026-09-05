@@ -7,7 +7,7 @@
     routes: [
       { path: '/', redirect: '/dashboard' },
       { path: '/login', component: window.CronAdminLogin, meta: { title: '登录', public: true } },
-      { path: '/register', component: window.CronAdminRegister, meta: { title: '注册', public: true } },
+      { path: '/register', redirect: '/login' },
       { path: '/dashboard', component: window.CronAdminDashboard, meta: { title: 'Dashboard', subtitle: '任务、今日执行与节点心跳聚合', breadcrumb: 'Dashboard' } },
       { path: '/tasks', component: window.CronAdminTasks, meta: { title: '计划任务', subtitle: '配置写入 cron_task，Worker Polling 后生效', breadcrumb: '计划任务' } },
       { path: '/tasks/create', component: window.CronAdminEditor, meta: { title: '创建计划任务', subtitle: '配置任务调度规则、执行方式以及运行策略', breadcrumb: '计划任务 / 创建任务' } },
@@ -32,7 +32,7 @@
     var isPublic = !!(to.meta && to.meta.public);
     var token = common.getToken();
     if (isPublic) {
-      if (token && (to.path === '/login' || to.path === '/register')) {
+      if (token && to.path === '/login') {
         var loggedIn = common.getUser();
         return next(loggedIn ? common.firstAllowedRoute(loggedIn) : '/dashboard');
       }

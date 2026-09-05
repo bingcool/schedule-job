@@ -42,38 +42,7 @@ class StaffAuthService
 
     public function register(RegisterDto $dto): AuthSessionDto
     {
-        $account = trim($dto->getAccount());
-        $userName = trim($dto->getUserName());
-        if ($account === '' || $userName === '') {
-            throw StaffException::throw('账号和用户名称不能为空', -1);
-        }
-        if ($dto->getPassword() !== $dto->getPasswordConfirm()) {
-            throw StaffException::throw('两次输入的密码不一致', -1);
-        }
-        StaffUserService::assertAccount($account);
-        StaffUserService::assertPassword($dto->getPassword());
-        if ((new StaffUserEntity())->loadByAccount($account)) {
-            throw StaffException::throw('账号已存在', -1);
-        }
-
-        $isFirstUser = (int) StaffUserEntity::query()->count() === 0;
-
-        $user = new StaffUserEntity();
-        $user->setData([
-            'account' => $account,
-            'user_name' => $userName,
-            'password' => StaffUserService::hashPassword($dto->getPassword()),
-            'status' => 1,
-            'enabled_at' => date('Y-m-d H:i:s'),
-        ]);
-        $user->save();
-
-        if ($isFirstUser) {
-            $super = $this->staffRoleService->ensureBootstrap();
-            $this->staffUserService->replaceUserRoles((int) $user->id, [(int) $super->id]);
-        }
-
-        return $this->issueSession($user);
+        throw StaffException::throw('系统已关闭公开注册，请联系管理员创建账号', -1);
     }
 
     public function login(LoginDto $dto): AuthSessionDto

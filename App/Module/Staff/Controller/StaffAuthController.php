@@ -20,7 +20,7 @@ use Swoolefy\Annotation\ApiOperation;
 use Swoolefy\Core\Controller\BController;
 
 /**
- * 登录 / 注册 / 当前用户。
+ * 登录 / 当前用户（公开注册已关闭，用户由管理员在后台创建）。
  */
 class StaffAuthController extends BController
 {
@@ -29,15 +29,11 @@ class StaffAuthController extends BController
     }
 
     /**
-     * Route: POST /api/v1/auth/register
+     * 公开注册已关闭，保留方法供兼容；实际应通过管理员在用户管理中创建账号。
      *
-     ```bash
-     curl -X POST 'http://127.0.0.1:9501/api/v1/auth/register' \
-       -H 'Content-Type: application/json' \
-       -d '{"account":"admin@example.com","userName":"管理员","password":"12345678","passwordConfirm":"12345678"}'
-     ```
+     * @deprecated 路由已移除
      */
-    #[ApiOperation('用户注册')]
+    #[ApiOperation('用户注册（已关闭）')]
     public function register(RegisterRequest $request): LoginResponse
     {
         return new LoginResponse($this->staffAuthService->register(

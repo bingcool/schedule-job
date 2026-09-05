@@ -8,6 +8,7 @@ use App\Module\Staff\Dto\StaffManager\CreateUserDto;
 use App\Module\Staff\Dto\StaffManager\GrantUserNodeGroupsDto;
 use App\Module\Staff\Dto\StaffManager\GrantUserRolesDto;
 use App\Module\Staff\Dto\StaffManager\ListUsersQueryDto;
+use App\Module\Staff\Dto\StaffManager\ResetUserPasswordDto;
 use App\Module\Staff\Dto\StaffManager\SwitchUserStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateUserDto;
 use App\Module\Staff\Dto\StaffManager\UserIdDto;
@@ -16,9 +17,11 @@ use App\Module\Staff\Request\StaffManager\StaffUserByNodeGroupRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserCreateRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserIdRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserNodeGroupsRequest;
+use App\Module\Staff\Request\StaffManager\StaffUserResetPasswordRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserRolesRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserStatusRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserUpdateRequest;
+use App\Module\Staff\Response\StaffManager\ChangePasswordAckResponse;
 use App\Module\Staff\Response\StaffManager\ListUsersResponse;
 use App\Module\Staff\Response\StaffManager\RoleOptionsResponse;
 use App\Module\Staff\Response\StaffManager\StaffDeleteAckResponse;
@@ -133,6 +136,32 @@ class StaffUserController extends BController
         );
 
         return new StaffUserStatusAckResponse($ack->getId(), $ack->getStatus());
+    }
+
+    /**
+     * 超级管理员重置其他用户密码。
+     *
+     * Route: PUT /api/v1/users/reset-password
+     *
+     ```bash
+     curl -X PUT 'http://127.0.0.1:9502/api/v1/users/reset-password' \
+       -H 'Authorization: Bearer <jwt>' \
+       -H 'Content-Type: application/json' \
+       -d '{"id":2,"newPassword":"123456789","newPasswordConfirm":"123456789"}'
+     ```
+     */
+    #[ApiOperation('超级管理员重置用户密码')]
+    public function resetPassword(StaffUserResetPasswordRequest $request): ChangePasswordAckResponse
+    {
+        $id = $this->staffUserService->resetPasswordBySuperAdmin(
+            ResetUserPasswordDto::of(
+                $request->getId(),
+                $request->getNewPassword(),
+                $request->getNewPasswordConfirm(),
+            )
+        );
+
+        return new ChangePasswordAckResponse($id);
     }
 
     /**

@@ -915,33 +915,7 @@
       </el-form-item>
       <el-button type="primary" class="auth-submit" :loading="loading" @click="submit">登 录</el-button>
     </el-form>
-    <div class="auth-footer">还没有账号？<router-link to="/register">立即注册</router-link></div>
-  </div>
-</script>
-
-<script type="text/x-template" id="tpl-register">
-  <div class="auth-card">
-    <div class="auth-brand">
-      <h1>创建账号</h1>
-      <p>注册后即可使用 Schedule Job 管理平台</p>
-    </div>
-    <el-form class="auth-form" label-position="top" @submit.native.prevent="submit">
-      <el-form-item label="账号">
-        <el-input v-model="form.account" placeholder="邮箱或字母数字账号" prefix-icon="el-icon-message"></el-input>
-        <p class="auth-field-hint">可使用邮箱；不含 @ 时仅支持大小写字母与数字</p>
-      </el-form-item>
-      <el-form-item label="用户名称">
-        <el-input v-model="form.userName" placeholder="请输入显示名称" prefix-icon="el-icon-user"></el-input>
-      </el-form-item>
-      <el-form-item label="密码">
-        <el-input v-model="form.password" type="password" placeholder="至少 8 位" prefix-icon="el-icon-lock" show-password></el-input>
-      </el-form-item>
-      <el-form-item label="确认密码">
-        <el-input v-model="form.passwordConfirm" type="password" placeholder="请再次输入密码" prefix-icon="el-icon-lock" show-password @keyup.enter.native="submit"></el-input>
-      </el-form-item>
-      <el-button type="primary" class="auth-submit" :loading="loading" @click="submit">注 册</el-button>
-    </el-form>
-    <div class="auth-footer">已有账号？<router-link to="/login">返回登录</router-link></div>
+    <div class="auth-footer">账号由管理员统一创建，如需开通请联系管理员</div>
   </div>
 </script>
 
@@ -999,11 +973,16 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template slot-scope="s">
             <el-button type="text" size="small" @click="$router.push('/users/edit/' + s.row.id)">编辑</el-button>
             <el-button type="text" size="small" @click="openRoles(s.row)">角色分配</el-button>
             <el-button type="text" size="small" :disabled="!!s.row.isSuper" @click="openGrant(s.row)">节点组授权</el-button>
+            <el-button
+              v-if="viewerIsSuper && Number(s.row.id) !== viewerUserId"
+              type="text"
+              size="small"
+              @click="openResetPassword(s.row)">重置密码</el-button>
             <el-button type="text" size="small" style="color:#f56c6c" @click="remove(s.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -1059,6 +1038,21 @@
       <div slot="footer">
         <el-button @click="grantDlg = false">取消</el-button>
         <el-button type="primary" :loading="grantSaving" @click="saveGrant">保存</el-button>
+      </div>
+    </el-dialog>
+    <el-dialog title="重置密码" :visible.sync="resetPwdDlg" width="480px" append-to-body>
+      <p style="margin:0 0 12px;color:var(--muted);font-size:13px">为「{{ resetPwdUser.userName || resetPwdUser.account }}」设置新密码，重置后立即生效。</p>
+      <el-form label-position="top" @submit.native.prevent="saveResetPassword">
+        <el-form-item label="新密码">
+          <el-input v-model="resetPwdForm.newPassword" type="password" placeholder="至少 8 位" show-password></el-input>
+        </el-form-item>
+        <el-form-item label="确认新密码">
+          <el-input v-model="resetPwdForm.newPasswordConfirm" type="password" placeholder="请再次输入新密码" show-password @keyup.enter.native="saveResetPassword"></el-input>
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="resetPwdDlg = false">取消</el-button>
+        <el-button type="primary" :loading="resetPwdSaving" @click="saveResetPassword">确认重置</el-button>
       </div>
     </el-dialog>
   </div>
@@ -1323,7 +1317,6 @@
 <script defer src="/cron-admin/assets/js/nodes.js"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js?v=login-menu-1"></script>
-<script defer src="/cron-admin/assets/js/register.js?v=login-menu-1"></script>
 <script defer src="/cron-admin/assets/js/users.js?v=roles-2"></script>
 <script defer src="/cron-admin/assets/js/user-editor.js?v=roles-1"></script>
 <script defer src="/cron-admin/assets/js/roles.js?v=pages-dlg-2"></script>

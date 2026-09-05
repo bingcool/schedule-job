@@ -4,7 +4,7 @@
   var API = '/api/v1';
   var TOKEN_KEY = 'schedule_job_token';
   var USER_KEY = 'schedule_job_user';
-  var AUTH_PUBLIC_PATHS = ['/login', '/register'];
+  var AUTH_PUBLIC_PATHS = ['/login'];
 
   function getToken() {
     return localStorage.getItem(TOKEN_KEY) || '';

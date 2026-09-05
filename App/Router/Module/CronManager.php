@@ -63,9 +63,6 @@ Route::get('/cron-admin/assets/css/auth.css', [
 Route::get('/cron-admin/assets/js/login.js', [
     'dispatch_route' => [CronAdminController::class, 'assets'],
 ]);
-Route::get('/cron-admin/assets/js/register.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
 Route::get('/cron-admin/assets/js/users.js', [
     'dispatch_route' => [CronAdminController::class, 'assets'],
 ]);

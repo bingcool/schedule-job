@@ -20,12 +20,22 @@
         roleDlg: false,
         roleSaving: false,
         roleUser: { id: 0, userName: '', account: '' },
-        roleForm: { roleIds: [] }
+        roleForm: { roleIds: [] },
+        resetPwdDlg: false,
+        resetPwdSaving: false,
+        resetPwdUser: { id: 0, userName: '', account: '' },
+        resetPwdForm: { newPassword: '', newPasswordConfirm: '' }
       };
     },
     computed: {
       grantGroupOptions: function () {
         return common.filterGroupsForViewer(this.nodeGroups);
+      },
+      viewerIsSuper: function () {
+        return common.isViewerSuper();
+      },
+      viewerUserId: function () {
+        return common.viewerUserId();
       }
     },
     created: function () {
@@ -161,6 +171,54 @@
           this.load();
         } catch (e) {
           if (e !== 'cancel') common.toastErr(this, e);
+        }
+      },
+      openResetPassword: function (row) {
+        if (!common.isViewerSuper()) {
+          this.$message.warning('仅超级管理员可重置密码');
+          return;
+        }
+        if (Number(row.id) === common.viewerUserId()) {
+          this.$message.warning('请使用个人设置修改自己的密码');
+          return;
+        }
+        this.resetPwdUser = {
+          id: Number(row.id),
+          userName: row.userName || '',
+          account: row.account || ''
+        };
+        this.resetPwdForm = { newPassword: '', newPasswordConfirm: '' };
+        this.resetPwdDlg = true;
+      },
+      saveResetPassword: async function () {
+        if (!this.resetPwdForm.newPassword || !this.resetPwdForm.newPasswordConfirm) {
+          this.$message.warning('请填写新密码');
+          return;
+        }
+        if (this.resetPwdForm.newPassword.length < 8) {
+          this.$message.warning('密码至少 8 位');
+          return;
+        }
+        if (this.resetPwdForm.newPassword !== this.resetPwdForm.newPasswordConfirm) {
+          this.$message.warning('两次输入的密码不一致');
+          return;
+        }
+        this.resetPwdSaving = true;
+        try {
+          await common.api('/users/reset-password', {
+            method: 'PUT',
+            body: {
+              id: this.resetPwdUser.id,
+              newPassword: this.resetPwdForm.newPassword,
+              newPasswordConfirm: this.resetPwdForm.newPasswordConfirm
+            }
+          });
+          this.$message.success('密码已重置');
+          this.resetPwdDlg = false;
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.resetPwdSaving = false;
         }
       }
     }
