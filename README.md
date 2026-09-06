@@ -206,8 +206,10 @@ cp App/.env.example App/.env
 按顺序执行迁移脚本（在目标库中）：
 
 ```bash
-mysql -h <host> -u <user> -p <database> < migrations/permission.sql
 mysql -h <host> -u <user> -p <database> < migrations/cron.sql
+
+// 获取直接复制sql在面板执行    
+
 ```
 
 迁移完成后会预置**超级管理员**账号，用于首次登录：
