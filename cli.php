@@ -14,11 +14,19 @@ defined('START_DIR_ROOT') or define('START_DIR_ROOT', __DIR__);
 defined('SRC_DIR_ROOT') or define('SRC_DIR_ROOT', __DIR__ . "/vendor/bingcool/swoolefy/src");
 // 应用父目录
 defined('ROOT_PATH') or define('ROOT_PATH', __DIR__);
-// 应用目录
+// 应用目录（env() 依赖 APP_PATH 才会加载 App/.env）
 defined('APP_PATH') or define('APP_PATH', __DIR__ . '/' . $appName);
 
-registerNamespace(APP_PATH);
+$appEnv = (string) env('APP_ENV', 'dev');
+$mapped = match ($appEnv) {
+    'prod', 'production' => 'prd',
+    default => $appEnv,
+};
+if (in_array($mapped, ['dev', 'test', 'gra', 'prd'], true)) {
+    putenv('SWOOLEFY_CLI_ENV=' . $mapped);
+}
 
+registerNamespace(APP_PATH);
 // 你的项目命名为App，对应协议为http协议服务器，支持多个项目的，只需要在这里添加好项目名称与对应的协议即可
 define('APP_META_ARR', [
     'App' => [
@@ -42,7 +50,4 @@ define('CLI_TO_WORKER_PIPE', WORKER_PID_FILE_ROOT . '/cli.pipe');
 define('WORKER_TO_CLI_PIPE', WORKER_PID_FILE_ROOT . '/ctl.pipe');
 define('SERVER_START_LOG_JSON_FILE', WORKER_PID_FILE_ROOT . '/start.json');
 
-// nacos.yaml 完整路径（环境变量 NACOS_FILE_PATH 可覆盖，默认 APP_PATH/nacos.yaml）
-$nacosFilePath = getenv('NACOS_FILE_PATH');
-define('NACOS_FILE_PATH', (false !== $nacosFilePath && '' !== $nacosFilePath) ? $nacosFilePath : APP_PATH . '/nacos.yaml');
 include dirname(SRC_DIR_ROOT) . '/swoolefy';

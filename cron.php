@@ -10,14 +10,21 @@ define('APP_NAME', $appName);
 // 启动目录
 defined('START_DIR_ROOT') or define('START_DIR_ROOT', __DIR__);
 
-// 直接下载使用时，定义成如下路径
-// defined('SRC_DIR_ROOT') or define('SRC_DIR_ROOT', __DIR__.'/src');
 // composer安装时，必须定义成如下路径
 defined('SRC_DIR_ROOT') or define('SRC_DIR_ROOT', __DIR__."/vendor/bingcool/swoolefy/src");
 // 应用父目录
 defined('ROOT_PATH') or define('ROOT_PATH',__DIR__);
-// 应用目录
+// 应用目录（env() 依赖 APP_PATH 才会加载 App/.env）
 defined('APP_PATH') or define('APP_PATH',__DIR__.'/'.$appName);
+
+$appEnv = (string) env('APP_ENV', 'dev');
+$mapped = match ($appEnv) {
+    'prod', 'production' => 'prd',
+    default => $appEnv,
+};
+if (in_array($mapped, ['dev', 'test', 'gra', 'prd'], true)) {
+    putenv('SWOOLEFY_CLI_ENV=' . $mapped);
+}
 
 registerNamespace(APP_PATH);
 
@@ -55,9 +62,5 @@ define('SERVER_START_LOG_JSON_FILE', WORKER_PID_FILE_ROOT.'/start.json');
 
 // 定义配置文件
 define('WORKER_CONF_FILE', APP_PATH.'/WorkerCron/worker_cron_conf.php');
-
-// nacos.yaml 完整路径（环境变量 NacosConst::ENV_FILE_PATH 可覆盖，默认 APP_PATH/nacos.yaml）
-$nacosFilePath = getenv('NACOS_FILE_PATH');
-define('NACOS_FILE_PATH', (false !== $nacosFilePath && '' !== $nacosFilePath) ? $nacosFilePath : APP_PATH . '/nacos.yaml');
 
 include dirname(SRC_DIR_ROOT).'/swoolefy';
