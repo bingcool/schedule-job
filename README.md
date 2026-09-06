@@ -667,6 +667,7 @@ A: 新增前端 JS/CSS 需加入 `CronAdminController` 的白名单 `$allowed`�
 
 ---
 
-## License
+### License
 
-MIT — 详见 [composer.json](composer.json)。
+MIT  
+Copyright (c) 2017-2026 zengbing huang
