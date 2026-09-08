@@ -121,6 +121,9 @@ Route::group([
     Route::get('/tasks/execution', [
         'dispatch_route' => [CronTaskManagerController::class, 'getExecution'],
     ]);
+    Route::post('/executions/cancel', [
+        'dispatch_route' => [CronTaskManagerController::class, 'cancelExecution'],
+    ]);
     Route::post('/tasks/duplicate', [
         'dispatch_route' => [CronTaskManagerController::class, 'duplicateTask'],
     ]);

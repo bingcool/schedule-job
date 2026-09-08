@@ -266,6 +266,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="retry" label="Retry" width="70"></el-table-column>
+        <el-table-column label="超时" width="80">
+          <template slot-scope="s">{{ s.row.timeout > 0 ? (s.row.timeout + 's') : '-' }}</template>
+        </el-table-column>
         <el-table-column label="下次执行" width="170">
           <template slot-scope="s">
             <span class="next-run-at" :class="{ 'text-muted': formatNextRun(s.row) === '-' }">{{ formatNextRun(s.row) }}</span>
@@ -538,6 +541,11 @@
             <input class="form-control" type="number" min="0" v-model.number="form.retry">
             <div class="help">不含首次；0=不重试。</div>
           </div>
+          <div class="field field-gap-top">
+            <label>Shell 超时（秒）</label>
+            <input class="form-control" type="number" min="0" v-model.number="form.timeout">
+            <div class="help">仅 GLUE/Shell；0=不限制。到期 SIGTERM，grace 后 SIGKILL。HTTP 仍用下方请求超时。</div>
+          </div>
         </section>
 
         <section class="section">
@@ -568,6 +576,7 @@
         <div class="kv"><span>执行类型</span><b>{{ form.execType===2?'HTTP':'GLUE模式' }}</b></div>
         <div class="kv"><span>防重叠</span><b>{{ form.withBlockLapping?'是':'否' }}</b></div>
         <div class="kv"><span>Retry</span><b>{{ form.retry }}</b></div>
+        <div class="kv"><span>Shell 超时</span><b>{{ form.timeout > 0 ? (form.timeout + 's') : '不限制' }}</b></div>
         <div class="callout">
           <b>配置链路</b><br>
           保存后只写入 <span class="mono">cron_task</span>。Cron Worker 通过数据库 Polling 发现配置变化，再更新 Runtime Job / Timer。
@@ -598,6 +607,7 @@
         <el-descriptions-item label="类型">{{ row.execType===2?'HTTP':'GLUE模式' }}</el-descriptions-item>
         <el-descriptions-item label="状态"><el-tag :type="row.status===1?'success':'info'" size="mini">{{ row.status===1?'启用':'禁用' }}</el-tag></el-descriptions-item>
         <el-descriptions-item label="Retry">{{ row.retry }}</el-descriptions-item>
+        <el-descriptions-item label="Shell 超时">{{ row.timeout > 0 ? (row.timeout + 's') : '不限制' }}</el-descriptions-item>
         <el-descriptions-item label="防重叠">{{ row.withBlockLapping?'是':'否' }}</el-descriptions-item>
         <el-descriptions-item label="允许执行时段" :span="2">
           <div v-if="cronBetweenItems.length" class="detail-range-list">
@@ -698,8 +708,10 @@
             <el-option value="success" label="成功"></el-option>
             <el-option value="failed" label="失败"></el-option>
             <el-option value="skipped" label="跳过"></el-option>
+            <el-option value="running" label="执行中"></el-option>
             <el-option value="timeout" label="超时"></el-option>
             <el-option value="cancelled" label="取消"></el-option>
+            <el-option value="cancel_requested" label="取消中"></el-option>
             <el-option value="unregister" label="解除定时任务"></el-option>
           </el-select>
         </el-form-item>
@@ -750,17 +762,39 @@
         <el-table-column prop="pid" label="PID" width="80"></el-table-column>
         <el-table-column prop="message" label="消息" min-width="220"></el-table-column>
         <el-table-column prop="createdAt" label="时间" width="160"></el-table-column>
-        <el-table-column label="操作" width="140">
+        <el-table-column label="操作" width="180">
           <template slot-scope="s">
             <el-button type="text" @click="detail(s.row)">详情</el-button>
             <el-button type="text" @click="viewLog(s.row)">日志</el-button>
+            <el-button
+              v-if="canCancel(s.row)"
+              type="text"
+              @click="cancelExec(s.row)"
+            >取消</el-button>
           </template>
         </el-table-column>
       </el-table>
       <el-pagination style="margin-top:12px" background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
     </div>
-    <el-dialog title="执行详情" :visible.sync="dlg" width="640px">
-      <pre class="mono" style="white-space:pre-wrap">{{ execDetail ? JSON.stringify(execDetail, null, 2) : '' }}</pre>
+    <el-dialog title="执行详情" :visible.sync="dlg" width="720px">
+      <div v-if="execDetail" class="meta-grid" style="margin-bottom:12px">
+        <div class="meta-item"><span class="k">状态</span><b>{{ statusText(execDetail) }}</b></div>
+        <div class="meta-item"><span class="k">PID</span><b>{{ execDetail.pid || '-' }}</b></div>
+        <div class="meta-item"><span class="k">Lease Owner</span><b class="mono">{{ execDetail.leaseOwner || '-' }}</b></div>
+        <div class="meta-item"><span class="k">Lease Until</span><b>{{ execDetail.leaseUntil || '-' }}</b></div>
+        <div class="meta-item"><span class="k">Heartbeat</span><b>{{ execDetail.heartbeatAt || '-' }}</b></div>
+        <div class="meta-item"><span class="k">Timeout At</span><b>{{ execDetail.timeoutAt || '-' }}</b></div>
+        <div class="meta-item"><span class="k">Failure</span><b>{{ execDetail.failureReason || '-' }}</b></div>
+        <div class="meta-item"><span class="k">Request</span><b>{{ execDetail.requestId || '-' }}</b></div>
+      </div>
+      <el-button
+        v-if="execDetail && canCancel(execDetail)"
+        type="danger"
+        size="small"
+        :loading="cancelling"
+        @click="cancelExec(execDetail)"
+      >取消执行</el-button>
+      <pre class="mono" style="white-space:pre-wrap;margin-top:12px">{{ execDetail ? JSON.stringify(execDetail, null, 2) : '' }}</pre>
     </el-dialog>
   </div>
 </script>

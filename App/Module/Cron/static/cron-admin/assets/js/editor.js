@@ -30,6 +30,7 @@
           status: 1,
           withBlockLapping: 1,
           retry: 0,
+          timeout: 0,
           httpMethod: 'GET',
           httpRequestTimeOut: 30,
           httpHeaders: null,

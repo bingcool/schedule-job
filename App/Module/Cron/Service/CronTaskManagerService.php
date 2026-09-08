@@ -27,6 +27,7 @@ use App\Module\Cron\Dto\CronTaskManager\CronTaskPayloadDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskStatsResultDto;
 use App\Module\Cron\Dto\CronTaskManager\DashboardOverviewDto;
+use App\Module\Cron\Dto\CronTaskManager\ExecutionCancelResultDto;
 use App\Module\Cron\Dto\CronTaskManager\ExecutionDetailDto;
 use App\Module\Cron\Dto\CronTaskManager\ExecutionDetailQueryDto;
 use App\Module\Cron\Dto\CronTaskManager\ExecutionTrendBucketDto;
@@ -158,6 +159,7 @@ class CronTaskManagerService
             'status',
             'with_block_lapping',
             'retry',
+            'timeout',
             'description',
             'cron_between',
             'cron_skip',
@@ -885,6 +887,7 @@ class CronTaskManagerService
         }
 
         $execBatchId = trim((string)($row['exec_batch_id'] ?? ''));
+        $executionService = new ExecutionService();
         if ($execBatchId !== '') {
             $existing = CronTaskLogEntity::queryNotDeleted()
                 ->where([
@@ -894,10 +897,19 @@ class CronTaskManagerService
                 ->order('id', 'asc')
                 ->find();
             if ($existing) {
-                $id = is_array($existing) ? (int)($existing['id'] ?? 0) : (int)$existing->id;
+                $attrs = is_array($existing) ? $existing : $existing->toArray();
+                $id = (int) ($attrs['id'] ?? 0);
                 if ($id > 0) {
                     unset($row['cron_id'], $row['exec_batch_id']);
-                    CronTaskLogEntity::query()->where(['id' => $id])->update($row);
+                    $from = (int) ($attrs['status'] ?? 0);
+                    if ($dto->getStatus() !== null) {
+                        $executionService->transition($id, $from, (int) $dto->getStatus(), $row);
+                    } else {
+                        CronTaskLogEntity::query()
+                            ->where('id', $id)
+                            ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
+                            ->update($row);
+                    }
 
                     return $cronId;
                 }
@@ -1136,6 +1148,24 @@ class CronTaskManagerService
         $this->assertTaskVisible((int) ($attrs['cron_id'] ?? 0));
 
         return ExecutionDetailDto::fromLogRow($attrs);
+    }
+
+    /**
+     * Admin Cancel：只 CAS RUNNING → CANCEL_REQUESTED，由 Agent 杀进程。
+     */
+    public function cancelExecution(int $logId): ExecutionCancelResultDto
+    {
+        if ($logId <= 0) {
+            throw CronTaskException::throw('id不能为空', -1);
+        }
+        $row = CronTaskLogEntity::queryNotDeleted()->where('id', $logId)->find();
+        if (!$row) {
+            throw CronTaskException::throw('执行记录不存在', -1);
+        }
+        $attrs = is_array($row) ? $row : $row->toArray();
+        $this->assertTaskManageAllowed($this->requireTask((int) ($attrs['cron_id'] ?? 0)));
+
+        return (new ExecutionService())->requestCancel($logId);
     }
 
     /**

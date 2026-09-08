@@ -39,6 +39,7 @@ class StaffMenuPermissionService
         '/api/v1/tasks/operation-logs/operators' => '/tasks',
         '/api/v1/tasks/operation-logs' => '/tasks',
         '/api/v1/tasks/execution' => '/executions',
+        '/api/v1/executions/cancel' => ['/executions', '/tasks'],
         '/api/v1/tasks/stats' => ['/tasks', '/executions'],
         '/api/v1/tasks/expression/preview' => '/tasks',
         '/api/v1/tasks/creators' => '/tasks',

@@ -9,7 +9,7 @@ use Test\Scripts\Kernel;
 return [
         [
         'process_name' => 'schedule-fork-task-cron', // 进程名称
-        'handler' => \Swoolefy\Worker\Cron\CronForkProcess::class,
+        'handler' => \App\WorkerCron\ScheduleForkCronProcess::class,
         'description' => '系统fork模式任务调度',
         'worker_num' => 1, // 默认动态进程数量
         'max_handle' => 100, //消费达到10000后reboot进程
@@ -26,6 +26,9 @@ return [
             'run_once_ack' => static function (string $jobId, int $cronTaskId, $result = null, int $requestId = 0): void {
                 unset($jobId, $cronTaskId, $result);
                 (new \App\Module\Cron\Service\CronTaskService())->ackRunOnce($requestId);
+            },
+            'run_once_precheck' => static function (int $requestId): string {
+                return (new \App\Module\Cron\Service\ExecutionService())->precheckRunOnce($requestId);
             },
             // 节点心跳落库：upsert cron_agent_node.last_heartbeat_at / heartbeat_interval
             'node_heartbeat_ack' => static function (string $nodeId, int $heartbeatInterval = 15): void {

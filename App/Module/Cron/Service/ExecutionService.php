@@ -1,0 +1,489 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Module\Cron\Service;
+
+use App\Module\Cron\Dto\CronTaskManager\ExecutionCancelResultDto;
+use App\Module\Cron\Entity\CronTaskLogEntity;
+use App\Module\Cron\ExecutionWorkerIdentity;
+use App\Module\Cron\FailureReason;
+use Swoolefy\Core\Schedule\ScheduleEvent;
+use Swoolefy\Worker\Cron\ExecutionStatus;
+use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
+
+/**
+ * Execution 生命周期唯一入口：upsert + CAS，不把 status 散落到各处直接 UPDATE。
+ */
+class ExecutionService
+{
+    /**
+     * Agent Worker 启动：生成 boot_id，回收过期 RUNNING，启动看护 Tick。
+     */
+    public function bootAgent(): void
+    {
+        ExecutionWorkerIdentity::bootId();
+        ExecutionRuntimeGuard::boot();
+    }
+
+    /**
+     * CronManager logWriter 入口。
+     *
+     * @param array<string, mixed> $execution
+     */
+    public function writeRuntime(
+        ScheduleEvent|CronUrlTaskMetaDtoWorker $scheduleTask,
+        string $execBatchId,
+        string $message,
+        int $pid = 0,
+        array $execution = [],
+    ): void {
+        $cronId = (int) $scheduleTask->cron_task_id;
+        $row = [
+            'cron_id' => $cronId,
+            'exec_batch_id' => $execBatchId,
+            'message' => $message,
+        ];
+        if ($pid > 0) {
+            $row['pid'] = $pid;
+        }
+
+        $taskItem = $scheduleTask->toArray();
+        $row['task_item'] = $taskItem;
+
+        foreach ([
+            'status', 'trigger_type', 'request_id', 'node_id', 'scheduled_at', 'started_at',
+            'finished_at', 'duration_ms', 'exit_code', 'http_status', 'failure_reason',
+        ] as $field) {
+            if (array_key_exists($field, $execution) && $execution[$field] !== null && $execution[$field] !== '') {
+                $row[$field] = $execution[$field];
+            }
+        }
+        if (isset($row['request_id']) && (int) $row['request_id'] <= 0) {
+            unset($row['request_id']);
+        }
+
+        if ($execBatchId === '') {
+            CronTaskLogEntity::query()->insert($row);
+
+            return;
+        }
+
+        $existing = $this->findByBatch($cronId, $execBatchId);
+        if ($existing === null) {
+            $this->insertExecution($scheduleTask, $row, $execution);
+            return;
+        }
+
+        $this->updateExecution((int) $existing['id'], $existing, $row, $execution, $pid);
+    }
+
+    /**
+     * RunOnce 消费前闸门：ack=已有终态只确认；defer=租约仍有效；execute=需要跑。
+     */
+    public function precheckRunOnce(int $requestId): string
+    {
+        if ($requestId <= 0) {
+            return 'execute';
+        }
+        $row = $this->findLatestByRequestId($requestId);
+        if ($row === null) {
+            return 'execute';
+        }
+        $status = (int) ($row['status'] ?? 0);
+        if (in_array($status, [
+            ExecutionStatus::SUCCESS,
+            ExecutionStatus::TIMEOUT,
+            ExecutionStatus::CANCELLED,
+        ], true)) {
+            return 'ack';
+        }
+        if ($status === ExecutionStatus::RUNNING) {
+            if ($this->leaseValid($row)) {
+                return 'defer';
+            }
+            $this->recoverRow($row, FailureReason::WORKER_CRASH);
+
+            return 'execute';
+        }
+        if ($status === ExecutionStatus::CANCEL_REQUESTED) {
+            return 'defer';
+        }
+
+        return 'execute';
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findById(int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+        $row = CronTaskLogEntity::queryNotDeleted()->where('id', $id)->find();
+        if (!$row) {
+            return null;
+        }
+
+        return is_array($row) ? $row : $row->toArray();
+    }
+
+    public function heartbeat(int $logId, string $owner): bool
+    {
+        $seconds = $this->leaseDuration();
+        $until = date('Y-m-d H:i:s', time() + $seconds);
+        $now = date('Y-m-d H:i:s');
+        $n = CronTaskLogEntity::query()
+            ->where('id', $logId)
+            ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
+            ->where('lease_owner', $owner)
+            ->update([
+                'heartbeat_at' => $now,
+                'lease_until' => $until,
+            ]);
+
+        return $this->affected($n);
+    }
+
+    public function finishOwned(int $logId, string $owner, int $toStatus, string $reason): bool
+    {
+        $row = $this->findById($logId);
+        if ($row === null) {
+            return false;
+        }
+        if ((string) ($row['lease_owner'] ?? '') !== $owner) {
+            return false;
+        }
+        $from = (int) ($row['status'] ?? 0);
+        if ($from === ExecutionStatus::CANCEL_REQUESTED && $toStatus === ExecutionStatus::TIMEOUT) {
+            $toStatus = ExecutionStatus::CANCELLED;
+            $reason = FailureReason::CANCELLED;
+        }
+        if ($from === ExecutionStatus::RUNNING && $toStatus === ExecutionStatus::CANCELLED) {
+            $this->transition($logId, ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED, [
+                'cancelled_at' => date('Y-m-d H:i:s'),
+            ]);
+            $from = ExecutionStatus::CANCEL_REQUESTED;
+        }
+
+        return $this->transition($logId, $from, $toStatus, [
+            'failure_reason' => $reason,
+            'finished_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    public function recoverExpiredLeases(int $limit = 100): int
+    {
+        $now = date('Y-m-d H:i:s');
+        $rows = CronTaskLogEntity::queryNotDeleted()
+            ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
+            ->whereNotNull('lease_until')
+            ->where('lease_until', '<', $now)
+            ->order('id', 'asc')
+            ->limit($limit)
+            ->select()
+            ->toArray();
+        $closed = 0;
+        $nodeId = ExecutionWorkerIdentity::nodeId();
+        foreach ($rows as $row) {
+            if ($this->recoverRow($row, FailureReason::WORKER_CRASH)) {
+                $closed++;
+                $pid = (int) ($row['pid'] ?? 0);
+                if ($nodeId > 0 && (int) ($row['node_id'] ?? 0) === $nodeId && $pid > 0) {
+                    ExecutionRuntimeGuard::signalPid($pid, 9);
+                }
+            }
+        }
+
+        return $closed;
+    }
+
+    public function requestCancel(int $logId): ExecutionCancelResultDto
+    {
+        $row = $this->findById($logId);
+        if ($row === null) {
+            return ExecutionCancelResultDto::alreadyFinished(0, 'unknown');
+        }
+        $status = (int) ($row['status'] ?? 0);
+        $name = ExecutionStatus::name($status);
+        if ($status !== ExecutionStatus::RUNNING) {
+            return ExecutionCancelResultDto::alreadyFinished($logId, $name);
+        }
+        $ok = $this->transition($logId, ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED, [
+            'cancelled_at' => date('Y-m-d H:i:s'),
+            'failure_reason' => FailureReason::CANCELLED,
+        ]);
+        if (!$ok) {
+            $fresh = $this->findById($logId);
+            $freshStatus = (int) ($fresh['status'] ?? $status);
+
+            return ExecutionCancelResultDto::alreadyFinished($logId, ExecutionStatus::name($freshStatus));
+        }
+
+        return ExecutionCancelResultDto::accepted($logId, ExecutionStatus::name(ExecutionStatus::CANCEL_REQUESTED));
+    }
+
+    /**
+     * @param array<string, mixed> $extra
+     */
+    public function transition(int $id, int $fromStatus, int $toStatus, array $extra = []): bool
+    {
+        if ($id <= 0 || !$this->isLegalTransition($fromStatus, $toStatus)) {
+            return false;
+        }
+        $data = $extra;
+        $data['status'] = $toStatus;
+        if ($this->isTerminal($toStatus) && empty($data['finished_at'])) {
+            $data['finished_at'] = date('Y-m-d H:i:s');
+        }
+        $n = CronTaskLogEntity::query()
+            ->where('id', $id)
+            ->where('status', $fromStatus)
+            ->update($data);
+
+        return $this->affected($n);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function recoverRow(array $row, string $reason): bool
+    {
+        $id = (int) ($row['id'] ?? 0);
+        $from = (int) ($row['status'] ?? 0);
+        $now = date('Y-m-d H:i:s');
+        $to = ExecutionStatus::FAILED;
+        if ($from === ExecutionStatus::CANCEL_REQUESTED) {
+            $to = ExecutionStatus::CANCELLED;
+            $reason = FailureReason::CANCELLED;
+        }
+        $ok = $this->transition($id, $from, $to, [
+            'failure_reason' => $reason,
+            'finished_at' => $now,
+            'message' => trim((string) ($row['message'] ?? '') . ' [RECOVERED ' . $reason . ']'),
+        ]);
+
+        return $ok;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $execution
+     */
+    private function insertExecution(
+        ScheduleEvent|CronUrlTaskMetaDtoWorker $scheduleTask,
+        array $row,
+        array $execution,
+    ): void {
+        $status = (int) ($row['status'] ?? ExecutionStatus::RUNNING);
+        $row['status'] = $status;
+        $nodeId = (int) ($row['node_id'] ?? 0);
+        if ($nodeId <= 0) {
+            $nodeId = (int) ($scheduleTask->node_id ?? ExecutionWorkerIdentity::nodeId());
+            $row['node_id'] = $nodeId;
+        }
+        if ($status === ExecutionStatus::RUNNING) {
+            $this->applyLease($row, $execution, $scheduleTask);
+        }
+        CronTaskLogEntity::query()->insert($row);
+        $saved = $this->findByBatch((int) $row['cron_id'], (string) $row['exec_batch_id']);
+        if ($saved && $status === ExecutionStatus::RUNNING) {
+            $id = (int) $saved['id'];
+            ExecutionRuntimeGuard::watch(
+                $id,
+                (int) ($saved['pid'] ?? 0),
+                isset($saved['timeout_at']) ? (string) $saved['timeout_at'] : null,
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $existing
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $execution
+     */
+    private function updateExecution(int $id, array $existing, array $row, array $execution, int $pid): void
+    {
+        $from = (int) ($existing['status'] ?? 0);
+        $hasStatus = array_key_exists('status', $execution) && $execution['status'] !== null && $execution['status'] !== '';
+        $to = $hasStatus ? (int) $execution['status'] : $from;
+
+        unset($row['cron_id'], $row['exec_batch_id']);
+
+        if (!$hasStatus) {
+            if ($pid > 0) {
+                $row['pid'] = $pid;
+            }
+            unset($row['status']);
+            if ($row === []) {
+                return;
+            }
+            CronTaskLogEntity::query()
+                ->where('id', $id)
+                ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
+                ->update($row);
+            if ($pid > 0) {
+                ExecutionRuntimeGuard::touchPid($id, $pid);
+            }
+
+            return;
+        }
+
+        if ($to === $from) {
+            if ($to === ExecutionStatus::RUNNING) {
+                $this->applyLease($row, $execution, null, $existing);
+            }
+            unset($row['status']);
+            if ($row !== []) {
+                CronTaskLogEntity::query()->where('id', $id)->where('status', $from)->update($row);
+            }
+            if ($pid > 0) {
+                ExecutionRuntimeGuard::touchPid($id, $pid);
+            }
+
+            return;
+        }
+
+        if ($from === ExecutionStatus::CANCEL_REQUESTED && in_array($to, [ExecutionStatus::SUCCESS, ExecutionStatus::FAILED], true)) {
+            $to = ExecutionStatus::CANCELLED;
+            $row['failure_reason'] = FailureReason::CANCELLED;
+        }
+        if ($from === ExecutionStatus::TIMEOUT || $from === ExecutionStatus::CANCELLED || $from === ExecutionStatus::SUCCESS) {
+            return;
+        }
+        if ($to === ExecutionStatus::FAILED && empty($row['failure_reason'])) {
+            $row['failure_reason'] = FailureReason::EXECUTION_ERROR;
+        }
+        if ($to === ExecutionStatus::TIMEOUT) {
+            $row['failure_reason'] = FailureReason::TIMEOUT;
+        }
+        $this->transition($id, $from, $to, $row);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $execution
+     * @param array<string, mixed>|null $existing
+     */
+    private function applyLease(
+        array &$row,
+        array $execution,
+        ScheduleEvent|CronUrlTaskMetaDtoWorker|null $scheduleTask,
+        ?array $existing = null,
+    ): void {
+        $owner = ExecutionWorkerIdentity::owner();
+        $nowTs = time();
+        $now = date('Y-m-d H:i:s', $nowTs);
+        $row['lease_owner'] = $owner;
+        $row['lease_until'] = date('Y-m-d H:i:s', $nowTs + $this->leaseDuration());
+        $row['heartbeat_at'] = $now;
+        if (empty($row['started_at'])) {
+            $row['started_at'] = $now;
+        }
+        $timeoutSec = (int) ($execution['timeout'] ?? 0);
+        if ($timeoutSec <= 0 && $scheduleTask !== null) {
+            $arr = $scheduleTask->toArray();
+            $timeoutSec = (int) ($arr['timeout'] ?? 0);
+        }
+        if ($timeoutSec > 0 && empty($existing['timeout_at'])) {
+            $startedTs = strtotime((string) $row['started_at']) ?: $nowTs;
+            $row['timeout_at'] = date('Y-m-d H:i:s', $startedTs + $timeoutSec);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function findByBatch(int $cronId, string $execBatchId): ?array
+    {
+        if ($cronId <= 0 || $execBatchId === '') {
+            return null;
+        }
+        $row = CronTaskLogEntity::queryNotDeleted()
+            ->where([
+                'cron_id' => $cronId,
+                'exec_batch_id' => $execBatchId,
+            ])
+            ->order('id', 'asc')
+            ->find();
+        if (!$row) {
+            return null;
+        }
+
+        return is_array($row) ? $row : $row->toArray();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function findLatestByRequestId(int $requestId): ?array
+    {
+        $row = CronTaskLogEntity::queryNotDeleted()
+            ->where('request_id', $requestId)
+            ->order('id', 'desc')
+            ->find();
+        if (!$row) {
+            return null;
+        }
+
+        return is_array($row) ? $row : $row->toArray();
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function leaseValid(array $row): bool
+    {
+        $until = (string) ($row['lease_until'] ?? '');
+        if ($until === '') {
+            return false;
+        }
+        $ts = strtotime($until);
+
+        return $ts !== false && $ts >= time();
+    }
+
+    private function isLegalTransition(int $from, int $to): bool
+    {
+        if ($from === $to) {
+            return false;
+        }
+        $map = [
+            ExecutionStatus::RUNNING => [
+                ExecutionStatus::SUCCESS,
+                ExecutionStatus::FAILED,
+                ExecutionStatus::TIMEOUT,
+                ExecutionStatus::CANCEL_REQUESTED,
+            ],
+            ExecutionStatus::CANCEL_REQUESTED => [
+                ExecutionStatus::CANCELLED,
+                ExecutionStatus::TIMEOUT,
+                ExecutionStatus::FAILED,
+            ],
+        ];
+
+        return in_array($to, $map[$from] ?? [], true);
+    }
+
+    private function isTerminal(int $status): bool
+    {
+        return in_array($status, [
+            ExecutionStatus::SUCCESS,
+            ExecutionStatus::FAILED,
+            ExecutionStatus::SKIPPED,
+            ExecutionStatus::TIMEOUT,
+            ExecutionStatus::CANCELLED,
+        ], true);
+    }
+
+    private function leaseDuration(): int
+    {
+        return max(20, (int) env('EXECUTION_LEASE_DURATION', 60));
+    }
+
+    private function affected(mixed $n): bool
+    {
+        return $n === true || (int) $n === 1;
+    }
+}

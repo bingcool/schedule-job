@@ -13,13 +13,16 @@ use Swoolefy\Worker\Cron\ExecutionStatus;
  */
 class ExecutionDetailDto extends AbstractDto
 {
+    #[ApiProperty(description: '执行日志 ID')]
+    protected int $id = 0;
+
     #[ApiProperty(description: '任务 ID')]
     protected int $taskId = 0;
 
     #[ApiProperty(description: '执行批次 ID')]
     protected string $execBatchId = '';
 
-    #[ApiProperty(description: 'register / running / success / failed / skipped / timeout / cancelled / unregister / unknown')]
+    #[ApiProperty(description: 'register / running / success / failed / skipped / timeout / cancelled / cancel_requested / unregister / unknown')]
     protected string $status = 'unknown';
 
     #[ApiProperty(description: 'status 整型')]
@@ -27,6 +30,30 @@ class ExecutionDetailDto extends AbstractDto
 
     #[ApiProperty(description: '触发类型：1-scheduler 2-run_once')]
     protected int $triggerType = 0;
+
+    #[ApiProperty(description: '手动执行请求 ID')]
+    protected ?int $requestId = null;
+
+    #[ApiProperty(description: '执行节点 ID')]
+    protected int $nodeId = 0;
+
+    #[ApiProperty(description: 'Lease owner')]
+    protected string $leaseOwner = '';
+
+    #[ApiProperty(description: 'Lease 过期时间')]
+    protected string $leaseUntil = '';
+
+    #[ApiProperty(description: '心跳时间')]
+    protected string $heartbeatAt = '';
+
+    #[ApiProperty(description: '超时截止时间')]
+    protected string $timeoutAt = '';
+
+    #[ApiProperty(description: '取消请求时间')]
+    protected string $cancelledAt = '';
+
+    #[ApiProperty(description: '失败原因')]
+    protected string $failureReason = '';
 
     #[ApiProperty(description: '进程 PID')]
     protected int $pid = 0;
@@ -64,6 +91,7 @@ class ExecutionDetailDto extends AbstractDto
     public static function fromLogRow(array $row): self
     {
         $dto = new self();
+        $dto->id = (int) (self::pick($row, 'id') ?? 0);
         $dto->taskId = (int) (self::pick($row, 'cron_id', 'cronId') ?? 0);
         $dto->execBatchId = (string) (self::pick($row, 'exec_batch_id', 'execBatchId') ?? '');
         $dto->pid = (int) (self::pick($row, 'pid') ?? 0);
@@ -72,6 +100,15 @@ class ExecutionDetailDto extends AbstractDto
         $dto->statusCode = $statusCode;
         $dto->status = ExecutionStatus::name($statusCode);
         $dto->triggerType = (int) (self::pick($row, 'trigger_type', 'triggerType') ?? 0);
+        $rid = self::pick($row, 'request_id', 'requestId');
+        $dto->requestId = $rid !== null && $rid !== '' ? (int) $rid : null;
+        $dto->nodeId = (int) (self::pick($row, 'node_id', 'nodeId') ?? 0);
+        $dto->leaseOwner = (string) (self::pick($row, 'lease_owner', 'leaseOwner') ?? '');
+        $dto->leaseUntil = (string) (self::pick($row, 'lease_until', 'leaseUntil') ?? '');
+        $dto->heartbeatAt = (string) (self::pick($row, 'heartbeat_at', 'heartbeatAt') ?? '');
+        $dto->timeoutAt = (string) (self::pick($row, 'timeout_at', 'timeoutAt') ?? '');
+        $dto->cancelledAt = (string) (self::pick($row, 'cancelled_at', 'cancelledAt') ?? '');
+        $dto->failureReason = (string) (self::pick($row, 'failure_reason', 'failureReason') ?? '');
         $dto->scheduledAt = (string) (self::pick($row, 'scheduled_at', 'scheduledAt') ?? '');
         $started = (string) (self::pick($row, 'started_at', 'startedAt') ?? '');
         $finished = (string) (self::pick($row, 'finished_at', 'finishedAt') ?? '');

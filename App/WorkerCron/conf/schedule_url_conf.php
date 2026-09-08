@@ -6,7 +6,7 @@ return [
     // 定时请求远程url触发远程url的任务处理
     [
         'process_name' => 'schedule-url-task-cron', // 进程名称
-        'handler' => \Swoolefy\Worker\Cron\CronUrlProcess::class,
+        'handler' => \App\WorkerCron\ScheduleUrlCronProcess::class,
         'worker_num' => 1, // 默认动态进程数量
         'max_handle' => 100, //消费达到10000后reboot进程
         'life_time'  => 3600 * 24, // 每隔3600s重启进程
@@ -20,6 +20,9 @@ return [
             'run_once_ack' => static function (string $jobId, int $cronTaskId, $result = null, int $requestId = 0): void {
                 unset($jobId, $cronTaskId, $result);
                 (new \App\Module\Cron\Service\CronTaskService())->ackRunOnce($requestId);
+            },
+            'run_once_precheck' => static function (int $requestId): string {
+                return (new \App\Module\Cron\Service\ExecutionService())->precheckRunOnce($requestId);
             },
             'heartbeat_interval' => env('CRON_HEARTBEAT_INTERVAL', 15),
             'node_heartbeat_ack' => static function (string $nodeId, int $heartbeatInterval = 15): void {

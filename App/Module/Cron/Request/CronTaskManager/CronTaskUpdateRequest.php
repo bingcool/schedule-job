@@ -48,6 +48,9 @@ class CronTaskUpdateRequest extends BaseRequest
     #[ApiProperty(description: '失败后重试次数（不含首次；0=不重试）')]
     protected ?int $retry = null;
 
+    #[ApiProperty(description: 'Shell 执行超时秒数，0=不限制')]
+    protected ?int $timeout = null;
+
     #[ApiProperty(description: 'HTTP 方法')]
     protected ?string $httpMethod = null;
 
@@ -200,6 +203,18 @@ class CronTaskUpdateRequest extends BaseRequest
         return $this;
     }
 
+    public function getTimeout(): ?int
+    {
+        return $this->timeout;
+    }
+
+    public function setTimeout(?int $timeout): static
+    {
+        $this->timeout = $timeout;
+
+        return $this;
+    }
+
     public function getHttpMethod(): ?string
     {
         return $this->httpMethod;
@@ -348,6 +363,9 @@ class CronTaskUpdateRequest extends BaseRequest
         }
         if ($this->retry !== null) {
             $out['retry'] = $this->retry;
+        }
+        if ($this->timeout !== null) {
+            $out['timeout'] = $this->timeout;
         }
         if ($this->httpMethod !== null) {
             $out['http_method'] = $this->httpMethod;

@@ -52,6 +52,30 @@ class CronTaskLogRowDto extends AbstractDto
     #[ApiProperty(description: '触发类型：1-scheduler 2-run_once')]
     protected int $triggerType = 0;
 
+    #[ApiProperty(description: '手动执行请求 ID')]
+    protected ?int $requestId = null;
+
+    #[ApiProperty(description: '执行节点 ID')]
+    protected int $nodeId = 0;
+
+    #[ApiProperty(description: 'Lease owner')]
+    protected string $leaseOwner = '';
+
+    #[ApiProperty(description: 'Lease 过期时间')]
+    protected string $leaseUntil = '';
+
+    #[ApiProperty(description: '心跳时间')]
+    protected string $heartbeatAt = '';
+
+    #[ApiProperty(description: '超时截止时间')]
+    protected string $timeoutAt = '';
+
+    #[ApiProperty(description: '取消请求时间')]
+    protected string $cancelledAt = '';
+
+    #[ApiProperty(description: '失败原因')]
+    protected string $failureReason = '';
+
     #[ApiProperty(description: '计划执行时间')]
     protected string $scheduledAt = '';
 
@@ -106,6 +130,15 @@ class CronTaskLogRowDto extends AbstractDto
         $dto->setStatus($status);
         $dto->setStatusName(ExecutionStatus::name($status));
         $dto->setTriggerType((int)($row['trigger_type'] ?? 0));
+        $rid = $row['request_id'] ?? null;
+        $dto->requestId = $rid !== null && $rid !== '' ? (int) $rid : null;
+        $dto->nodeId = (int) ($row['node_id'] ?? 0);
+        $dto->leaseOwner = (string) ($row['lease_owner'] ?? '');
+        $dto->leaseUntil = (string) ($row['lease_until'] ?? '');
+        $dto->heartbeatAt = (string) ($row['heartbeat_at'] ?? '');
+        $dto->timeoutAt = (string) ($row['timeout_at'] ?? '');
+        $dto->cancelledAt = (string) ($row['cancelled_at'] ?? '');
+        $dto->failureReason = (string) ($row['failure_reason'] ?? '');
         $dto->setScheduledAt((string)($row['scheduled_at'] ?? ''));
         $dto->setStartedAt((string)($row['started_at'] ?? ''));
         $dto->setFinishedAt((string)($row['finished_at'] ?? ''));

@@ -11,8 +11,16 @@ use App\Model\ClientModel;
  * @property int cron_id 关联的cron_task_id
  * @property string exec_batch_id 每轮执行的批次id
  * @property int pid 执行进程 PID
- * @property int status 执行状态：0-register（注册定时任务） 1-running 2-success 3-failed 4-skipped 5-timeout 6-cancelled 7-unregister
+ * @property int status 执行状态：0-register 1-running 2-success 3-failed 4-skipped 5-timeout 6-cancelled 7-unregister 8-cancel_requested
  * @property int trigger_type 触发类型：1-scheduler 2-run_once
+ * @property int|null request_id 关联 cron_task_run_request.id
+ * @property int node_id 执行节点快照
+ * @property string lease_owner
+ * @property string|null lease_until
+ * @property string|null heartbeat_at
+ * @property string|null timeout_at
+ * @property string|null cancelled_at
+ * @property string failure_reason
  * @property string|null scheduled_at 计划执行时间
  * @property string|null started_at 实际开始执行时间
  * @property string|null finished_at 实际结束执行时间

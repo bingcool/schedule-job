@@ -42,6 +42,7 @@ use App\Module\Cron\Request\CronTaskManager\CronTaskStatsQueryRequest;
 use App\Module\Cron\Request\CronTaskManager\CronTaskStatusSwitchRequest;
 use App\Module\Cron\Request\CronTaskManager\CronTaskUpdateRequest;
 use App\Module\Cron\Request\CronTaskManager\DashboardTrendRequest;
+use App\Module\Cron\Request\CronTaskManager\ExecutionCancelRequest;
 use App\Module\Cron\Request\CronTaskManager\ExecutionDetailRequest;
 use App\Module\Cron\Request\CronTaskManager\ExpressionPreviewRequest;
 use App\Module\Cron\Request\CronTaskManager\ListTasksRequest;
@@ -62,6 +63,7 @@ use App\Module\Cron\Response\CronTaskManager\CronTaskRowResponse;
 use App\Module\Cron\Response\CronTaskManager\CronTaskStatsResponse;
 use App\Module\Cron\Response\CronTaskManager\CronTaskStatusAckResponse;
 use App\Module\Cron\Response\CronTaskManager\DashboardOverviewResponse;
+use App\Module\Cron\Response\CronTaskManager\ExecutionCancelResponse;
 use App\Module\Cron\Response\CronTaskManager\ExecutionDetailResponse;
 use App\Module\Cron\Response\CronTaskManager\ExecutionTrendResponse;
 use App\Module\Cron\Response\CronTaskManager\ExpressionPreviewResponse;
@@ -572,6 +574,19 @@ class CronTaskManagerController extends BController
             $this->cronTaskManagerService->getExecution(
                 ExecutionDetailQueryDto::of($request->getId(), $request->getExecBatchId(), $request->getLogId())
             )
+        );
+    }
+
+    /**
+     * 请求取消一次 RUNNING Execution。只改库状态，由 Agent 发 SIGTERM。
+     *
+     * Route: POST /api/v1/executions/cancel
+     */
+    #[ApiOperation("取消一次执行")]
+    public function cancelExecution(ExecutionCancelRequest $request): ExecutionCancelResponse
+    {
+        return new ExecutionCancelResponse(
+            $this->cronTaskManagerService->cancelExecution($request->getId())
         );
     }
 

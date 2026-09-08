@@ -13,6 +13,7 @@
     if (raw === 'failed' || raw === 'failure' || raw === 'error' || raw === '失败') return 'failed';
     if (raw === 'timeout' || raw === 'timed_out' || raw === '超时') return 'timeout';
     if (raw === 'cancelled' || raw === 'canceled' || raw === '取消') return 'cancelled';
+    if (raw === 'cancel_requested' || raw === '8' || raw === '取消中') return 'cancel_requested';
     if (raw === 'running' || raw === 'processing' || raw === '执行中') return 'running';
     if (raw === 'skipped' || raw === 'skip' || raw === '跳过') return 'skipped';
     if (raw === 'register' || raw === 'pending' || raw === '0' || raw === '注册定时任务') return 'register';
@@ -30,6 +31,7 @@
       failed: '失败',
       timeout: '超时',
       cancelled: '取消',
+      cancel_requested: '取消中',
       running: '执行中',
       skipped: '跳过',
       register: '注册定时任务',
@@ -48,6 +50,7 @@
         loading: false,
         dlg: false,
         execDetail: null,
+        cancelling: false,
         query: { taskId: '', taskName: '', page: 1, pageSize: 20, execBatchId: '', status: '', execType: '', triggerType: '', startTime: '', endTime: '', executionTimeRange: [] }
       };
     },
@@ -170,6 +173,37 @@
           path: '/executions/log',
           query: { taskId: row.cronId, execBatchId: row.execBatchId, logId: row.id }
         });
+      },
+      canCancel: function (row) {
+        var key = this.normalizeStatus(row);
+        return key === 'running' || key === 'cancel_requested';
+      },
+      cancelExec: async function (row) {
+        var id = row && row.id;
+        if (!id) {
+          this.$message.warning('缺少执行记录 ID，无法取消');
+          return;
+        }
+        try {
+          await this.$confirm('确认取消这次执行？将发送 SIGTERM。', '取消执行', { type: 'warning' });
+        } catch (e) {
+          return;
+        }
+        this.cancelling = true;
+        try {
+          var result = await common.api('/executions/cancel', { method: 'POST', body: { id: Number(id) } });
+          if (result && result.alreadyFinished) {
+            this.$message.info('执行已结束：' + (result.status || ''));
+          } else {
+            this.$message.success('已请求取消');
+          }
+          this.dlg = false;
+          this.load();
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.cancelling = false;
+        }
       }
     }
   };

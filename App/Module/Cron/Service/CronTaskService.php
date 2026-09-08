@@ -5,11 +5,9 @@ namespace App\Module\Cron\Service;
 use Swoolefy\Core\Schedule\ScheduleEvent;
 use Swoolefy\Worker\Cron\CronNodeLiveness;
 use Swoolefy\Worker\Cron\CronProcess;
-use Swoolefy\Worker\Cron\ExecutionStatus;
 use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
 use App\Module\Cron\Entity\CronAgentNodeEntity;
 use App\Module\Cron\Entity\CronTaskEntity;
-use App\Module\Cron\Entity\CronTaskLogEntity;
 
 /**
  * Cron Worker 侧任务拉取与运行日志写入。
@@ -120,8 +118,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             }
 
             $arr = $cronForkTask->toArray();
-            // 不改 cron_task.updated_at：手动执行标记来自独立队列表。
-            // 带上全部 pending requestId，Worker 一条 request 对应一次 Execution。
+            $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
             $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
             $arr['run_once_request_ids'] = $pendingIds;
             $arr['run_once_request_id'] = $pendingIds[0] ?? null;
@@ -189,6 +186,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             $cronHttpTask->request_time_out = $configuredTimeout > 0 ? $configuredTimeout : 120;
 
             $arr = $cronHttpTask->toArray();
+            $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
             $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
             $arr['run_once_request_ids'] = $pendingIds;
             $arr['run_once_request_id'] = $pendingIds[0] ?? null;
@@ -219,22 +217,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
         int $pid = 0,
         array $execution = [],
     ) {
-        $cronId = (int) $scheduleTask->cron_task_id;
-        $row = [
-            'cron_id' => $cronId,
-            'exec_batch_id' => $execBatchId,
-            'pid' => $pid,
-            'task_item' => $scheduleTask->toArray(),
-            'message' => $message,
-        ];
-
-        foreach (['status', 'trigger_type', 'scheduled_at', 'started_at', 'finished_at', 'duration_ms', 'exit_code', 'http_status'] as $field) {
-            if (array_key_exists($field, $execution)) {
-                $row[$field] = $execution[$field];
-            }
-        }
-
-        CronTaskLogEntity::query()->insert($row);
+        (new ExecutionService())->writeRuntime($scheduleTask, $execBatchId, $message, $pid, $execution);
     }
 
     /**

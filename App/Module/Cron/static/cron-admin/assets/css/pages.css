@@ -708,6 +708,12 @@
   border-color: #e5e7eb;
 }
 
+.status-pill.status-cancel_requested {
+  color: #9a3412;
+  background: #ffedd5;
+  border-color: #fed7aa;
+}
+
 .status-pill.status-running {
   color: #1d4ed8;
   background: #dbeafe;

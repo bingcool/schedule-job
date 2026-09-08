@@ -72,6 +72,9 @@ class CronTaskRowDto extends AbstractDto
     #[ApiProperty(description: '失败后重试次数（不含首次；0=不重试）')]
     protected int $retry = 0;
 
+    #[ApiProperty(description: 'Shell 执行超时秒数，0=不限制')]
+    protected int $timeout = 0;
+
     #[ApiProperty(description: '表达式类型：interval=每N秒，cron=Linux Cron（展示层派生，不落库）')]
     protected string $expressionType = 'interval';
 
@@ -162,6 +165,7 @@ class CronTaskRowDto extends AbstractDto
         $dto->setStatus((int)($row['status'] ?? 1));
         $dto->setWithBlockLapping((int)($row['with_block_lapping'] ?? 0));
         $dto->setRetry(max(0, (int)($row['retry'] ?? 0)));
+        $dto->setTimeout(max(0, (int)($row['timeout'] ?? 0)));
         $dto->setExpressionType(self::deriveExpressionType((string)($row['expression'] ?? '')));
         $dto->setDescription((string)($row['description'] ?? ''));
         $cb = $row['cron_between'] ?? [];
@@ -445,6 +449,18 @@ class CronTaskRowDto extends AbstractDto
     public function setRetry(int $retry): static
     {
         $this->retry = max(0, $retry);
+
+        return $this;
+    }
+
+    public function getTimeout(): int
+    {
+        return $this->timeout;
+    }
+
+    public function setTimeout(int $timeout): static
+    {
+        $this->timeout = max(0, $timeout);
 
         return $this;
     }

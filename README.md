@@ -364,49 +364,49 @@ HTTP 服务默认暴露（可在 `App/Config/health.php` 调整）：
 
 任务统计、今日执行趋势与节点心跳概览。
 
-![Dashboard](docs/dashboard.png)
+![Dashboard](docs/images/dashboard.png)
 
 ### 计划任务
 
 任务列表：筛选、启停、手动执行、创建人过滤等。
 
-![计划任务列表](docs/tasklist.png)
+![计划任务列表](docs/images/tasklist.png)
 
 ### 创建 / 编辑任务
 
 配置 Cron 表达式、执行方式（Shell / HTTP）、节点、重试与阻塞策略等。
 
-![编辑计划任务](docs/edittask.png)
+![编辑计划任务](docs/images/edittask.png)
 
 ### 执行记录
 
 按任务、状态、批次查看 Execution，可进入单次执行详情。
 
-![执行记录](docs/log.png)
+![执行记录](docs/images/log.png)
 
 ### Cron Nodes
 
 Agent 节点与分组管理、心跳状态查看。
 
-![Cron Nodes](docs/node.png)
+![Cron Nodes](docs/images/node.png)
 
 ### 用户管理
 
 管理系统用户、角色分配与节点组授权。
 
-![用户管理](docs/user.png)
+![用户管理](docs/images/user.png)
 
 ### 角色管理
 
 定义角色、配置菜单页面权限；系统内置角色（超管、编辑任务组）不可删除。
 
-![角色管理](docs/role.png)
+![角色管理](docs/images/role.png)
 
 ### 菜单管理
 
 维护侧栏菜单结构，支持分组与排序。
 
-![菜单管理](docs/menu.png)
+![菜单管理](docs/images/menu.png)
 
 ---
 

@@ -58,6 +58,9 @@ class CronTaskPayloadDto extends AbstractDto
     #[ApiProperty(description: '失败后重试次数（不含首次；0=不重试）')]
     protected ?int $retry = null;
 
+    #[ApiProperty(description: 'Shell 执行超时秒数，0=不限制')]
+    protected ?int $timeout = null;
+
     #[ApiProperty(description: 'HTTP 请求方法')]
     protected ?string $httpMethod = null;
 
@@ -191,6 +194,17 @@ class CronTaskPayloadDto extends AbstractDto
         return $this;
     }
 
+    /**
+     * @param int $timeout 0=不限制，N=最多运行 N 秒
+     */
+    public function putTimeout(int $timeout): static
+    {
+        $this->timeout = $timeout;
+        $this->presentFields['timeout'] = true;
+
+        return $this;
+    }
+
     /** 标记并设置 HTTP 请求方法 */
     public function putHttpMethod(string $httpMethod): static
     {
@@ -289,6 +303,7 @@ class CronTaskPayloadDto extends AbstractDto
             'status' => 'status',
             'withBlockLapping' => 'with_block_lapping',
             'retry' => 'retry',
+            'timeout' => 'timeout',
             'httpMethod' => 'http_method',
             'httpRequestTimeOut' => 'http_request_time_out',
             'cronBetween' => 'cron_between',
