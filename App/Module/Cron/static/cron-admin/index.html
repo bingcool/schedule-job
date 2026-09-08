@@ -541,10 +541,13 @@
             <input class="form-control" type="number" min="0" v-model.number="form.retry">
             <div class="help">不含首次；0=不重试。</div>
           </div>
-          <div class="field field-gap-top">
+          <div class="field field-gap-top" v-if="form.execType===1">
             <label>Shell 超时（秒）</label>
             <input class="form-control" type="number" min="0" v-model.number="form.timeout">
-            <div class="help">仅 GLUE/Shell；0=不限制。到期 SIGTERM，grace 后 SIGKILL。HTTP 仍用下方请求超时。</div>
+            <div class="help-stack">
+              <div class="help">仅 GLUE/Shell；0=不限制。到期 SIGTERM，grace 后 SIGKILL。</div>
+              <div class="help">除非很明确任务可能跑很长时间的，否则不建议设置这个超时，容易误杀正在运行的脚本。</div>
+            </div>
           </div>
         </section>
 
@@ -576,7 +579,7 @@
         <div class="kv"><span>执行类型</span><b>{{ form.execType===2?'HTTP':'GLUE模式' }}</b></div>
         <div class="kv"><span>防重叠</span><b>{{ form.withBlockLapping?'是':'否' }}</b></div>
         <div class="kv"><span>Retry</span><b>{{ form.retry }}</b></div>
-        <div class="kv"><span>Shell 超时</span><b>{{ form.timeout > 0 ? (form.timeout + 's') : '不限制' }}</b></div>
+        <div class="kv" v-if="form.execType===1"><span>Shell 超时</span><b>{{ form.timeout > 0 ? (form.timeout + 's') : '不限制' }}</b></div>
         <div class="callout">
           <b>配置链路</b><br>
           保存后只写入 <span class="mono">cron_task</span>。Cron Worker 通过数据库 Polling 发现配置变化，再更新 Runtime Job / Timer。
@@ -607,7 +610,7 @@
         <el-descriptions-item label="类型">{{ row.execType===2?'HTTP':'GLUE模式' }}</el-descriptions-item>
         <el-descriptions-item label="状态"><el-tag :type="row.status===1?'success':'info'" size="mini">{{ row.status===1?'启用':'禁用' }}</el-tag></el-descriptions-item>
         <el-descriptions-item label="Retry">{{ row.retry }}</el-descriptions-item>
-        <el-descriptions-item label="Shell 超时">{{ row.timeout > 0 ? (row.timeout + 's') : '不限制' }}</el-descriptions-item>
+        <el-descriptions-item v-if="row.execType!==2" label="Shell 超时">{{ row.timeout > 0 ? (row.timeout + 's') : '不限制' }}</el-descriptions-item>
         <el-descriptions-item label="防重叠">{{ row.withBlockLapping?'是':'否' }}</el-descriptions-item>
         <el-descriptions-item label="允许执行时段" :span="2">
           <div v-if="cronBetweenItems.length" class="detail-range-list">
