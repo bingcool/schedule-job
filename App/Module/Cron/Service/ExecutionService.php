@@ -6,6 +6,7 @@ namespace App\Module\Cron\Service;
 
 use App\Module\Cron\Dto\CronTaskManager\ExecutionCancelResultDto;
 use App\Module\Cron\Entity\CronTaskLogEntity;
+use App\Module\Cron\ExecutionLeaseConfig;
 use App\Module\Cron\ExecutionWorkerIdentity;
 use App\Module\Cron\FailureReason;
 use Swoolefy\Core\Schedule\ScheduleEvent;
@@ -601,7 +602,7 @@ class ExecutionService
 
     private function leaseDuration(): int
     {
-        return max(20, (int) env('EXECUTION_LEASE_DURATION', 60));
+        return ExecutionLeaseConfig::duration();
     }
 
     private function affected(mixed $n): bool

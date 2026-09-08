@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Service;
 
+use App\Module\Cron\ExecutionLeaseConfig;
 use App\Module\Cron\ExecutionWorkerIdentity;
 use App\Module\Cron\FailureReason;
 use Swoolefy\Worker\Cron\ExecutionStatus;
@@ -22,8 +23,11 @@ final class ExecutionRuntimeGuard
 
     private static int $lastRecoveryAt = 0;
 
+    private static int $lastHeartbeatAt = 0;
+
     public static function boot(): void
     {
+        ExecutionLeaseConfig::duration();
         self::ensureTimer();
         (new ExecutionService())->recoverExpiredLeases();
     }
@@ -106,14 +110,19 @@ final class ExecutionRuntimeGuard
     {
         $service = new ExecutionService();
         $now = time();
-        $recoveryEvery = max(10, (int) env('EXECUTION_LEASE_RECOVERY_INTERVAL', 30));
+        $recoveryEvery = ExecutionLeaseConfig::recoveryInterval();
         if ($now - self::$lastRecoveryAt >= $recoveryEvery) {
             self::$lastRecoveryAt = $now;
             $service->recoverExpiredLeases();
         }
 
         $owner = ExecutionWorkerIdentity::owner();
-        $grace = max(1, (int) env('EXECUTION_TERMINATE_GRACE_PERIOD', 10));
+        $grace = ExecutionLeaseConfig::terminateGracePeriod();
+        $heartbeatEvery = ExecutionLeaseConfig::heartbeatInterval();
+        $doHeartbeat = ($now - self::$lastHeartbeatAt) >= $heartbeatEvery;
+        if ($doHeartbeat) {
+            self::$lastHeartbeatAt = $now;
+        }
         foreach (self::$watched as $logId => $state) {
             $row = $service->findById($logId);
             if ($row === null) {
@@ -144,7 +153,7 @@ final class ExecutionRuntimeGuard
                 continue;
             }
 
-            if (in_array($status, [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED], true)) {
+            if ($doHeartbeat && in_array($status, [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED], true)) {
                 $service->heartbeat($logId, $owner);
             }
 

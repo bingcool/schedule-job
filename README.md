@@ -31,7 +31,7 @@ Cron Agent 部署在**实际需要跑定时脚本的机器**上，负责本机�
 | **部署位置** | 每台执行机各部署 1 套；多台机器 = 多个 Agent 节点 |
 | **启动命令** | `php cron.php start App` |
 | **必需 `.env` 配置** | `CRON_NODE_ID`、`CRON_NODE_API_KEY`、以及与管理端相同的 **DB 连接**（`DB_HOST_*` 等） |
-| **可选配置** | `CRON_POLL_INTERVAL`（拉取间隔）、`CRON_HEARTBEAT_INTERVAL`（心跳间隔） |
+| **可选配置** | `CRON_POLL_INTERVAL`（拉取间隔）、`CRON_HEARTBEAT_INTERVAL`（节点心跳）、`EXECUTION_LEASE_*`（执行租约，见下表） |
 
 **Agent 机器还需部署目标业务代码。** 管理台里任务的 `command` / `exec_script` 指向本机路径（如 `/home/wwwroot/your-project/script.sh`），Agent 只负责按 Cron 表达式触发执行，**不会**把代码分发到节点；脚本依赖的运行时（PHP、Python、Shell 等）也需在 Agent 机器上预先安装。
 
@@ -285,9 +285,19 @@ php cron.php start App
 | `CRON_NODE_ID` | 当前 Agent 节点 ID（每台机器不同） |
 | `CRON_NODE_API_KEY` | 节点 API Key（创建节点时获得） |
 | `CRON_POLL_INTERVAL` | Worker 轮询 DB 间隔（秒），默认 `20` |
-| `CRON_HEARTBEAT_INTERVAL` | 心跳间隔（秒），默认 `15` |
+| `CRON_HEARTBEAT_INTERVAL` | 节点心跳间隔（秒），默认 `15`。只判断 Agent 在不在线，与下面执行租约续期间隔无关 |
 | `CRON_DEBUG` | Cron 调试开关 |
 | `CRON_TASK_LOG_DELETE_DAY` | 执行日志保留天数，默认 `7`；≤0 表示不自动清理 |
+
+#### Execution Lease（Agent）
+
+续租间隔不单独配置，由代码计算：`(EXECUTION_LEASE_DURATION / 2) - 5`。
+
+| 配置 | 不设置 | 显式设置 |
+|------|--------|----------|
+| `EXECUTION_LEASE_DURATION` | 60 秒 | 不能小于 20，否则 Agent 启动抛异常 |
+| `EXECUTION_LEASE_RECOVERY_INTERVAL` | 30 秒 | 按设置值 |
+| `EXECUTION_TERMINATE_GRACE_PERIOD` | 10 秒 | 按设置值 |
 
 ### 其他
 
@@ -440,6 +450,11 @@ CRON_NODE_API_KEY=<创建节点时返回的 apiKey>
 
 CRON_POLL_INTERVAL=20
 CRON_HEARTBEAT_INTERVAL=15
+
+# Execution Lease（均可不设，走默认值）
+# EXECUTION_LEASE_DURATION=60
+# EXECUTION_LEASE_RECOVERY_INTERVAL=30
+# EXECUTION_TERMINATE_GRACE_PERIOD=10
 ```
 
 3. **部署目标业务代码**  
