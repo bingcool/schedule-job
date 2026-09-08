@@ -82,7 +82,7 @@ class ExecutionDetailDto extends AbstractDto
     #[ApiProperty(description: '执行时任务快照')]
     protected array $taskItem = [];
 
-    #[ApiProperty(description: '日志原文（人类可读）')]
+    #[ApiProperty(description: '执行流水（开始执行 / PID / 重试 / 终态等，按时间追加）')]
     protected string $message = '';
 
     /**

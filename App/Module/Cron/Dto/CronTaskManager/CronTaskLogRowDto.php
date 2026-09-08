@@ -102,7 +102,7 @@ class CronTaskLogRowDto extends AbstractDto
     #[ApiProperty(description: '任务项快照')]
     protected ?array $taskItem = null;
 
-    #[ApiProperty(description: '运行消息')]
+    #[ApiProperty(description: '执行流水（按时间追加的关键步骤）')]
     protected string $message = '';
 
     #[ApiProperty(description: '创建时间')]

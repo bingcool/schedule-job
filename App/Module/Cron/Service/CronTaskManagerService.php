@@ -901,6 +901,10 @@ class CronTaskManagerService
                 $id = (int) ($attrs['id'] ?? 0);
                 if ($id > 0) {
                     unset($row['cron_id'], $row['exec_batch_id']);
+                    $row['message'] = $executionService->mergeRuntimeMessage(
+                        (string) ($attrs['message'] ?? ''),
+                        $message,
+                    );
                     $from = (int) ($attrs['status'] ?? 0);
                     if ($dto->getStatus() !== null) {
                         $executionService->transition($id, $from, (int) $dto->getStatus(), $row);

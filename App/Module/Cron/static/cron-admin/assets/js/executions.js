@@ -98,6 +98,14 @@
       formatDurationMs: function (ms) {
         return common.formatDurationMs(ms);
       },
+      lastMessageLine: function (message) {
+        var text = String(message || '').trim();
+        if (!text) {
+          return '-';
+        }
+        var lines = text.split(/\n/);
+        return lines[lines.length - 1] || '-';
+      },
       triggerTypeText: function (row) {
         var triggerType = Number(row && row.triggerType);
         if (triggerType === 1) return '定时';
@@ -265,7 +273,8 @@
           '[taskId]', String(this.taskId), '',
           '[execBatchId]', String(this.execBatchId), '',
           '[logId]', String(this.logId || ''), '',
-          '[stdout]', this.detail.stdout || this.detail.message || '', '',
+          '[执行流水]', this.detail.message || '', '',
+          '[stdout]', this.detail.stdout || '', '',
           '[stderr]', this.detail.stderr || '', '',
           '[taskItem]', JSON.stringify(this.detail.taskItem || {}, null, 2)
         ].join('\n');

@@ -8,7 +8,7 @@
   <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=task-action-grid-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-log-wrap-1">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=menu-sort-1">
 </head>
 <body>
@@ -703,7 +703,7 @@
         <el-form-item label="任务名称"><el-input v-model="query.taskName" clearable placeholder="支持模糊搜索"></el-input></el-form-item>
         <el-form-item label="批次"><el-input v-model="query.execBatchId" clearable></el-input></el-form-item>
         <el-form-item label="流水状态">
-          <el-select v-model="query.status" clearable style="width:140px">
+          <el-select v-model="query.status" clearable style="width:140px" popper-class="exec-status-select-dropdown">
             <el-option value="register" label="注册定时任务"></el-option>
             <el-option value="success" label="成功"></el-option>
             <el-option value="failed" label="失败"></el-option>
@@ -744,7 +744,7 @@
         </el-form-item>
         <el-form-item><el-button type="primary" @click="search">查询</el-button></el-form-item>
       </el-form>
-      <el-table :data="items" v-loading="loading">
+      <el-table class="exec-list-table" :data="items" v-loading="loading" style="width: 100%">
         <el-table-column prop="cronId" label="任务ID" width="80"></el-table-column>
         <el-table-column prop="taskName" label="任务名称" min-width="150"></el-table-column>
         <el-table-column prop="execBatchId" label="批次" min-width="160"></el-table-column>
@@ -760,9 +760,13 @@
           <template slot-scope="s">{{ formatDurationMs(s.row.durationMs) }}</template>
         </el-table-column>
         <el-table-column prop="pid" label="PID" width="80"></el-table-column>
-        <el-table-column prop="message" label="消息" min-width="220"></el-table-column>
+        <el-table-column label="消息" min-width="280">
+          <template slot-scope="s">
+            <span class="exec-log-line" :title="s.row.message">{{ lastMessageLine(s.row.message) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="createdAt" label="时间" width="160"></el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column label="操作" width="180" fixed="right">
           <template slot-scope="s">
             <el-button type="text" @click="detail(s.row)">详情</el-button>
             <el-button type="text" @click="viewLog(s.row)">日志</el-button>
@@ -821,8 +825,9 @@
         <div class="meta-item"><span class="k">Exit Code</span><b>{{ detail && detail.exitCode != null ? detail.exitCode : '-' }}</b></div>
       </div>
     </div>
-    <div class="panel" style="margin-top:16px"><h3 style="margin-top:0">stdout</h3><pre class="log-pre">{{ detail && (detail.stdout || detail.message) || '-' }}</pre></div>
-    <div class="panel" style="margin-top:16px"><h3 style="margin-top:0">stderr</h3><pre class="log-pre">{{ detail && detail.stderr || '-' }}</pre></div>
+    <div class="panel" style="margin-top:16px"><h3 style="margin-top:0">执行流水</h3><pre class="log-pre">{{ detail && detail.message || '-' }}</pre></div>
+    <div class="panel" style="margin-top:16px"><h3 style="margin-top:0">stdout</h3><pre class="log-pre">{{ (detail && detail.stdout) || '-' }}</pre></div>
+    <div class="panel" style="margin-top:16px"><h3 style="margin-top:0">stderr</h3><pre class="log-pre">{{ (detail && detail.stderr) || '-' }}</pre></div>
     <div class="panel" style="margin-top:16px"><h3 style="margin-top:0">taskItem</h3><pre class="log-pre">{{ detail ? JSON.stringify(detail.taskItem || {}, null, 2) : '-' }}</pre></div>
   </div>
 </script>
@@ -1347,7 +1352,7 @@
 <script defer src="/cron-admin/assets/js/editor.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
-<script defer src="/cron-admin/assets/js/executions.js"></script>
+<script defer src="/cron-admin/assets/js/executions.js?v=exec-log-chain-1"></script>
 <script defer src="/cron-admin/assets/js/nodes.js"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js?v=login-menu-1"></script>
@@ -1357,6 +1362,6 @@
 <script defer src="/cron-admin/assets/js/role-editor.js?v=basic-only-3"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/sortablejs@1.15.2/Sortable.min.js'"></script>
 <script defer src="/cron-admin/assets/js/menus.js?v=menu-sort-1"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=login-menu-1"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=exec-log-chain-1"></script>
 </body>
 </html>

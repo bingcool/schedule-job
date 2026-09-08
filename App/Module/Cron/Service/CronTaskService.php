@@ -203,6 +203,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
      * 同一 exec_batch_id 只保留一条 Execution 行：开始为 RUNNING，结束 UPDATE 终态。
      * 配置变更（exec_batch_id 空串）始终 INSERT；DELETE/DISABLE 可带 status=unregister。
      * $execution 只覆盖显式给出的结构化字段，避免 PID 回调把 status 打回 0。
+     * message 追加为流水链（开始执行 / PROC_OPEN PID / 重试 / 终态），不覆盖已有步骤。
      *
      * @param ScheduleEvent|CronUrlTaskMetaDtoWorker $scheduleTask 当前执行的任务元数据
      * @param string $execBatchId 本轮执行批次 ID

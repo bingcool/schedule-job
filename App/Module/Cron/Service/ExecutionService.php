@@ -17,6 +17,9 @@ use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
  */
 class ExecutionService
 {
+    /** cron_task_log.message 追加上限（字节），超出保留最新尾部 */
+    private const MESSAGE_MAX_BYTES = 60000;
+
     /**
      * Agent Worker 启动：生成 boot_id，回收过期 RUNNING，启动看护 Tick。
      */
@@ -28,6 +31,9 @@ class ExecutionService
 
     /**
      * CronManager logWriter 入口。
+     *
+     * 同一 exec_batch_id 只保留一条 Execution 行（CAS/统计），message 按时间追加成流水链，
+     * 不覆盖「开始执行 / PROC_OPEN PID / 重试 / 终态」等关键步骤。
      *
      * @param array<string, mixed> $execution
      */
@@ -42,7 +48,6 @@ class ExecutionService
         $row = [
             'cron_id' => $cronId,
             'exec_batch_id' => $execBatchId,
-            'message' => $message,
         ];
         if ($pid > 0) {
             $row['pid'] = $pid;
@@ -64,6 +69,7 @@ class ExecutionService
         }
 
         if ($execBatchId === '') {
+            $row['message'] = $this->formatLogLine($message);
             CronTaskLogEntity::query()->insert($row);
 
             return;
@@ -71,11 +77,45 @@ class ExecutionService
 
         $existing = $this->findByBatch($cronId, $execBatchId);
         if ($existing === null) {
+            $row['message'] = $this->formatLogLine($message);
             $this->insertExecution($scheduleTask, $row, $execution);
             return;
         }
 
+        $merged = $this->mergeMessage((string) ($existing['message'] ?? ''), $message);
+        if ($merged !== (string) ($existing['message'] ?? '')) {
+            $row['message'] = $merged;
+        }
+
         $this->updateExecution((int) $existing['id'], $existing, $row, $execution, $pid);
+    }
+
+    /**
+     * 给已有 Execution 追加一条流水，不改 status。超时 SIGTERM/SIGKILL、Cancel 等用。
+     */
+    public function appendLog(int $logId, string $message): bool
+    {
+        $row = $this->findById($logId);
+        if ($row === null) {
+            return false;
+        }
+        $merged = $this->mergeMessage((string) ($row['message'] ?? ''), $message);
+        if ($merged === (string) ($row['message'] ?? '')) {
+            return true;
+        }
+        $n = CronTaskLogEntity::query()
+            ->where('id', $logId)
+            ->update(['message' => $merged]);
+
+        return $this->affected($n) || $n === 0;
+    }
+
+    /**
+     * Agent Report 等同路径：已有批次则追加 message，避免冲掉流水。
+     */
+    public function mergeRuntimeMessage(string $existing, string $incoming): string
+    {
+        return $this->mergeMessage($existing, $incoming);
     }
 
     /**
@@ -146,7 +186,7 @@ class ExecutionService
         return $this->affected($n);
     }
 
-    public function finishOwned(int $logId, string $owner, int $toStatus, string $reason): bool
+    public function finishOwned(int $logId, string $owner, int $toStatus, string $reason, string $logMessage = ''): bool
     {
         $row = $this->findById($logId);
         if ($row === null) {
@@ -165,12 +205,18 @@ class ExecutionService
                 'cancelled_at' => date('Y-m-d H:i:s'),
             ]);
             $from = ExecutionStatus::CANCEL_REQUESTED;
+            $row = $this->findById($logId) ?? $row;
         }
 
-        return $this->transition($logId, $from, $toStatus, [
+        $extra = [
             'failure_reason' => $reason,
             'finished_at' => date('Y-m-d H:i:s'),
-        ]);
+        ];
+        if ($logMessage !== '') {
+            $extra['message'] = $this->mergeMessage((string) ($row['message'] ?? ''), $logMessage);
+        }
+
+        return $this->transition($logId, $from, $toStatus, $extra);
     }
 
     public function recoverExpiredLeases(int $limit = 100): int
@@ -213,6 +259,7 @@ class ExecutionService
         $ok = $this->transition($logId, ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED, [
             'cancelled_at' => date('Y-m-d H:i:s'),
             'failure_reason' => FailureReason::CANCELLED,
+            'message' => $this->mergeMessage((string) ($row['message'] ?? ''), 'Admin 请求取消，等待 Agent 终止进程'),
         ]);
         if (!$ok) {
             $fresh = $this->findById($logId);
@@ -261,7 +308,7 @@ class ExecutionService
         $ok = $this->transition($id, $from, $to, [
             'failure_reason' => $reason,
             'finished_at' => $now,
-            'message' => trim((string) ($row['message'] ?? '') . ' [RECOVERED ' . $reason . ']'),
+            'message' => $this->mergeMessage((string) ($row['message'] ?? ''), 'RECOVERED ' . $reason),
         ]);
 
         return $ok;
@@ -319,10 +366,13 @@ class ExecutionService
             if ($row === []) {
                 return;
             }
-            CronTaskLogEntity::query()
+            $n = CronTaskLogEntity::query()
                 ->where('id', $id)
                 ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
                 ->update($row);
+            if (!$this->affected($n)) {
+                $this->persistMessageIfChanged($id, $existing, $row, $pid);
+            }
             if ($pid > 0) {
                 ExecutionRuntimeGuard::touchPid($id, $pid);
             }
@@ -350,6 +400,7 @@ class ExecutionService
             $row['failure_reason'] = FailureReason::CANCELLED;
         }
         if ($from === ExecutionStatus::TIMEOUT || $from === ExecutionStatus::CANCELLED || $from === ExecutionStatus::SUCCESS) {
+            $this->persistMessageIfChanged($id, $existing, $row, $pid);
             return;
         }
         if ($to === ExecutionStatus::FAILED && empty($row['failure_reason'])) {
@@ -359,6 +410,27 @@ class ExecutionService
             $row['failure_reason'] = FailureReason::TIMEOUT;
         }
         $this->transition($id, $from, $to, $row);
+    }
+
+    /**
+     * 已进入终态后仍追加流水（例如超时杀进程后 proc_open 回报的 signal 文案）。
+     *
+     * @param array<string, mixed> $existing
+     * @param array<string, mixed> $row
+     */
+    private function persistMessageIfChanged(int $id, array $existing, array $row, int $pid): void
+    {
+        $tail = [];
+        if (isset($row['message']) && (string) $row['message'] !== (string) ($existing['message'] ?? '')) {
+            $tail['message'] = $row['message'];
+        }
+        if ($pid > 0 && (int) ($existing['pid'] ?? 0) <= 0) {
+            $tail['pid'] = $pid;
+        }
+        if ($tail === []) {
+            return;
+        }
+        CronTaskLogEntity::query()->where('id', $id)->update($tail);
     }
 
     /**
@@ -475,6 +547,56 @@ class ExecutionService
             ExecutionStatus::TIMEOUT,
             ExecutionStatus::CANCELLED,
         ], true);
+    }
+
+    /**
+     * 把一次关键步骤追加到 message 流水；相邻重复行不写。
+     */
+    private function mergeMessage(string $existing, string $incoming): string
+    {
+        $incoming = trim($incoming);
+        if ($incoming === '') {
+            return $existing;
+        }
+        $line = $this->formatLogLine($incoming);
+        $existing = rtrim($existing);
+        if ($existing === '') {
+            return $this->capMessage($line);
+        }
+        $lastLine = strrchr($existing, "\n");
+        $lastLine = $lastLine === false ? $existing : substr($lastLine, 1);
+        if ($this->stripLogTimestamp($lastLine) === $this->stripLogTimestamp($line)) {
+            return $existing;
+        }
+
+        return $this->capMessage($existing . "\n" . $line);
+    }
+
+    private function formatLogLine(string $message): string
+    {
+        $message = trim($message);
+        if ($message === '') {
+            return '';
+        }
+        if (preg_match('/^\[\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}\]/', $message) === 1) {
+            return $message;
+        }
+
+        return '[' . date('Y-m-d H:i:s') . '] ' . $message;
+    }
+
+    private function stripLogTimestamp(string $line): string
+    {
+        return (string) preg_replace('/^\[\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}\]\s*/', '', trim($line));
+    }
+
+    private function capMessage(string $message): string
+    {
+        if (strlen($message) <= self::MESSAGE_MAX_BYTES) {
+            return $message;
+        }
+
+        return "...[truncated]...\n" . substr($message, -(self::MESSAGE_MAX_BYTES - 20));
     }
 
     private function leaseDuration(): int

@@ -187,6 +187,9 @@ final class ExecutionRuntimeGuard
                 ExecutionWorkerIdentity::owner(),
                 $finalStatus,
                 $reason,
+                $reason === FailureReason::CANCELLED
+                    ? '收到取消请求（无 PID 可杀）'
+                    : '执行超时（无 PID 可杀）',
             );
             self::unwatch($logId);
 
@@ -197,10 +200,14 @@ final class ExecutionRuntimeGuard
             ExecutionWorkerIdentity::owner(),
             $finalStatus,
             $reason,
+            $reason === FailureReason::CANCELLED
+                ? '收到取消请求，准备终止进程'
+                : '执行超时，准备终止进程',
         );
         if ($state['termSentAt'] <= 0) {
             self::signalPid($pid, 15);
             $state['termSentAt'] = $now;
+            $service->appendLog($logId, '发送 SIGTERM pid=' . $pid);
 
             return;
         }
@@ -214,6 +221,7 @@ final class ExecutionRuntimeGuard
         if ($state['killSentAt'] <= 0) {
             self::signalPid($pid, 9);
             $state['killSentAt'] = $now;
+            $service->appendLog($logId, 'grace 到期，发送 SIGKILL pid=' . $pid);
 
             return;
         }
