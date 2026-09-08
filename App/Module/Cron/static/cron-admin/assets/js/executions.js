@@ -230,6 +230,14 @@
       },
       logId: function () {
         return this.$route.query.logId || '';
+      },
+      executionTaskName: function () {
+        if (this.detail && this.detail.taskName) {
+          return String(this.detail.taskName).trim() || '-';
+        }
+        var item = (this.detail && this.detail.taskItem) || {};
+        var name = item.cron_name || item.name || item.task_name || '';
+        return String(name || '').trim() || '-';
       }
     },
     created: function () {
@@ -270,6 +278,7 @@
       download: function () {
         if (!this.detail) return;
         var content = [
+          '[任务名称]', this.executionTaskName || '', '',
           '[taskId]', String(this.taskId), '',
           '[execBatchId]', String(this.execBatchId), '',
           '[logId]', String(this.logId || ''), '',

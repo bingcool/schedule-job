@@ -82,6 +82,12 @@ class ExecutionDetailDto extends AbstractDto
     #[ApiProperty(description: '执行时任务快照')]
     protected array $taskItem = [];
 
+    #[ApiProperty(description: '执行时快照中的 Command / URL')]
+    protected string $command = '';
+
+    #[ApiProperty(description: '任务名称')]
+    protected string $taskName = '';
+
     #[ApiProperty(description: '执行流水（开始执行 / PID / 重试 / 终态等，按时间追加）')]
     protected string $message = '';
 
@@ -124,8 +130,47 @@ class ExecutionDetailDto extends AbstractDto
         $dto->httpStatus = $httpStatus !== null && $httpStatus !== ''
             ? (int) $httpStatus : null;
         $dto->taskItem = self::normalizeTaskItem(self::pick($row, 'task_item', 'taskItem'));
+        $dto->command = self::commandFromTaskItem($dto->taskItem);
+        $dto->taskName = self::taskNameFromRow($row, $dto->taskItem);
 
         return $dto;
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private static function commandFromTaskItem(array $item): string
+    {
+        foreach (['command', 'exec_script', 'url'] as $key) {
+            $value = trim((string) ($item[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $item
+     */
+    private static function taskNameFromRow(array $row, array $item): string
+    {
+        foreach (['cron_name', 'name', 'task_name'] as $key) {
+            $value = trim((string) ($item[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+        foreach (['task_name', 'taskName', 'cron_name'] as $key) {
+            $value = trim((string) ($row[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     /**

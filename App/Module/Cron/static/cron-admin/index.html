@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
-  <link rel="stylesheet" href="/cron-admin/assets/css/common.css">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-log-wrap-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/common.css?v=sidebar-fixed-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-log-task-name-2">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=menu-sort-1">
 </head>
 <body>
@@ -18,7 +18,7 @@
   </div>
   <div class="app" v-else>
     <aside class="sidebar">
-      <div class="brand">Schedule Job<small>Production Admin</small></div>
+      <div class="brand">Schedule Job<small>Cron Task System</small></div>
       <nav class="nav">
         <div v-for="group in navMenus" :key="'nav-group-' + group.id">
           <div class="nav-section">{{ group.name }}</div>
@@ -817,6 +817,10 @@
       </div>
     </div>
     <div class="panel" v-loading="loading">
+      <div class="meta-item exec-log-task-name">
+        <span class="k">任务名称</span>
+        <b>{{ executionTaskName }}</b>
+      </div>
       <div class="meta-grid">
         <div class="meta-item"><span class="k">Task ID</span><b>{{ detail && detail.taskId || taskId || '-' }}</b></div>
         <div class="meta-item"><span class="k">Exec Batch</span><b>{{ detail && detail.execBatchId || execBatchId || '-' }}</b></div>
@@ -1355,7 +1359,7 @@
 <script defer src="/cron-admin/assets/js/editor.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
-<script defer src="/cron-admin/assets/js/executions.js?v=exec-log-chain-1"></script>
+<script defer src="/cron-admin/assets/js/executions.js?v=exec-log-task-name-1"></script>
 <script defer src="/cron-admin/assets/js/nodes.js"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js?v=login-menu-1"></script>

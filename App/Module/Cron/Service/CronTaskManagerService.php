@@ -1150,6 +1150,13 @@ class CronTaskManagerService
         }
         $attrs = is_array($row) ? $row : $row->getAttributes();
         $this->assertTaskVisible((int) ($attrs['cron_id'] ?? 0));
+        $cronId = (int) ($attrs['cron_id'] ?? 0);
+        if ($cronId > 0) {
+            $names = $this->mapTaskNamesByCronIds([$cronId]);
+            if (trim((string) ($attrs['task_name'] ?? '')) === '') {
+                $attrs['task_name'] = (string) ($names[$cronId] ?? '');
+            }
+        }
 
         return ExecutionDetailDto::fromLogRow($attrs);
     }
