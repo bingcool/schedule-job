@@ -7,6 +7,7 @@ namespace App\Module\Cron\Service;
 use Swoolefy\Worker\Cron\ExpressionParser;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskPayloadBuildResultDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskPayloadDto;
+use App\Module\Cron\ShellCommandGuard;
 
 /**
  * 将原始 payload 数组规范为 {@see CronTaskPayloadDto}。
@@ -15,6 +16,7 @@ use App\Module\Cron\Dto\CronTaskManager\CronTaskPayloadDto;
  * - **不依赖** HTTP Request；入参为 snake_case 数组（与 Request::toPayloadArray() 对齐）
  * - 创建态（$isCreate=true）：强制 name/expression/command、合法 exec_type、node_id
  * - 更新态：仅 put 有值/合法字段，空更新由上层根据 {@see CronTaskPayloadDto::isEmpty} 拒绝
+ * - Shell（exec_type=1）command 经 {@see ShellCommandGuard} 黑名单检查，拒绝则不写库
  * - 成功/失败统一包在 {@see CronTaskPayloadBuildResultDto}，不抛异常
  */
 class CronTaskPayloadBuilder
@@ -69,6 +71,13 @@ class CronTaskPayloadBuilder
         }
         if ($timeout !== null && $timeout < 0) {
             return CronTaskPayloadBuildResultDto::fail('timeout必须是>=0的整数');
+        }
+
+        if ($this->shouldCheckShellCommand($execType, $command)) {
+            $deny = ShellCommandGuard::denyReason($command);
+            if ($deny !== null) {
+                return CronTaskPayloadBuildResultDto::fail($deny);
+            }
         }
 
         $dto = new CronTaskPayloadDto();
@@ -195,6 +204,25 @@ class CronTaskPayloadBuilder
         }
 
         return !empty($ranges) ? $ranges : null;
+    }
+
+    /**
+     * Shell 任务才检查 command；HTTP URL 跳过。
+     * 部分更新未带 exec_type 时，以 http(s) URL 判断，避免误伤。
+     */
+    protected function shouldCheckShellCommand(?int $execType, string $command): bool
+    {
+        if ($command === '') {
+            return false;
+        }
+        if ($execType === CronTaskPayloadDto::EXEC_TYPE_HTTP) {
+            return false;
+        }
+        if ($execType === CronTaskPayloadDto::EXEC_TYPE_SHELL) {
+            return true;
+        }
+
+        return preg_match('#^https?://#i', $command) !== 1;
     }
 
     /**

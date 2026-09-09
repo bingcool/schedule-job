@@ -59,6 +59,7 @@ use App\Module\Cron\Entity\CronTaskLogEntity;
 use App\Module\Cron\Entity\CronTaskOperationLogEntity;
 use App\Module\Cron\Entity\CronTaskRunRequestEntity;
 use App\Module\Cron\Exception\CronTaskException;
+use App\Module\Cron\ShellCommandGuard;
 use App\Module\Cron\Response\CronTaskManager\ListTasksPageResult;
 use App\Module\Cron\Response\CronTaskManager\TaskOperationLogsPageResult;
 use App\Module\Cron\Response\CronTaskManager\TaskLogsPageResult;
@@ -1470,6 +1471,12 @@ class CronTaskManagerService
     {
         $task = $this->requireTask($dto->getId());
         $attrs = $task->getAttributes();
+        if ((int) ($attrs['exec_type'] ?? 0) === CronTaskPayloadDto::EXEC_TYPE_SHELL) {
+            $deny = ShellCommandGuard::denyReason((string) ($attrs['command'] ?? ''));
+            if ($deny !== null) {
+                throw CronTaskException::throw($deny, -1);
+            }
+        }
         unset($attrs['id'], $attrs['created_at'], $attrs['updated_at'], $attrs['deleted_at']);
         $baseName = (string)($attrs['cron_name'] ?? $attrs['name'] ?? 'task');
         $attrs['cron_name'] = $this->uniqueCopyName($baseName);
