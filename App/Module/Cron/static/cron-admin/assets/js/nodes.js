@@ -11,6 +11,12 @@
     return { id: 0, groupName: '', remark: '' };
   }
 
+  function emptyRobotForm() {
+    return { id: 0, groupName: '', remark: '', robotId: 0 };
+  }
+
+  var PLATFORM_LABELS = { 1: '企业微信', 2: '钉钉', 3: '飞书' };
+
   window.CronAdminNodes = {
     template: '#tpl-nodes',
     data: function () {
@@ -22,8 +28,12 @@
         groupLoading: false,
         dlg: false,
         groupDlg: false,
+        robotDlg: false,
         form: emptyNodeForm(),
-        groupForm: emptyGroupForm()
+        groupForm: emptyGroupForm(),
+        robotForm: emptyRobotForm(),
+        enabledRobots: [],
+        isSuper: common.isViewerSuper()
       };
     },
     created: function () {
@@ -170,6 +180,62 @@
           this.loadGroups();
         } catch (e) {
           if (e !== 'cancel') common.toastErr(this, e);
+        }
+      },
+      platformLabel: function (platform) {
+        return PLATFORM_LABELS[Number(platform)] || '未知';
+      },
+      openGroupRobot: async function (row) {
+        if (!common.isViewerSuper()) {
+          this.$message.warning('仅超级管理员可绑定机器人');
+          return;
+        }
+        this.robotForm = {
+          id: row.id,
+          groupName: row.groupName,
+          remark: row.remark || '',
+          robotId: row.robotId ? Number(row.robotId) : 0
+        };
+        try {
+          var d = await common.api('/robots');
+          this.enabledRobots = ((d && d.list) || []).filter(function (r) {
+            return Number(r.status) === 1;
+          });
+          if (row.robotId && !this.enabledRobots.some(function (r) { return Number(r.id) === Number(row.robotId); })) {
+            this.enabledRobots.unshift({
+              id: Number(row.robotId),
+              name: row.robotName || ('#' + row.robotId),
+              platform: row.robotPlatform || 0
+            });
+          }
+        } catch (e) {
+          common.toastErr(this, e);
+          return;
+        }
+        this.robotDlg = true;
+      },
+      saveGroupRobot: async function () {
+        var robotId = this.robotForm.robotId === '' || this.robotForm.robotId === null || this.robotForm.robotId === undefined
+          ? 0
+          : Number(this.robotForm.robotId);
+        if (Number.isNaN(robotId) || robotId < 0) {
+          robotId = 0;
+        }
+        try {
+          await common.api('/node-groups', {
+            method: 'PUT',
+            body: {
+              id: this.robotForm.id,
+              groupName: this.robotForm.groupName,
+              remark: this.robotForm.remark,
+              robotId: robotId
+            }
+          });
+          this.robotDlg = false;
+          this.$message.success('已保存');
+          this.loadGroups();
+        } catch (e) {
+          common.toastErr(this, e);
         }
       }
     }

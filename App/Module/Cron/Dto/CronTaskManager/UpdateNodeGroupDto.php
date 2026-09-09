@@ -21,6 +21,12 @@ class UpdateNodeGroupDto extends AbstractDto
     #[ApiProperty(description: '备注')]
     protected string $remark = '';
 
+    #[ApiProperty(description: '是否在本次请求中更新 robotId')]
+    protected bool $robotIdProvided = false;
+
+    #[ApiProperty(description: '绑定的机器人 ID；0=不告警')]
+    protected int $robotId = 0;
+
     public function getId(): int
     {
         return $this->id;
@@ -53,6 +59,30 @@ class UpdateNodeGroupDto extends AbstractDto
     public function setRemark(string $remark): static
     {
         $this->remark = $remark;
+
+        return $this;
+    }
+
+    public function isRobotIdProvided(): bool
+    {
+        return $this->robotIdProvided;
+    }
+
+    public function setRobotIdProvided(bool $robotIdProvided): static
+    {
+        $this->robotIdProvided = $robotIdProvided;
+
+        return $this;
+    }
+
+    public function getRobotId(): int
+    {
+        return $this->robotId;
+    }
+
+    public function setRobotId(int $robotId): static
+    {
+        $this->robotId = $robotId;
 
         return $this;
     }

@@ -23,6 +23,10 @@ class CronNodeGroupUpdateRequest extends BaseRequest
     #[ApiProperty(description: '备注')]
     protected ?string $remark = null;
 
+    #[ApiProperty(description: '绑定的机器人 ID；0=不告警；省略则不改')]
+    #[StringToInt]
+    protected ?int $robotId = null;
+
     public function getId(): int
     {
         return $this->id;
@@ -55,6 +59,18 @@ class CronNodeGroupUpdateRequest extends BaseRequest
     public function setRemark(?string $remark): static
     {
         $this->remark = $remark;
+
+        return $this;
+    }
+
+    public function getRobotId(): ?int
+    {
+        return $this->robotId;
+    }
+
+    public function setRobotId(?int $robotId): static
+    {
+        $this->robotId = $robotId;
 
         return $this;
     }

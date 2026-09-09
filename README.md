@@ -110,6 +110,12 @@ Cron Agent 部署在**实际需要跑定时脚本的机器**上，负责本机�
 - **节点组授权**：非超管用户仅可见授权节点组下的任务与日志
 - 内置角色：`super_admin`（超管）、`editer_task_group`（可维护他人创建的任务）
 
+### 机器人告警
+
+- 全局配置企微 / 钉钉 / 飞书群机器人，节点组绑定其中一个（或不绑定）
+- 任务执行 `FAILED` / `TIMEOUT`（非取消）时旁路推送，不改 Execution 状态机
+- 发送时读取节点组**当前**绑定；Webhook 明文落库、API 脱敏；写操作仅超级管理员
+
 ---
 
 ## 系统架构
@@ -299,6 +305,15 @@ php cron.php start App
 | `EXECUTION_LEASE_RECOVERY_INTERVAL` | 30 秒 | 按设置值 |
 | `EXECUTION_TERMINATE_GRACE_PERIOD` | 10 秒 | 按设置值 |
 
+#### 群机器人 Webhook
+
+| 配置 | 不设置 | 说明 |
+|------|--------|------|
+| `ROBOT_CONNECT_TIMEOUT` | 2 秒 | 连接超时 |
+| `ROBOT_REQUEST_TIMEOUT` | 5 秒 | 请求总超时 |
+
+官方对接：企微 [群机器人消息推送](https://developer.work.weixin.qq.com/document/path/91770)；钉钉 [自定义机器人安全设置](https://open.dingtalk.com/document/orgapp/customize-robot-security-settings)（加签 HMAC-SHA256）；飞书 [自定义机器人](https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot)（签名校验 HMAC-SHA256）。
+
 ### 其他
 
 | 变量 | 说明 |
@@ -455,6 +470,9 @@ CRON_HEARTBEAT_INTERVAL=15
 # EXECUTION_LEASE_DURATION=60
 # EXECUTION_LEASE_RECOVERY_INTERVAL=30
 # EXECUTION_TERMINATE_GRACE_PERIOD=10
+
+# ROBOT_CONNECT_TIMEOUT=2
+# ROBOT_REQUEST_TIMEOUT=5
 ```
 
 3. **部署目标业务代码**  
@@ -544,7 +562,19 @@ curl 'http://127.0.0.1:9502/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&exec
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET/POST/PUT/DELETE | `/nodes` | 节点 CRUD |
-| GET/POST/PUT/DELETE | `/node-groups` | 节点分组 CRUD |
+| GET/POST/PUT/DELETE | `/node-groups` | 节点分组 CRUD（PUT 可选 `robotId`） |
+
+### 机器人告警
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/robots` | 列表（Webhook 脱敏） |
+| GET | `/robots/detail` | 详情（脱敏） |
+| POST | `/robots` | 创建（超管） |
+| PUT | `/robots` | 更新（超管；空 webhook/secret 表示不改） |
+| DELETE | `/robots` | 软删（超管；仍被节点组引用则 409） |
+| PUT | `/robots/status` | 启用 / 禁用（超管） |
+| POST | `/robots/test` | 连通测试（超管） |
 
 ### Dashboard
 
@@ -586,7 +616,9 @@ curl 'http://127.0.0.1:9502/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&exec
 |------|------|
 | `cron_task` | 定时任务定义 |
 | `cron_agent_node` | Agent 节点（含 `api_key`、心跳） |
-| `cron_agent_node_group` | 节点分组 |
+| `cron_agent_node_group` | 节点分组（含 `robot_id`） |
+| `cron_robot` | 群机器人（企微/钉钉/飞书 Webhook） |
+| `cron_robot_alert_log` | 告警投递记录（每条 Execution 最多一行） |
 | `cron_task_run_request` | 手动执行请求队列 |
 | `cron_task_log` | 执行记录 |
 | `cron_task_operation_log` | 操作审计 |
@@ -597,7 +629,7 @@ curl 'http://127.0.0.1:9502/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&exec
 | `staff_user_role` | 用户-角色 |
 | `staff_user_relate_node_group` | 用户-节点组 |
 
-迁移脚本：`migrations/cron.sql`、`migrations/permission.sql`。
+迁移脚本：`migrations/cron.sql`（新库）、`migrations/robot_alert.sql`（已有库升级）。
 
 ---
 

@@ -33,6 +33,18 @@ class CronAgentNodeGroupRowDto extends AbstractDto
     #[ApiProperty(description: '备注')]
     protected string $remark = '';
 
+    #[ApiProperty(description: '绑定的机器人 ID；0=不告警')]
+    protected int $robotId = 0;
+
+    #[ApiProperty(description: '绑定的机器人名称；未绑定为空')]
+    protected string $robotName = '';
+
+    #[ApiProperty(description: '绑定的机器人平台：1-企微 2-钉钉 3-飞书；未绑定为 0')]
+    protected int $robotPlatform = 0;
+
+    #[ApiProperty(description: '绑定的机器人状态：0-禁用 1-启用；未绑定为 0')]
+    protected int $robotStatus = 0;
+
     #[ApiProperty(description: '分组下未软删节点数')]
     protected int $nodeCount = 0;
 
@@ -53,6 +65,10 @@ class CronAgentNodeGroupRowDto extends AbstractDto
         $dto->setGroupId($id);
         $dto->setGroupName((string)($row['group_name'] ?? ''));
         $dto->setRemark((string)($row['remark'] ?? ''));
+        $dto->setRobotId((int)($row['robot_id'] ?? 0));
+        $dto->setRobotName((string)($row['robot_name'] ?? ''));
+        $dto->setRobotPlatform((int)($row['robot_platform'] ?? 0));
+        $dto->setRobotStatus((int)($row['robot_status'] ?? 0));
         $dto->setNodeCount((int)($row['node_count'] ?? 0));
         $dto->setCreatedAt((string)($row['created_at'] ?? ''));
         $dto->setUpdatedAt((string)($row['updated_at'] ?? ''));
@@ -104,6 +120,54 @@ class CronAgentNodeGroupRowDto extends AbstractDto
     public function setRemark(string $remark): static
     {
         $this->remark = $remark;
+
+        return $this;
+    }
+
+    public function getRobotId(): int
+    {
+        return $this->robotId;
+    }
+
+    public function setRobotId(int $robotId): static
+    {
+        $this->robotId = $robotId;
+
+        return $this;
+    }
+
+    public function getRobotName(): string
+    {
+        return $this->robotName;
+    }
+
+    public function setRobotName(string $robotName): static
+    {
+        $this->robotName = $robotName;
+
+        return $this;
+    }
+
+    public function getRobotPlatform(): int
+    {
+        return $this->robotPlatform;
+    }
+
+    public function setRobotPlatform(int $robotPlatform): static
+    {
+        $this->robotPlatform = $robotPlatform;
+
+        return $this;
+    }
+
+    public function getRobotStatus(): int
+    {
+        return $this->robotStatus;
+    }
+
+    public function setRobotStatus(int $robotStatus): static
+    {
+        $this->robotStatus = $robotStatus;
 
         return $this;
     }

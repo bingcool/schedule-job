@@ -8,6 +8,7 @@ use App\Model\ClientModel;
  *
  * @property int id
  * @property string group_name 分组名称
+ * @property int robot_id 绑定的 cron_robot.id；0=不告警
  * @property string remark 备注
  * @property string created_at 创建时间
  * @property string updated_at 修改时间

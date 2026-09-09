@@ -6,6 +6,7 @@ use Swoolefy\Http\Middleware\AuthenticateMiddleware;
 use Swoolefy\Http\Middleware\CorsMiddleware;
 use Swoolefy\Http\Route;
 use App\Module\Cron\Controller\CronAdminController;
+use App\Module\Cron\Controller\CronRobotController;
 use App\Module\Cron\Controller\CronTaskManagerController;
 use App\Module\Staff\Middleware\MenuPagePermissionMiddleware;
 
@@ -52,6 +53,9 @@ Route::get('/cron-admin/assets/js/executions.js', [
     'dispatch_route' => [CronAdminController::class, 'assets'],
 ]);
 Route::get('/cron-admin/assets/js/nodes.js', [
+    'dispatch_route' => [CronAdminController::class, 'assets'],
+]);
+Route::get('/cron-admin/assets/js/robots.js', [
     'dispatch_route' => [CronAdminController::class, 'assets'],
 ]);
 Route::get('/cron-admin/assets/js/runtime.js', [
@@ -166,6 +170,28 @@ Route::group([
     ]);
     Route::delete('/node-groups', [
         'dispatch_route' => [CronTaskManagerController::class, 'deleteNodeGroup'],
+    ]);
+
+    Route::get('/robots', [
+        'dispatch_route' => [CronRobotController::class, 'listRobots'],
+    ]);
+    Route::get('/robots/detail', [
+        'dispatch_route' => [CronRobotController::class, 'getRobot'],
+    ]);
+    Route::post('/robots', [
+        'dispatch_route' => [CronRobotController::class, 'createRobot'],
+    ]);
+    Route::put('/robots', [
+        'dispatch_route' => [CronRobotController::class, 'updateRobot'],
+    ]);
+    Route::delete('/robots', [
+        'dispatch_route' => [CronRobotController::class, 'deleteRobot'],
+    ]);
+    Route::match(['POST', 'PUT'], '/robots/status', [
+        'dispatch_route' => [CronRobotController::class, 'switchStatus'],
+    ]);
+    Route::post('/robots/test', [
+        'dispatch_route' => [CronRobotController::class, 'testRobot'],
     ]);
 
     // 日志监控

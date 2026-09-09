@@ -31,14 +31,38 @@ INSERT INTO `cron_task` (`id`, `cron_name`, `expression`, `command`, `exec_type`
 INSERT INTO `cron_task` (`id`, `cron_name`, `expression`, `command`, `exec_type`, `status`, `with_block_lapping`, `description`, `cron_between`, `cron_skip`, `http_method`, `http_body`, `http_headers`, `http_request_time_out`, `created_at`, `updated_at`, `deleted_at`) VALUES (5, 'http-demo', '20', 'https://www.baidu.com', 2, 1, 0, '334', NULL, NULL, 'GET', NULL, NULL, 0, '2025-04-25 16:18:10', '2025-04-27 19:55:22', NULL);
 
 
+CREATE TABLE `cron_robot` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `name` varchar(100) NOT NULL DEFAULT '' COMMENT '机器人名称，未删除范围内应用层唯一',
+    `platform` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-企业微信wecom 2-钉钉dingtalk 3-飞书feishu',
+    `webhook_url` varchar(2048) NOT NULL DEFAULT '' COMMENT 'Webhook 完整地址（含 key），敏感，API 必须脱敏',
+    `secret` varchar(512) NOT NULL DEFAULT '' COMMENT '签名密钥，可空（企微通常不需要）；API 不回明文',
+    `config_json` json DEFAULT NULL COMMENT '平台扩展配置',
+    `status` tinyint unsigned NOT NULL DEFAULT '1' COMMENT '0-禁用 1-启用',
+    `last_test_at` datetime DEFAULT NULL COMMENT '最近一次点「测试」的时间',
+    `last_test_ok` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '最近测试是否成功：0-否/未测 1-是',
+    `last_test_error` varchar(1000) NOT NULL DEFAULT '' COMMENT '最近测试失败原因，成功则清空',
+    `created_by` int unsigned NOT NULL DEFAULT '0' COMMENT '创建人 staff_user.id',
+    `updated_by` int unsigned NOT NULL DEFAULT '0' COMMENT '最后修改人 staff_user.id',
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `deleted_at` datetime DEFAULT NULL COMMENT '软删时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_name` (`name`),
+    KEY `idx_platform_status` (`platform`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Cron群机器';
+
+
 CREATE TABLE `cron_agent_node_group` (
     `id` bigint unsigned NOT NULL AUTO_INCREMENT,
     `group_name` varchar(128) NOT NULL DEFAULT '' COMMENT '分组名称（唯一）',
+    `robot_id` bigint unsigned NOT NULL DEFAULT '0' COMMENT '绑定的 cron_robot.id；0=该组不发告警',
     `remark` varchar(256) NOT NULL DEFAULT '' COMMENT '备注',
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uniq_group_name` (`group_name`)
+    UNIQUE KEY `uniq_group_name` (`group_name`),
+    KEY `idx_robot_id` (`robot_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Cron Agent 节点分组';
 
 
@@ -128,6 +152,28 @@ CREATE TABLE `cron_task_operation_log` (
     KEY `idx_operator_id` (`operator_id`),
     KEY `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计划任务操作审计日志';
+
+CREATE TABLE `cron_robot_alert_log` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `execution_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task_log.id',
+    `cron_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task.id',
+    `exec_batch_id` varchar(64) NOT NULL DEFAULT '' COMMENT '执行批次，与 cron_task_log.exec_batch_id 一致',
+    `robot_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT '发送时使用的机器人',
+    `platform` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '发送时平台快照：1-wecom 2-dingtalk 3-feishu',
+    `alert_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-FAILED 2-TIMEOUT',
+    `status` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-发送成功 2-发送失败 3-跳过（机器人禁用/已删）',
+    `skip_reason` varchar(32) NOT NULL DEFAULT '' COMMENT '跳过原因：robot_disabled/robot_not_found；成功或失败为空',
+    `http_status` smallint NOT NULL DEFAULT 0 COMMENT 'Webhook HTTP 状态码，未发出为 0',
+    `error_message` varchar(1000) NOT NULL DEFAULT '' COMMENT '失败/跳过原因说明，禁止写入 webhook URL 或 secret',
+    `sent_at` datetime DEFAULT NULL COMMENT 'Webhook 调用结束时间（成功或失败都写)',
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_execution_id` (`execution_id`),
+    KEY `idx_robot_created` (`robot_id`, `created_at`),
+    KEY `idx_cron_created` (`cron_id`, `created_at`),
+    KEY `idx_status_created` (`status`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Cron机器人告警投递记录';
 
 
 
@@ -238,6 +284,8 @@ INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, c
 INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status) VALUES (10, 1, '角色管理', '8', 8, '/roles', 'auth:roles', 'el-icon-s-custom', 0, 1);
 INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status) VALUES (11, 1, '菜单管理', '8', 8, '/menus', 'auth:menus', 'el-icon-menu', 0, 1);
 INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status) VALUES (12, 1, 'Cron 管理', '', 0, '/cron', 'cron', '', 100, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status) VALUES (13, 1, '系统设置', '', 0, '/system', 'system', 'el-icon-setting', 40, 1);
+INSERT INTO staff_menu_pages (id, app_id, name, parent_prefix, parent_id, uri, code, icon, sort, status) VALUES (14, 1, '机器人告警', '13', 13, '/robots', 'system:robots', 'el-icon-bell', 0, 1);
 
 
 -- 系统默认角色：初始化插入超级管理员角色和编辑任务角色组

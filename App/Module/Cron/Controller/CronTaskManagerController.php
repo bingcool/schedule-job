@@ -704,6 +704,9 @@ class CronTaskManagerController extends BController
             ->setId($request->getId())
             ->setGroupName($request->getGroupName())
             ->setRemark($request->getRemark());
+        if ($request->getRobotId() !== null) {
+            $dto->setRobotIdProvided(true)->setRobotId((int) $request->getRobotId());
+        }
 
         return new CronNodeGroupRowResponse($this->cronTaskManagerService->updateNodeGroup($dto));
     }

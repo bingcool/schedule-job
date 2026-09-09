@@ -883,11 +883,18 @@
             <el-table-column prop="id" label="ID" width="64"></el-table-column>
             <el-table-column prop="groupName" label="分组名称" min-width="140" show-overflow-tooltip></el-table-column>
             <el-table-column prop="nodeCount" label="节点数" width="80"></el-table-column>
+            <el-table-column label="机器人告警" min-width="140" show-overflow-tooltip>
+              <template slot-scope="s">
+                <span v-if="s.row.robotId">{{ s.row.robotName || ('#' + s.row.robotId) }}<span v-if="s.row.robotStatus === 0" class="text-muted">（已禁用）</span></span>
+                <span v-else class="text-muted">未绑定</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip></el-table-column>
             <el-table-column prop="updatedAt" label="更新时间" width="168"></el-table-column>
-            <el-table-column label="操作" width="120">
+            <el-table-column label="操作" width="200">
               <template slot-scope="s">
                 <el-button type="text" @click="openGroup(s.row)">编辑</el-button>
+                <el-button v-if="isSuper" type="text" @click="openGroupRobot(s.row)">机器人告警</el-button>
                 <el-button type="text" style="color:#f56c6c" @click="removeGroup(s.row)">删除</el-button>
               </template>
             </el-table-column>
@@ -925,6 +932,99 @@
         <el-form-item label="备注"><el-input v-model="groupForm.remark"></el-input></el-form-item>
       </el-form>
       <span slot="footer"><el-button @click="groupDlg=false">取消</el-button><el-button type="primary" @click="saveGroup">保存</el-button></span>
+    </el-dialog>
+    <el-dialog title="绑定机器人告警" :visible.sync="robotDlg" width="480px">
+      <el-form label-width="90px" size="small">
+        <el-form-item label="节点组">{{ robotForm.groupName }}</el-form-item>
+        <el-form-item label="机器人">
+          <el-select v-model="robotForm.robotId" placeholder="不使用机器人" clearable style="width:100%">
+            <el-option :value="0" label="不使用机器人"></el-option>
+            <el-option v-for="r in enabledRobots" :key="'rb-'+r.id" :value="r.id" :label="r.name + '（' + platformLabel(r.platform) + '）'"></el-option>
+          </el-select>
+        </el-form-item>
+        <p class="section-desc" style="margin:0 0 0 90px">任务失败或超时（非取消）时，向该组当前绑定的群机器人发告警。仅超级管理员可修改。</p>
+      </el-form>
+      <span slot="footer"><el-button @click="robotDlg=false">取消</el-button><el-button type="primary" @click="saveGroupRobot">保存</el-button></span>
+    </el-dialog>
+  </div>
+</script>
+
+<script type="text/x-template" id="tpl-robots">
+  <div>
+    <div class="page-head">
+      <div></div>
+      <div class="actions">
+        <el-button v-if="isSuper" type="primary" icon="el-icon-plus" @click="open()">新增机器人</el-button>
+      </div>
+    </div>
+    <div class="panel">
+      <p class="section-desc" style="margin-top:0">配置企微 / 钉钉 / 飞书群机器人。节点组绑定后，组内任务失败或超时（非取消）会向<strong>当时</strong>绑定的机器人发告警。Webhook 与密钥仅超级管理员可写。</p>
+      <el-table :data="items" v-loading="loading">
+        <el-table-column prop="id" label="ID" width="64"></el-table-column>
+        <el-table-column prop="name" label="名称" min-width="140" show-overflow-tooltip></el-table-column>
+        <el-table-column label="平台" width="110">
+          <template slot-scope="s">{{ platformLabel(s.row.platform) }}</template>
+        </el-table-column>
+        <el-table-column prop="webhookUrl" label="Webhook" min-width="220" show-overflow-tooltip></el-table-column>
+        <el-table-column label="密钥" width="80">
+          <template slot-scope="s">{{ s.row.secretConfigured ? '已配置' : '无' }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template slot-scope="s">
+            <span class="status-mark" :class="s.row.status === 1 ? 'status-enabled' : 'status-disabled'">{{ s.row.status === 1 ? '启用' : '禁用' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="最近测试" min-width="200">
+          <template slot-scope="s">
+            <span v-if="!s.row.lastTestAt" class="text-muted">未测</span>
+            <span v-else>
+              {{ s.row.lastTestOk ? '成功' : '失败' }}
+              <span class="text-muted">{{ s.row.lastTestAt }}</span>
+              <div v-if="!s.row.lastTestOk && s.row.lastTestError" class="text-muted">{{ s.row.lastTestError }}</div>
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="isSuper" label="操作" width="220" fixed="right">
+          <template slot-scope="s">
+            <el-button type="text" :loading="testingId === s.row.id" @click="test(s.row)">测试</el-button>
+            <el-button type="text" @click="open(s.row)">编辑</el-button>
+            <el-button type="text" @click="switchStatus(s.row, s.row.status === 1 ? 0 : 1)">{{ s.row.status === 1 ? '禁用' : '启用' }}</el-button>
+            <el-button type="text" style="color:#f56c6c" @click="remove(s.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+    <el-dialog :title="form.id ? '编辑机器人' : '新增机器人'" :visible.sync="dlg" width="560px">
+      <el-form label-width="110px" size="small">
+        <el-form-item>
+          <template slot="label">名称 <span class="required-mark">*</span></template>
+          <el-input v-model="form.name" maxlength="100"></el-input>
+        </el-form-item>
+        <el-form-item>
+          <template slot="label">平台 <span class="required-mark">*</span></template>
+          <el-select v-model="form.platform" style="width:100%">
+            <el-option :value="1" label="企业微信"></el-option>
+            <el-option :value="2" label="钉钉"></el-option>
+            <el-option :value="3" label="飞书"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <template slot="label">Webhook <span class="required-mark" v-if="!form.id">*</span></template>
+          <el-input v-model="form.webhookUrl" type="textarea" :rows="2" :placeholder="form.id ? '留空表示不修改' : 'https:// 官方 Webhook 完整地址'"></el-input>
+        </el-form-item>
+        <el-form-item label="签名密钥">
+          <el-input v-model="form.secret" show-password :placeholder="form.id ? '留空表示不修改' : '企微通常不需要；钉钉/飞书加签时填写'"></el-input>
+        </el-form-item>
+        <p class="section-desc" style="margin:0 0 0 110px">
+          企微：群机器人 Webhook，无需密钥。<br>
+          钉钉：安全设置选「加签」时填写 SEC 开头密钥。<br>
+          飞书：安全设置选「签名校验」时填写密钥。
+        </p>
+      </el-form>
+      <span slot="footer">
+        <el-button @click="dlg=false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+      </span>
     </el-dialog>
   </div>
 </script>
@@ -1360,7 +1460,8 @@
 <script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
 <script defer src="/cron-admin/assets/js/executions.js?v=exec-log-task-name-1"></script>
-<script defer src="/cron-admin/assets/js/nodes.js"></script>
+<script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-1"></script>
+<script defer src="/cron-admin/assets/js/robots.js?v=1"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js?v=login-menu-1"></script>
 <script defer src="/cron-admin/assets/js/users.js?v=roles-2"></script>
@@ -1369,6 +1470,6 @@
 <script defer src="/cron-admin/assets/js/role-editor.js?v=basic-only-3"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/sortablejs@1.15.2/Sortable.min.js'"></script>
 <script defer src="/cron-admin/assets/js/menus.js?v=menu-sort-1"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=exec-log-chain-1"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=robot-alert-1"></script>
 </body>
 </html>

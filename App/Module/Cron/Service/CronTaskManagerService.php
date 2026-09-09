@@ -53,6 +53,7 @@ use App\Module\Cron\Dto\CronTaskManager\UpdateNodeGroupDto;
 use App\Module\Cron\Dto\CronTaskManager\UpdateTaskCommandDto;
 use App\Module\Cron\Entity\CronAgentNodeEntity;
 use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
+use App\Module\Cron\Entity\CronRobotEntity;
 use App\Module\Cron\Entity\CronTaskEntity;
 use App\Module\Cron\Entity\CronTaskLogEntity;
 use App\Module\Cron\Entity\CronTaskOperationLogEntity;
@@ -98,6 +99,10 @@ class CronTaskManagerService
     private StaffUserService $staffUserService {
         get => $this->staffUserService ??= new StaffUserService();
         set => $this->staffUserService = $value;
+    }
+
+    private CronRobotService $cronRobotService {
+        get => $this->cronRobotService ??= new CronRobotService();
     }
 
     /**
@@ -2247,7 +2252,7 @@ class CronTaskManagerService
     public function listNodeGroups(): array
     {
         $list = CronAgentNodeGroupEntity::query()
-            ->field(['id', 'group_name', 'remark', 'created_at', 'updated_at'])
+            ->field(['id', 'group_name', 'robot_id', 'remark', 'created_at', 'updated_at'])
             ->order('id', 'desc')
             ->select()
             ->toArray();
@@ -2267,7 +2272,7 @@ class CronTaskManagerService
         }
         unset($row);
 
-        return $list;
+        return $this->attachRobotInfoToGroups($list);
     }
 
     /**
@@ -2287,7 +2292,7 @@ class CronTaskManagerService
         $attrs = $group->getAttributes();
         $attrs['node_count'] = 0;
 
-        return $attrs;
+        return $this->attachRobotInfoToGroups([$attrs])[0];
     }
 
     /**
@@ -2298,15 +2303,29 @@ class CronTaskManagerService
         $group = $this->requireNodeGroup($dto->getId());
         $groupName = self::assertGroupName($dto->getGroupName());
         self::assertUniqueGroupName($this->groupNameExists($groupName, $dto->getId()));
-        $group->setData([
+        $data = [
             'group_name' => $groupName,
             'remark' => $dto->getRemark(),
-        ]);
+        ];
+        if ($dto->isRobotIdProvided()) {
+            $robotId = $dto->getRobotId();
+            if ($robotId < 0) {
+                throw CronTaskException::throw('robotId 不合法', 422);
+            }
+            if ($robotId > 0) {
+                $this->cronRobotService->assertSuperUser();
+                $this->cronRobotService->requireEnabledRobot($robotId);
+            } elseif ($robotId === 0 && (int) ($group->robot_id ?? 0) > 0) {
+                $this->cronRobotService->assertSuperUser();
+            }
+            $data['robot_id'] = $robotId;
+        }
+        $group->setData($data);
         $group->save();
         $attrs = $group->getAttributes();
         $attrs['node_count'] = $this->countActiveNodesInGroup($dto->getId());
 
-        return $attrs;
+        return $this->attachRobotInfoToGroups([$attrs])[0];
     }
 
     /**
@@ -2318,7 +2337,7 @@ class CronTaskManagerService
         $attrs = $group->getAttributes();
         $attrs['node_count'] = $this->countActiveNodesInGroup($dto->getId());
 
-        return $attrs;
+        return $this->attachRobotInfoToGroups([$attrs])[0];
     }
 
     /**
@@ -2332,6 +2351,44 @@ class CronTaskManagerService
         $group->delete();
 
         return $id;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $list
+     * @return list<array<string, mixed>>
+     */
+    protected function attachRobotInfoToGroups(array $list): array
+    {
+        $robotIds = [];
+        foreach ($list as $row) {
+            $robotId = (int) ($row['robot_id'] ?? 0);
+            if ($robotId > 0) {
+                $robotIds[$robotId] = $robotId;
+            }
+        }
+        $robots = [];
+        if ($robotIds !== []) {
+            $rows = CronRobotEntity::withoutTrashed()
+                ->whereIn('id', array_values($robotIds))
+                ->select()
+                ->toArray();
+            foreach ($rows as $robot) {
+                $robots[(int) ($robot['id'] ?? 0)] = $robot;
+            }
+        }
+        foreach ($list as &$row) {
+            $robotId = (int) ($row['robot_id'] ?? 0);
+            $robot = $robots[$robotId] ?? null;
+            $deleted = is_array($robot) && !empty($robot['deleted_at'])
+                && $robot['deleted_at'] !== '0000-00-00 00:00:00';
+            $row['robot_id'] = $robotId;
+            $row['robot_name'] = $robot && !$deleted ? (string) ($robot['name'] ?? '') : '';
+            $row['robot_platform'] = $robot && !$deleted ? (int) ($robot['platform'] ?? 0) : 0;
+            $row['robot_status'] = $robot && !$deleted ? (int) ($robot['status'] ?? 0) : 0;
+        }
+        unset($row);
+
+        return $list;
     }
 
     /**

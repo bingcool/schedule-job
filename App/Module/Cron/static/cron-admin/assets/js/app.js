@@ -17,6 +17,7 @@
       { path: '/executions', component: window.CronAdminExecutions, meta: { title: '执行记录', subtitle: '按任务、流水状态、批次过滤', breadcrumb: '执行记录' } },
       { path: '/executions/log', component: window.CronAdminExecutionLog, meta: { title: '执行日志', subtitle: '执行流水、stdout/stderr 与下载', breadcrumb: '执行记录 / 执行日志' } },
       { path: '/nodes', component: window.CronAdminNodes, meta: { title: 'Cron Nodes', subtitle: 'Agent 节点管理与心跳状态', breadcrumb: 'Cron Nodes' } },
+      { path: '/robots', component: window.CronAdminRobots, meta: { title: '机器人告警', subtitle: '企微 / 钉钉 / 飞书群机器人，节点组绑定后任务失败超时会告警', breadcrumb: '系统设置 / 机器人告警' } },
       { path: '/runtime', component: window.CronAdminRuntime, meta: { title: 'Runtime', subtitle: 'Cron Worker 运行时聚合概览', breadcrumb: 'Runtime' } },
       { path: '/users', component: window.CronAdminUsers, meta: { title: '用户管理', subtitle: '管理系统登录用户及其角色分配', breadcrumb: '权限管理 / 用户管理' } },
       { path: '/users/create', component: window.CronAdminUserEditor, meta: { title: '新增用户', subtitle: '配置用户基本信息、密码及角色权限', breadcrumb: '权限管理 / 用户管理 / 新增用户' } },

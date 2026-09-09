@@ -1,7 +1,7 @@
 # schedule-job 节点组机器人告警技术方案
 
-> 版本：v4（对照现有代码修订）  
-> 状态：设计方案，尚未落地实现  
+> 版本：v5（对照现有代码修订；SQL 以本文第 5 节为准）  
+> 状态：已落地实现  
 > 目标：节点组任务执行 `FAILED` / `TIMEOUT` 时，向该组绑定的企微 / 钉钉 / 飞书群机器人发告警。  
 > 原则：**不改 Execution 状态机；不引入 MQ；告警是旁路；SQL 与现有 `cron_*` 表风格对齐。**
 
@@ -9,11 +9,13 @@
 
 ## 0. 相对 v3 的修订结论
 
-v3 方向正确：Robot 全局资源、NodeGroup 只存 `robot_id`、Execution 快照、CAS 保证最多一次触发、Webhook 必须超时、Strategy 隔离平台。
+v3 方向正确：Robot 全局资源、NodeGroup 只存 `robot_id`、CAS 保证最多一次触发、Webhook 必须超时、Strategy 隔离平台。
 
-对照当前仓库后，以下设计不合理，v4 已改：
+**不在 `cron_task_log` 上快照 `robot_id`。** 告警发送时按 Execution 的 `node_id` 找到节点组，读取 **当时** 的 `cron_agent_node_group.robot_id`。管理员中途改绑定，已在跑的任务失败后会打到新机器人；这是明确接受的取舍。
 
-| 问题 | v3 | v4 |
+对照当前仓库后，以下设计不合理，已改：
+
+| 问题 | v3 | 现行 |
 |------|----|----|
 | 路由 | `/api/cron/robots` | 现有前缀 **`/api/v1`** |
 | 事件总线 | `ExecutionFinishedEvent` 独立总线 | 项目无业务 Event 总线；CAS 成功后 **`go()` 协程** 调 `CronAlertService` |
@@ -23,9 +25,8 @@ v3 方向正确：Robot 全局资源、NodeGroup 只存 `robot_id`、Execution �
 | `cron_robot.uk_name` | UNIQUE(name) | 与软删冲突（删后再建同名会 1062）；**应用层**对 `deleted_at IS NULL` 唯一，库上只建普通索引 |
 | 测试成功时间混用 | `last_success_at` 既测又发 | 机器人表只记 **测试**；真实投递只写 `cron_robot_alert_log` |
 | alert_log `delete_at` | 有软删 | 投递记录追加写，**不软删** |
-| `attempt` + pending | 像要做重试队列 | 第一版不重试；插入终态一行，`attempt=1` |
-| `cron_task_log.idx_robot_id` | 有 | 几乎不按 robot 扫执行记录，**不建**，减少写入放大 |
-| 禁用机器人仍快照 | 新 Execution 仍带 robot_id，发送时 skip | **创建时若机器人未启用则快照 0** |
+| `attempt` + pending | 像要做重试队列 | 第一版不重试；插入终态一行 |
+| `cron_task_log.robot_id` 快照 | Execution 创建时写入 | **不需要该列**；发送时读节点组当前 `robot_id` |
 | TIMEOUT 一律告警 | 是 | **`failure_reason=CANCELLED` 不告警**（取消杀进程可能走过 TIMEOUT 路径） |
 | Metrics | P1 Prometheus | 项目无现成 Cron 指标管道；第一版不做 |
 | 权限 | 自造 CREATE/TEST 枚举 | 沿用菜单 `staff_role_page` + **写操作再校验超级管理员** |
@@ -54,10 +55,12 @@ Worker Crash Recovery 把 RUNNING 收成 `FAILED` + `WORKER_CRASH`，走同一�
         ▲
         │ robot_id（0=不告警）
 cron_agent_node_group
-        │
-        │ Execution 创建时快照（仅启用中的机器人）
-        ▼
-cron_task_log.robot_id
+        ▲
+        │ group_id
+cron_agent_node
+        ▲
+        │ node_id
+cron_task_log
         │
         │ Terminal CAS affected=1
         │ 且 status ∈ {FAILED, TIMEOUT}
@@ -66,7 +69,8 @@ cron_task_log.robot_id
    go() 隔离协程
         ▼
   CronAlertService
-        │ robot_id=0 → return（不写 log）
+        │ node → group.robot_id
+        │ robot_id=0 / 无分组 → return（不写 log）
         │ robot 禁用/删除 → 写 alert_log skipped
         ▼
   RobotAlertMessage → RobotStrategyFactory
@@ -121,7 +125,7 @@ Service 层必须再判 `isSuperUser`，不能只靠前端藏按钮。
 
 ## 5. 数据模型与 SQL
 
-所有新增列、索引必须带 `COMMENT`。类型、时间字段、软删列名与现有 `cron_*` 表对齐：`deleted_at`（不用 staff 表的 `delete_at`）。
+新增列必须带 `COMMENT`。索引是否带 `COMMENT` 以本节 SQL 为准（不另行补索引注释）。类型、时间字段、软删列名与现有 `cron_*` 表对齐：`deleted_at`（不用 staff 表的 `delete_at`）。
 
 不建物理外键（与现库一致），关联在应用层维护。
 
@@ -167,33 +171,18 @@ ALTER TABLE `cron_agent_node_group`
 
 绑定校验：`id 存在 AND deleted_at IS NULL AND status=1`，否则 422。
 
-### 5.3 `cron_task_log.robot_id`（快照）
-
-```sql
-ALTER TABLE `cron_task_log`
-    ADD COLUMN `robot_id` bigint unsigned NOT NULL DEFAULT 0
-        COMMENT '本轮 Execution 创建时快照的告警机器人；0=创建时未绑定或机器人未启用，本轮不告警'
-        AFTER `failure_reason`;
-```
-
-**不建** `idx_robot_id`。告警查询走 `cron_robot_alert_log.execution_id` / `uk_execution_id`。
-
-快照路径（仅 RUNNING 插入 Execution 时，配置变更空 `exec_batch_id` 不写）：
+`cron_task_log` **不加** `robot_id`。发送告警时现查：
 
 ```text
-cron_task.node_id
+cron_task_log.node_id
   → cron_agent_node.group_id
   → cron_agent_node_group.robot_id
-  → 若 robot_id>0 且 cron_robot 存在、未删、status=1
-       则 cron_task_log.robot_id = 该 id
-     否则 0
+  → cron_robot（当前 webhook / secret / status）
 ```
 
-生命周期内 **不再读** NodeGroup。管理员中途改绑定，只影响之后新的 Execution。
+无分组、`robot_id=0`：不发送、不写 `cron_robot_alert_log`。
 
-发送时读 `cron_robot` **当前** webhook/secret（identity 稳定、配置可变）。
-
-### 5.4 `cron_robot_alert_log`
+### 5.3 `cron_robot_alert_log`
 
 第一版：**每条 Execution 最多一行**；无 pending；不软删；不重试。
 
@@ -231,11 +220,9 @@ CREATE TABLE `cron_robot_alert_log` (
 
 **删除：** `COUNT(*) FROM cron_agent_node_group WHERE robot_id=?` > 0 则 409：「该机器人被 N 个节点组使用，请先在节点组中解除」。解除后软删 `deleted_at`。
 
-**禁用：** 只改 `status=0`，不改各节点组 `robot_id`。  
-- 新 Execution：快照时发现未启用 → `robot_id=0`，不告警。  
-- 已快照的在途 Execution：发送时发现禁用 → alert_log `status=3 skip_reason=robot_disabled`。
+**禁用：** 只改 `status=0`，不改各节点组 `robot_id`。发送时发现禁用 → alert_log `status=3 skip_reason=robot_disabled`。
 
-已删除：在途发送 → `status=3 skip_reason=robot_not_found`。Execution 仍是 FAILED/TIMEOUT。
+已删除：发送时找不到机器人 → `status=3 skip_reason=robot_not_found`。Execution 仍是 FAILED/TIMEOUT。
 
 ---
 
@@ -256,8 +243,8 @@ CREATE TABLE `cron_robot_alert_log` (
 affected !== 1  → return
 status ∉ {FAILED, TIMEOUT} → return
 failure_reason === CANCELLED → return
-robot_id === 0 → return
 go(function () { try { CronAlertService::send($logId); } catch (\Throwable) { 只记应用日志 } })
+  内部再查 node → group.robot_id，为 0 则 return
 ```
 
 `go()` 在 Worker 返回之后跑，Webhook 阻塞不影响 Execution 闭合。无 Swoole 环境（单测）则同步调用但仍 catch，不得抛回状态机。
@@ -355,8 +342,8 @@ CronRobotRepository
 
 1. 非超管 POST robots / 改 robotId → 403；有菜单可看脱敏列表。
 2. 绑定禁用或不存在的 robot → 422；`robotId=0` 保存成功且后续不告警、不写 alert_log。
-3. **快照 P0：** 执行开始时 group.robot_id=1，中途改成 2，失败仍打机器人 1。
-4. 开始时机器人已禁用 → 快照 0，失败不告警。
+3. 执行开始时 group.robot_id=1，中途改成 2，失败打 **机器人 2**（发送时读当前绑定）。
+4. 发送时 `robot_id=0` / 无分组 → 不告警、不写 alert_log；发送时机器人已禁用 → alert_log `status=3 skip_reason=robot_disabled`。
 5. 两个 CAS 抢 FAILED → 仅一次 go()；alert_log 一行。
 6. Webhook timeout / 500 / 业务码失败 → alert_log.status=2，Execution 仍 FAILED。
 7. Recovery WORKER_CRASH → 告警；用户取消导致的闭合 → 不告警。
@@ -366,25 +353,24 @@ CronRobotRepository
 
 ## 13. 实施顺序
 
-**P0 库表一次做完**（分组绑定、快照、投递都依赖 `cron_robot` 存在）：
+**P0 库表一次做完**（分组绑定、投递都依赖 `cron_robot` 存在）：
 
-1. `cron_robot` + `node_group.robot_id` + `cron_task_log.robot_id` + `cron_robot_alert_log`
-2. `insertExecution` 写入快照
-3. CAS 成功出口 `go(CronAlertService)`（可先打日志，Strategy 随后补）
+1. `cron_robot` + `node_group.robot_id` + `cron_robot_alert_log`（**不加** `cron_task_log.robot_id`）
+2. CAS 成功出口 `go(CronAlertService)`（发送时查 node → group.robot_id；可先打日志，Strategy 随后补）
 
 **P1 管理面与发送：**
 
-4. 菜单 `/system` `/robots` + CRUD/测试/脱敏 + 超管校验  
-5. 节点组 `robotId`  
-6. 三个 Strategy + timeout  
-7. 权限与快照/CAS/取消/Crash 用例
+3. 菜单 `/system` `/robots` + CRUD/测试/脱敏 + 超管校验  
+4. 节点组 `robotId`  
+5. 三个 Strategy + timeout  
+6. 权限与 CAS / 取消 / Crash / 发送时绑定变更用例
 
 ---
 
 ## 14. 设计原则（落地检查清单）
 
 1. Robot 全局；NodeGroup 只存一个 `robot_id`。  
-2. Execution **创建时**快照；只快照启用中的机器人。  
+2. **不**在 `cron_task_log` 快照 `robot_id`；发送时读节点组当前绑定。  
 3. 状态机不依赖 Robot；告警在 CAS 之后协程旁路。  
 4. CAS 负责「最多触发一次」；`uk_execution_id` 负责「最多一行投递记录」。  
 5. 投递结果与 Execution.status 独立。  
@@ -392,4 +378,4 @@ CronRobotRepository
 7. Strategy 不查库。  
 8. 不引入 MQ / Repository / 任务操作审计表。  
 9. 写 webhook 与绑定节点组：超级管理员。  
-10. SQL 新增字段、索引全部 `COMMENT`。
+10. SQL 以第 5 节为准：新增列必须 `COMMENT`；索引按该节 DDL，不额外补注释。

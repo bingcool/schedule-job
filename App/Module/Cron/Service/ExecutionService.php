@@ -290,7 +290,12 @@ class ExecutionService
             ->where('status', $fromStatus)
             ->update($data);
 
-        return $this->affected($n);
+        $ok = $this->affected($n);
+        if ($ok) {
+            AlertDispatcher::dispatchIfNeeded($id, $toStatus);
+        }
+
+        return $ok;
     }
 
     /**

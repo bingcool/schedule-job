@@ -64,6 +64,7 @@ class CronAdminController extends BController
             'assets/js/executions.js',
             'assets/js/task-operation-logs.js',
             'assets/js/nodes.js',
+            'assets/js/robots.js',
             'assets/js/runtime.js',
             'assets/js/login.js',
             'assets/js/users.js',

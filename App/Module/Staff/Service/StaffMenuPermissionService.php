@@ -17,7 +17,7 @@ use Swoolefy\Support\FrameworkContext;
 class StaffMenuPermissionService
 {
     /** 分组占位 URI，本身不对应页面也不单独放行 API。 */
-    private const GROUP_PLACEHOLDER_URIS = ['/cron', '/auth'];
+    private const GROUP_PLACEHOLDER_URIS = ['/cron', '/auth', '/system'];
 
     /** 登录用户自身相关接口，仅需登录。 */
     private const AUTH_SKIP_PREFIXES = [
@@ -54,6 +54,10 @@ class StaffMenuPermissionService
         '/api/v1/nodes' => '/nodes',
         '/api/v1/node-groups/detail' => '/nodes',
         '/api/v1/node-groups' => ['/nodes', '/tasks', '/users'],
+        '/api/v1/robots/detail' => '/robots',
+        '/api/v1/robots/status' => '/robots',
+        '/api/v1/robots/test' => '/robots',
+        '/api/v1/robots' => '/robots',
         '/api/v1/runtime/overview' => '/runtime',
         '/api/v1/users/status' => '/users',
         '/api/v1/users/roles' => '/users',
