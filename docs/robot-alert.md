@@ -1,1878 +1,395 @@
-# schedule-job 节点组机器人告警技术方案（优化版）
+# schedule-job 节点组机器人告警技术方案
 
-> 版本：v3  
-> 状态：设计方案  
-> 目标：在现有 schedule-job Cron / Execution 架构基础上，为节点组增加企业微信、钉钉、飞书群机器人告警能力。  
-> 核心原则：**不改造 Execution 核心状态机、不引入 MQ、不做过度设计；以现有 CAS、NodeGroup、Execution 体系为基础增加告警旁路。**
-
----
-
-## 1. 背景
-
-当前任务执行已经具备：
-
-- Execution 生命周期状态管理
-- Execution 状态 CAS
-- Worker Crash Recovery
-- Timeout / Cancel
-- Node / NodeGroup
-- Execution 日志
-- 审计与 Metrics
-
-现在增加：
-
-> 当节点组中的任务执行 `FAILED` 或 `TIMEOUT` 时，向该节点组配置的群机器人发送告警。
-
-支持：
-
-- 企业微信
-- 钉钉
-- 飞书
-
-每个节点组最多选择一个机器人。
-
-机器人作为系统级资源，可以被多个节点组复用。
+> 版本：v4（对照现有代码修订）  
+> 状态：设计方案，尚未落地实现  
+> 目标：节点组任务执行 `FAILED` / `TIMEOUT` 时，向该组绑定的企微 / 钉钉 / 飞书群机器人发告警。  
+> 原则：**不改 Execution 状态机；不引入 MQ；告警是旁路；SQL 与现有 `cron_*` 表风格对齐。**
 
 ---
 
-# 2. 本次优化后的核心设计
+## 0. 相对 v3 的修订结论
 
-最终采用：
+v3 方向正确：Robot 全局资源、NodeGroup 只存 `robot_id`、Execution 快照、CAS 保证最多一次触发、Webhook 必须超时、Strategy 隔离平台。
 
-```text
-                        系统设置
-                           │
-                      机器人警告
-                           │
-                           ↓
-                    ┌─────────────┐
-                    │ cron_robot  │
-                    │ 全局机器人   │
-                    └──────┬──────┘
-                           ↑
-                           │ robot_id
-                           │
-                  cron_agent_node_group
-                           │
-                           ↓
-                    Execution Register
-                           │
-                           │ snapshot
-                           ↓
-                  cron_task_log.robot_id
-                           │
-                           ↓
-                   FAILED / TIMEOUT
-                           │
-                           ↓
-                  Terminal CAS Success
-                           │
-                           ↓
-                ExecutionFinishedEvent
-                           │
-                           ↓
-                  CronAlertService
-                           │
-                           ↓
-                 RobotAlertMessage
-                           │
-                           ↓
-                RobotStrategyFactory
-                  ┌────────┼────────┐
-                  ↓        ↓        ↓
-                 企微      钉钉      飞书
-                           │
-                           ↓
-                 cron_robot_alert_log
-```
+对照当前仓库后，以下设计不合理，v4 已改：
 
-本次重点优化：
-
-1. `cron_task_log.robot_id` 快照
-2. 增加 `cron_robot_alert_log`
-3. 明确 Event 唯一性与 Delivery 的区别
-4. Alert 不阻塞 Execution
-5. Webhook timeout
-6. 删除 `access_token`
-7. 增加 `RobotAlertMessage` DTO
+| 问题 | v3 | v4 |
+|------|----|----|
+| 路由 | `/api/cron/robots` | 现有前缀 **`/api/v1`** |
+| 事件总线 | `ExecutionFinishedEvent` 独立总线 | 项目无业务 Event 总线；CAS 成功后 **`go()` 协程** 调 `CronAlertService` |
+| Repository | `CronRobotRepository` | 现有是 Entity + Service，不新增 Repository |
+| 审计 | 塞进「现有操作审计」 | `cron_task_operation_log` 只服务计划任务，**禁止写入**；机器人变更用 `created_by` / `updated_by` + 测试字段 |
+| 加密 | 库内 AES | 项目无统一加密组件；库内明文 + **API 脱敏**；加密留后续 |
+| `cron_robot.uk_name` | UNIQUE(name) | 与软删冲突（删后再建同名会 1062）；**应用层**对 `deleted_at IS NULL` 唯一，库上只建普通索引 |
+| 测试成功时间混用 | `last_success_at` 既测又发 | 机器人表只记 **测试**；真实投递只写 `cron_robot_alert_log` |
+| alert_log `delete_at` | 有软删 | 投递记录追加写，**不软删** |
+| `attempt` + pending | 像要做重试队列 | 第一版不重试；插入终态一行，`attempt=1` |
+| `cron_task_log.idx_robot_id` | 有 | 几乎不按 robot 扫执行记录，**不建**，减少写入放大 |
+| 禁用机器人仍快照 | 新 Execution 仍带 robot_id，发送时 skip | **创建时若机器人未启用则快照 0** |
+| TIMEOUT 一律告警 | 是 | **`failure_reason=CANCELLED` 不告警**（取消杀进程可能走过 TIMEOUT 路径） |
+| Metrics | P1 Prometheus | 项目无现成 Cron 指标管道；第一版不做 |
+| 权限 | 自造 CREATE/TEST 枚举 | 沿用菜单 `staff_role_page` + **写操作再校验超级管理员** |
 
 ---
 
-# 3. 产品入口
+## 1. 产品范围
 
-## 3.1 系统设置
+当节点组内任务执行终态为 **FAILED** 或 **TIMEOUT**（且非取消）时，向该节点组绑定的群机器人发一条告警。
 
-新增一级菜单：
+支持平台：企业微信、钉钉、飞书。每个节点组最多绑定 **一个** 机器人；一个机器人可被多个节点组复用。
 
-```text
-系统设置
-└── 机器人警告
-```
+不发送：`SUCCESS` / `SKIPPED` / `CANCELLED` / `cancel_requested` / 配置变更日志（无 `exec_batch_id`）。
 
-进入后：
-
-```text
-机器人警告列表
-```
-
-支持：
-
-- 新增机器人
-- 编辑机器人
-- 删除机器人
-- 启用
-- 禁用
-- 测试机器人
-- 查看平台
-- 查看最近测试状态
+Worker Crash Recovery 把 RUNNING 收成 `FAILED` + `WORKER_CRASH`，走同一条告警旁路。
 
 ---
 
-## 3.2 节点组
-
-在节点组列表操作列增加：
+## 2. 架构
 
 ```text
-机器人警告
-```
-
-点击：
-
-```text
-选择机器人
-```
-
-例如：
-
-```text
-节点组：生产环境
-
-机器人：
-[ 生产钉钉告警 ▼ ]
-
-      [保存]
-```
-
-也可以选择：
-
-```text
-[ 不使用机器人 ]
-```
-
-对应：
-
-```text
-robot_id = 0
-```
-
----
-
-# 4. 权限
-
-机器人配置属于系统级敏感配置。
-
-## 4.1 超级管理员
-
-允许：
-
-```text
-机器人：
-CREATE
-UPDATE
-DELETE
-ENABLE
-DISABLE
-TEST
-
-节点组：
-SET_ROBOT
-REMOVE_ROBOT
-```
-
-## 4.2 普通管理员
-
-允许：
-
-```text
-VIEW
-```
-
-禁止：
-
-```text
-CREATE
-UPDATE
-DELETE
-TEST
-SET_ROBOT
-REMOVE_ROBOT
-```
-
-后端 Service 层必须再次校验超级管理员权限。
-
-不能只依赖前端按钮隐藏。
-
----
-
-# 5. 数据模型
-
-核心关系：
-
-```text
-cron_robot
-     ↑
-     │ robot_id
-     │
+系统设置 / 机器人告警
+        │
+        ▼
+   cron_robot（全局）
+        ▲
+        │ robot_id（0=不告警）
 cron_agent_node_group
+        │
+        │ Execution 创建时快照（仅启用中的机器人）
+        ▼
+cron_task_log.robot_id
+        │
+        │ Terminal CAS affected=1
+        │ 且 status ∈ {FAILED, TIMEOUT}
+        │ 且 failure_reason ≠ CANCELLED
+        ▼
+   go() 隔离协程
+        ▼
+  CronAlertService
+        │ robot_id=0 → return（不写 log）
+        │ robot 禁用/删除 → 写 alert_log skipped
+        ▼
+  RobotAlertMessage → RobotStrategyFactory
+        │ wecom / dingtalk / feishu
+        ▼
+  HTTP Webhook（connect/request timeout）
+        ▼
+  cron_robot_alert_log（每 Execution 最多 1 行，UNIQUE execution_id）
 ```
 
-机器人不保存：
-
-```text
-group_id
-```
-
-原因：
-
-```text
-Robot = 系统级资源
-NodeGroup = 使用方
-```
-
-因此：
-
-```text
-Robot A
-   ↑
-   ├── 生产节点组
-   ├── 灾备节点组
-   └── 测试节点组
-```
-
-一个机器人可以被多个节点组复用。
+告警失败不得回写 `cron_task_log.status`。
 
 ---
 
-# 6. cron_robot
+## 3. 产品入口
 
-建议：
+### 3.1 菜单
+
+新增一级分组与页面（写入 `staff_menu_pages`，超级管理员自动可见）：
+
+```text
+系统设置          uri=/system   （分组占位）
+└── 机器人告警    uri=/robots
+```
+
+`StaffMenuPermissionService::API_PATH_MENU_RULES` 增加 `/api/v1/robots` → `/robots`。
+
+列表能力：新增 / 编辑 / 删除 / 启用 / 禁用 / 测试；展示平台、状态、最近测试结果（脱敏 webhook）。
+
+### 3.2 节点组
+
+复用现有 `PUT /api/v1/node-groups`，增加可选字段 `robotId`：
+
+- `0`：不使用机器人
+- `>0`：绑定已存在、未删除、**已启用** 的机器人，否则 422
+
+节点组列表操作列增加「机器人告警」入口，本质仍是更新该字段。不新增无意义的独立 SET/REMOVE API。
+
+---
+
+## 4. 权限
+
+| 操作 | 菜单 `/robots` | 额外校验 |
+|------|----------------|----------|
+| 列表 / 详情（脱敏） | 有菜单即可 | 无 |
+| 新增 / 改 webhook·secret / 删除 / 启用禁用 / 测试 | 有菜单 | **必须超级管理员** |
+| 节点组绑定 `robotId` | 有节点组管理菜单（现有 `/nodes` 体系） | **必须超级管理员**（webhook 等同密钥） |
+
+Service 层必须再判 `isSuperUser`，不能只靠前端藏按钮。
+
+---
+
+## 5. 数据模型与 SQL
+
+所有新增列、索引必须带 `COMMENT`。类型、时间字段、软删列名与现有 `cron_*` 表对齐：`deleted_at`（不用 staff 表的 `delete_at`）。
+
+不建物理外键（与现库一致），关联在应用层维护。
+
+### 5.1 `cron_robot`
 
 ```sql
 CREATE TABLE `cron_robot` (
-    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `name` varchar(100) NOT NULL DEFAULT '' COMMENT '机器人名称',
-    `platform` varchar(32) NOT NULL DEFAULT '' COMMENT '平台：wecom/dingtalk/feishu',
-    `webhook_url` varchar(1000) NOT NULL DEFAULT '' COMMENT 'Webhook地址，敏感信息',
-    `secret` varchar(512) NOT NULL DEFAULT '' COMMENT '签名Secret，密文存储',
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `name` varchar(100) NOT NULL DEFAULT '' COMMENT '机器人名称，未删除范围内应用层唯一',
+    `platform` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-企业微信wecom 2-钉钉dingtalk 3-飞书feishu',
+    `webhook_url` varchar(2048) NOT NULL DEFAULT '' COMMENT 'Webhook 完整地址（含 key），敏感，API 必须脱敏',
+    `secret` varchar(512) NOT NULL DEFAULT '' COMMENT '签名密钥，可空（企微通常不需要）；API 不回明文',
     `config_json` json DEFAULT NULL COMMENT '平台扩展配置',
-    `status` tinyint NOT NULL DEFAULT 1 COMMENT '0禁用 1启用',
-    `last_test_at` datetime DEFAULT NULL COMMENT '最近测试时间',
-    `last_success_at` datetime DEFAULT NULL COMMENT '最近成功时间',
-    `last_failure_at` datetime DEFAULT NULL COMMENT '最近失败时间',
-    `last_error` varchar(1000) NOT NULL DEFAULT '' COMMENT '最近错误',
-    `created_by` bigint unsigned NOT NULL DEFAULT 0,
-    `updated_by` bigint unsigned NOT NULL DEFAULT 0,
-    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    `deleted_at` datetime DEFAULT NULL,
+    `status` tinyint unsigned NOT NULL DEFAULT '1' COMMENT '0-禁用 1-启用',
+    `last_test_at` datetime DEFAULT NULL COMMENT '最近一次点「测试」的时间',
+    `last_test_ok` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '最近测试是否成功：0-否/未测 1-是',
+    `last_test_error` varchar(1000) NOT NULL DEFAULT '' COMMENT '最近测试失败原因，成功则清空',
+    `created_by` int unsigned NOT NULL DEFAULT '0' COMMENT '创建人 staff_user.id',
+    `updated_by` int unsigned NOT NULL DEFAULT '0' COMMENT '最后修改人 staff_user.id',
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `deleted_at` datetime DEFAULT NULL COMMENT '软删时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_name` (`name`),
+    KEY `idx_name` (`name`),
     KEY `idx_platform_status` (`platform`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-COMMENT='Cron群机器人配置';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Cron群机器';
 ```
 
-## 6.1 删除 access_token
+说明：
 
-不再设计：
+- **不设 `access_token` 列。** 钉钉/飞书签名用 `secret`；企微 key 在 URL 里。
+- **不把真实投递成功/失败写进本表**（避免测试与告警互相覆盖）。投递只看 `cron_robot_alert_log`。
+- `platform` 用 tinyint，与 `exec_type` / `status` 风格一致；PHP 常量：`WeCom=1 Dingtalk=2 Feishu=3`。
 
-```text
-access_token
-```
-
-第一版只保留：
-
-```text
-webhook_url
-secret
-config_json
-```
-
-原因：
-
-- DingTalk / Feishu 的机器人认证信息已经包含在 Webhook / Secret 语义中
-- 不需要提前拆出平台特定字段
-- 避免 cron_robot 表不断增加平台专属字段
-
-如果未来平台确实存在额外配置，放入：
-
-```text
-config_json
-```
-
----
-
-# 7. NodeGroup.robot_id
-
-增加：
+### 5.2 `cron_agent_node_group.robot_id`
 
 ```sql
 ALTER TABLE `cron_agent_node_group`
-ADD COLUMN `robot_id` bigint unsigned NOT NULL DEFAULT 0
-COMMENT '告警机器人ID，0表示未配置';
-
-ALTER TABLE `cron_agent_node_group`
-ADD KEY `idx_robot_id` (`robot_id`);
+    ADD COLUMN `robot_id` bigint unsigned NOT NULL DEFAULT 0
+        COMMENT '绑定的 cron_robot.id；0=该组不发告警' AFTER `group_name`,
+    ADD KEY `idx_robot_id` (`robot_id`);
 ```
 
-业务语义：
+绑定校验：`id 存在 AND deleted_at IS NULL AND status=1`，否则 422。
 
-```text
-robot_id = 0
-    ↓
-不发送告警
-
-robot_id > 0
-    ↓
-使用指定机器人
-```
-
-设置时校验：
-
-```text
-robot exists
-robot not deleted
-robot enabled
-```
-
----
-
-# 8. Execution robot_id 快照 —— P0
-
-这是本次优化最重要的一项。
-
-不能在 Execution 结束时重新查询：
-
-```text
-NodeGroup.robot_id
-```
-
-否则会产生历史一致性问题。
-
-例如：
-
-```text
-10:00
-Execution A 开始
-NodeGroup.robot_id = 1
-
-10:01
-管理员把 NodeGroup.robot_id 改成 2
-
-10:02
-Execution A FAILED
-```
-
-如果失败时重新读取 NodeGroup：
-
-```text
-Execution A
-    ↓
-NodeGroup
-    ↓
-robot_id = 2
-```
-
-那么 Execution A 会错误地发送到机器人 2。
-
-因此：
-
-> Execution 创建时必须快照当时的 robot_id。
-
----
-
-## 8.1 cron_task_log.robot_id
-
-增加：
+### 5.3 `cron_task_log.robot_id`（快照）
 
 ```sql
 ALTER TABLE `cron_task_log`
-ADD COLUMN `robot_id` bigint unsigned NOT NULL DEFAULT 0
-COMMENT '执行创建时快照的告警机器人ID';
-
-ALTER TABLE `cron_task_log`
-ADD KEY `idx_robot_id` (`robot_id`);
+    ADD COLUMN `robot_id` bigint unsigned NOT NULL DEFAULT 0
+        COMMENT '本轮 Execution 创建时快照的告警机器人；0=创建时未绑定或机器人未启用，本轮不告警'
+        AFTER `failure_reason`;
 ```
 
----
+**不建** `idx_robot_id`。告警查询走 `cron_robot_alert_log.execution_id` / `uk_execution_id`。
 
-## 8.2 快照时机
-
-Execution register 时：
+快照路径（仅 RUNNING 插入 Execution 时，配置变更空 `exec_batch_id` 不写）：
 
 ```text
-cron_task
-   ↓
-node
-   ↓
-node_group
-   ↓
-node_group.robot_id
-   ↓
-cron_task_log.robot_id
+cron_task.node_id
+  → cron_agent_node.group_id
+  → cron_agent_node_group.robot_id
+  → 若 robot_id>0 且 cron_robot 存在、未删、status=1
+       则 cron_task_log.robot_id = 该 id
+     否则 0
 ```
 
-之后 Execution 生命周期内：
+生命周期内 **不再读** NodeGroup。管理员中途改绑定，只影响之后新的 Execution。
 
-```text
-不再重新读取 NodeGroup.robot_id
-```
+发送时读 `cron_robot` **当前** webhook/secret（identity 稳定、配置可变）。
 
-最终：
+### 5.4 `cron_robot_alert_log`
 
-```text
-Execution
-    ↓
-cron_task_log.robot_id
-    ↓
-cron_robot
-```
-
-这样机器人配置修改不会影响已经开始执行的任务。
-
----
-
-# 9. 机器人删除与禁用
-
-## 9.1 删除
-
-机器人可能被多个节点组使用。
-
-删除前：
-
-```sql
-SELECT COUNT(*)
-FROM cron_agent_node_group
-WHERE robot_id = ?;
-```
-
-如果：
-
-```text
-count > 0
-```
-
-返回：
-
-```text
-409 Conflict
-```
-
-提示：
-
-```text
-该机器人当前被 N 个节点组使用，请先解除关联。
-```
-
-解除所有关联后允许软删除：
-
-```sql
-UPDATE cron_robot
-SET deleted_at = NOW()
-WHERE id = ?;
-```
-
----
-
-## 9.2 禁用
-
-禁用：
-
-```text
-status = 0
-```
-
-不自动修改：
-
-```text
-node_group.robot_id
-```
-
-新的 Execution 仍然可以快照该 robot_id。
-
-但发送告警时发现：
-
-```text
-robot.status = 0
-```
-
-则：
-
-```text
-跳过发送
-```
-
-记录：
-
-```text
-reason = robot_disabled
-```
-
-这样不会因为机器人临时禁用而修改大量节点组配置。
-
----
-
-# 10. RobotAlertMessage DTO —— P1
-
-Strategy 不应该自己查询业务数据。
-
-统一由：
-
-```text
-CronAlertService
-```
-
-构造：
-
-```text
-RobotAlertMessage
-```
-
-建议字段：
-
-```php
-final class RobotAlertMessage
-{
-    public int $executionId;
-    public int $taskId;
-    public string $taskName;
-
-    public int $nodeId;
-    public string $nodeName;
-
-    public int $nodeGroupId;
-    public string $nodeGroupName;
-
-    public string $status;
-    public string $failureReason;
-
-    public ?string $scheduledAt;
-    public ?string $startedAt;
-    public ?string $finishedAt;
-
-    public ?int $durationMs;
-
-    public ?int $exitCode;
-    public ?int $httpStatus;
-
-    public ?string $requestId;
-}
-```
-
-Strategy 只负责：
-
-```text
-RobotAlertMessage
-        ↓
-平台消息格式
-        ↓
-Webhook
-```
-
-而不是：
-
-```text
-Strategy
-   ↓
-MySQL
-   ↓
-cron_task
-   ↓
-cron_task_log
-   ↓
-node
-```
-
-这样可以保持 Strategy 单一职责。
-
----
-
-# 11. Strategy Pattern
-
-统一接口：
-
-```php
-interface RobotStrategyInterface
-{
-    public function send(
-        RobotConfig $robot,
-        RobotAlertMessage $message
-    ): RobotSendResult;
-}
-```
-
-实现：
-
-```text
-RobotStrategyInterface
-        │
-        ├── WeComRobotStrategy
-        ├── DingTalkRobotStrategy
-        └── FeishuRobotStrategy
-```
-
-Factory：
-
-```php
-final class RobotStrategyFactory
-{
-    public function make(string $platform): RobotStrategyInterface
-    {
-        return match ($platform) {
-            'wecom'    => new WeComRobotStrategy(),
-            'dingtalk' => new DingTalkRobotStrategy(),
-            'feishu'   => new FeishuRobotStrategy(),
-            default    => throw new UnsupportedRobotPlatformException(),
-        };
-    }
-}
-```
-
-业务层完全不关心具体平台。
-
----
-
-# 12. RobotSendResult
-
-统一返回：
-
-```php
-final class RobotSendResult
-{
-    public function __construct(
-        public readonly bool $success,
-        public readonly int $httpStatus = 0,
-        public readonly string $errorMessage = '',
-    ) {}
-}
-```
-
-例如：
-
-```text
-DingTalk
-    ↓
-HTTP 200
-    ↓
-业务 code success
-    ↓
-RobotSendResult(success=true)
-```
-
-或者：
-
-```text
-HTTP timeout
-    ↓
-RobotSendResult(
-    success=false,
-    errorMessage="request timeout"
-)
-```
-
----
-
-# 13. Webhook Timeout —— P1
-
-所有 Strategy 必须设置：
-
-```text
-connect timeout
-request timeout
-```
-
-不能使用无限等待。
-
-建议默认：
-
-```text
-connect_timeout = 2s
-request_timeout = 5s
-```
-
-实际数值集中配置，不要散落在三个 Strategy 中。
-
-例如：
-
-```text
-CronRobotConfig
-
-robot_connect_timeout
-robot_request_timeout
-```
-
-如果第一版不开放后台配置，则使用系统配置：
-
-```text
-config/cron.php
-```
-
-即可。
-
----
-
-# 14. Alert 不阻塞 Execution —— P0
-
-这是核心原则。
-
-错误方式：
-
-```text
-ExecutionService
-    ↓
-CAS FAILED
-    ↓
-HTTP Webhook
-    ↓
-等待
-    ↓
-Execution 完成
-```
-
-正确：
-
-```text
-ExecutionService
-    ↓
-CAS FAILED
-    ↓
-publish Event
-    ↓
-Execution 返回
-```
-
-然后：
-
-```text
-ExecutionFinishedEvent
-       ↓
-CronAlertListener
-       ↓
-Swoole Coroutine
-       ↓
-CronAlertService
-       ↓
-Webhook
-```
-
-因此：
-
-> Robot Alert 是 Execution 的旁路能力，而不是 Execution 状态机的一部分。
-
-机器人故障：
-
-```text
-Webhook timeout
-Webhook 500
-Webhook 连接失败
-```
-
-都不能改变：
-
-```text
-Execution.status
-```
-
-例如：
-
-```text
-Execution = FAILED
-Robot Alert = FAILED
-```
-
-两个状态独立。
-
----
-
-# 15. Event 唯一性 ≠ Delivery 唯一性 —— P0
-
-必须区分：
-
-```text
-Event 唯一性
-```
-
-与：
-
-```text
-Delivery 结果
-```
-
-Terminal CAS 只负责：
-
-```text
-同一个 Execution
-    ↓
-最多发布一次 Alert Event
-```
-
-例如：
-
-```sql
-UPDATE cron_task_log
-SET status = ?
-WHERE id = ?
-  AND status = ?
-```
-
-只有：
-
-```text
-affected_rows = 1
-```
-
-的一方发布：
-
-```text
-ExecutionFinishedEvent
-```
-
-因此：
-
-```text
-Worker A
-RUNNING → FAILED
-CAS success
-    ↓
-Event
-
-Worker B
-RUNNING → FAILED
-CAS conflict
-    ↓
-No Event
-```
-
-但：
-
-```text
-Event
- ↓
-Webhook
- ↓
-可能成功
-可能失败
-可能 timeout
-```
-
-所以不能表述成：
-
-```text
-CAS → 最多一次实际告警
-```
-
-准确语义是：
-
-```text
-CAS
- ↓
-最多一次 Alert Event
- ↓
-Delivery 可以有独立结果
-```
-
----
-
-# 16. cron_robot_alert_log —— P1
-
-为了记录 Delivery 状态，增加：
+第一版：**每条 Execution 最多一行**；无 pending；不软删；不重试。
 
 ```sql
 CREATE TABLE `cron_robot_alert_log` (
-    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `execution_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'Execution ID',
-    `robot_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT '机器人ID',
-    `platform` varchar(32) NOT NULL DEFAULT '' COMMENT '平台',
-    `alert_type` varchar(32) NOT NULL DEFAULT '' COMMENT 'FAILED/TIMEOUT',
-    `status` tinyint NOT NULL DEFAULT 0 COMMENT '0->pending 1->success 2->failed',
-    `attempt` tinyint unsigned NOT NULL DEFAULT 0 COMMENT '发送次数',
-    `http_status` smallint NOT NULL DEFAULT 0 COMMENT 'HTTP状态码',
-    `error_message` varchar(1000) NOT NULL DEFAULT '' COMMENT '错误信息',
-    `send_success_at` datetime DEFAULT NULL COMMENT '成功发送时间',
-    `send_fail_at` datetime DEFAULT NULL COMMENT '失败时间',
-    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `delete_at` datetime DEFAULT NULL COMMENT '删除|禁用时间',
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `execution_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task_log.id',
+    `cron_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task.id',
+    `exec_batch_id` varchar(64) NOT NULL DEFAULT '' COMMENT '执行批次，与 cron_task_log.exec_batch_id 一致',
+    `robot_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT '发送时使用的机器人',
+    `platform` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '发送时平台快照：1-wecom 2-dingtalk 3-feishu',
+    `alert_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-FAILED 2-TIMEOUT',
+    `status` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-发送成功 2-发送失败 3-跳过（机器人禁用/已删）',
+    `skip_reason` varchar(32) NOT NULL DEFAULT '' COMMENT '跳过原因：robot_disabled/robot_not_found；成功或失败为空',
+    `http_status` smallint NOT NULL DEFAULT 0 COMMENT 'Webhook HTTP 状态码，未发出为 0',
+    `error_message` varchar(1000) NOT NULL DEFAULT '' COMMENT '失败/跳过原因说明，禁止写入 webhook URL 或 secret',
+    `sent_at` datetime DEFAULT NULL COMMENT 'Webhook 调用结束时间（成功或失败都写)',
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     PRIMARY KEY (`id`),
-    KEY `idx_execution_id` (`execution_id`),
-    KEY `idx_robot_id_created` (`robot_id`, `created_at`),
+    UNIQUE KEY `uk_execution_id` (`execution_id`),
+    KEY `idx_robot_created` (`robot_id`, `created_at`),
+    KEY `idx_cron_created` (`cron_id`, `created_at`),
     KEY `idx_status_created` (`status`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-COMMENT='Cron机器人告警发送记录';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Cron机器人告警投递记录';
 ```
+
+`robot_id=0`：**不插入** 本表（本来就没配置告警，避免噪声）。
+
+并发：Terminal CAS 只有一方 `affected=1` 才 `go()`；若协程仍被跑两次，第二次 INSERT 撞 `uk_execution_id` 则忽略。
 
 ---
 
-# 17. Alert Log 的意义
+## 6. 删除 / 禁用机器人
 
-它解决：
+**删除：** `COUNT(*) FROM cron_agent_node_group WHERE robot_id=?` > 0 则 409：「该机器人被 N 个节点组使用，请先在节点组中解除」。解除后软删 `deleted_at`。
 
-```text
-Execution FAILED
-      ↓
-Alert Event
-      ↓
-Webhook failed
-```
+**禁用：** 只改 `status=0`，不改各节点组 `robot_id`。  
+- 新 Execution：快照时发现未启用 → `robot_id=0`，不告警。  
+- 已快照的在途 Execution：发送时发现禁用 → alert_log `status=3 skip_reason=robot_disabled`。
 
-之后无法判断：
-
-```text
-到底有没有发送？
-为什么失败？
-HTTP 状态？
-是否 timeout？
-发送了几次？
-```
-
-增加 Alert Log 后：
-
-```text
-Execution
-    ↓
-Alert Event
-    ↓
-cron_robot_alert_log
-    ↓
-Strategy
-    ↓
-SUCCESS / FAILED
-```
-
-可以查询：
-
-```text
-Execution #10001
-机器人 #3
-DingTalk
-FAILED
-attempt = 2
-http_status = 500
-error_message = ...
-```
+已删除：在途发送 → `status=3 skip_reason=robot_not_found`。Execution 仍是 FAILED/TIMEOUT。
 
 ---
 
-# 18. 第一版不引入 MQ
+## 7. 触发与旁路（对接现有 CAS）
 
-不建议为了机器人告警直接增加：
+项目没有可订阅的 Execution Event 总线。落地方式：
 
-```text
-RabbitMQ
-Kafka
-Redis Stream
-独立 Alert Worker
-```
+在 `ExecutionService` **所有终态 CAS 成功** 的出口调用同一方法，例如 `AlertDispatcher::dispatchIfNeeded($logId)`：
 
-第一版：
+- `updateExecution` 合法转移到 FAILED/TIMEOUT
+- `finishOwned`（超时/取消杀进程）
+- `recoverRow`（租约过期 WORKER_CRASH）
+- `agentReport` 走到终态且 CAS 成功
 
-```text
-Event
- ↓
-Swoole Coroutine
- ↓
-Webhook
- ↓
-Alert Log
-```
-
-已经足够。
-
-如果未来出现：
+内部：
 
 ```text
-大量告警
-Webhook 堵塞
-复杂重试
-告警削峰
-跨机器可靠投递
+affected !== 1  → return
+status ∉ {FAILED, TIMEOUT} → return
+failure_reason === CANCELLED → return
+robot_id === 0 → return
+go(function () { try { CronAlertService::send($logId); } catch (\Throwable) { 只记应用日志 } })
 ```
 
-再演进：
+`go()` 在 Worker 返回之后跑，Webhook 阻塞不影响 Execution 闭合。无 Swoole 环境（单测）则同步调用但仍 catch，不得抛回状态机。
 
-```text
-Execution Event
-      ↓
-Message Queue
-      ↓
-Alert Worker
-      ↓
-Robot
-```
-
-当前不提前设计。
+禁止：CAS 成功后同步 HTTP；禁止告警异常改 status。
 
 ---
 
-# 19. Alert 触发条件
+## 8. 消息与 Strategy
 
-第一版：
+`CronAlertService` 组 `RobotAlertMessage`，Strategy **禁止再查** `cron_task` / log。
 
-```text
-FAILED  → Alert
-TIMEOUT → Alert
-```
-
-不发送：
+建议字段：
 
 ```text
-SUCCESS
-CANCELLED
-SKIPPED
+executionId, cronId, execBatchId, taskName
+nodeId, nodeName, nodeGroupId, nodeGroupName
+status, failureReason
+scheduledAt, startedAt, finishedAt, durationMs
+exitCode, httpStatus, triggerType
+command   // Shell 命令或 HTTP URL，截断 200 字
 ```
 
-Worker Crash Recovery：
+不把 webhook、secret、lease_owner 放进消息。
 
 ```text
-RUNNING
-   ↓
-Lease expired
-   ↓
-Recovery
-   ↓
-FAILED
-failure_reason = WORKER_CRASH
-   ↓
-Alert
+RobotStrategyInterface::send(RobotConfig, RobotAlertMessage): RobotSendResult
+WeComRobotStrategy / DingTalkRobotStrategy / FeishuRobotStrategy
+RobotStrategyFactory::make(platform): match 1/2/3
 ```
 
-因此 Worker Crash 也自然进入统一告警流程。
+签名：钉钉/飞书用 `secret` 算 sign；`secret=''` 则不签名。超时集中读取：
+
+```text
+ROBOT_CONNECT_TIMEOUT   不设置默认 2
+ROBOT_REQUEST_TIMEOUT   不设置默认 5
+```
+
+写入 `App/.env.example`，不要三个 Strategy 各写一套数字。
 
 ---
 
-# 20. 告警流程
+## 9. API（`/api/v1`）
 
 ```text
-Execution
-    │
-    ├── SUCCESS
-    │
-    ├── CANCELLED
-    │
-    ├── SKIPPED
-    │
-    ├── FAILED
-    │      ↓
-    │   Terminal CAS
-    │      ↓
-    │   Event
-    │
-    └── TIMEOUT
-           ↓
-        Terminal CAS
-           ↓
-         Event
-           │
-           ↓
-    CronAlertListener
-           │
-           ↓
-    CronAlertService
-           │
-           ├── robot_id = 0
-           │      ↓
-           │    return
-           │
-           ├── robot deleted
-           │      ↓
-           │    record failure/skip
-           │
-           ├── robot disabled
-           │      ↓
-           │    record skip
-           │
-           └── robot enabled
-                  ↓
-           RobotAlertMessage
-                  ↓
-          StrategyFactory
-                  ↓
-              Webhook
-                  ↓
-          Alert Delivery Log
-```
-
----
-
-# 21. robot_id 快照与机器人删除的关系
-
-这是需要明确的历史数据语义。
-
-假设：
-
-```text
-Execution A
-robot_id snapshot = 1
-```
-
-之后：
-
-```text
-Robot 1 被删除
-```
-
-Execution A 后续发生：
-
-```text
-FAILED
-```
-
-此时：
-
-```text
-robot_id = 1
-robot 不存在
-```
-
-则：
-
-```text
-无法发送
-```
-
-但：
-
-```text
-Execution 仍然 FAILED
-```
-
-Alert Log：
-
-```text
-status = failed
-error_message = robot_not_found
-```
-
-因此：
-
-> robot_id 快照保证历史选择一致性，但不保证机器人资源永久存在。
-
----
-
-# 22. Robot 配置修改
-
-如果修改：
-
-```text
-webhook_url
-secret
-config_json
-```
-
-只影响后续发送。
-
-已经创建的：
-
-```text
-cron_task_log.robot_id
-```
-
-不改变。
-
-但是发送时读取：
-
-```text
-cron_robot
-```
-
-得到最新配置。
-
-因此：
-
-```text
-robot_id = stable identity
-robot configuration = mutable
-```
-
-这是合理的。
-
----
-
-# 23. Robot Test
-
-接口：
-
-```text
-POST /api/cron/robots/{id}/test
-```
-
-仅超级管理员。
-
-测试不创建：
-
-```text
-Execution
-cron_task_log
-RunOnce
-```
-
-直接：
-
-```text
-Robot
-  ↓
-Strategy
-  ↓
-Webhook
-```
-
-测试消息：
-
-```text
-🔔 schedule-job 机器人测试
-
-机器人：生产钉钉告警
-平台：DingTalk
-
-状态：连接测试成功
-时间：2026-09-09 10:00:00
-```
-
-测试结果更新：
-
-```text
-last_test_at
-last_success_at
-last_failure_at
-last_error
-```
-
----
-
-# 24. API
-
-## 24.1 Robot
-
-```text
-GET    /api/cron/robots
-POST   /api/cron/robots
-PUT    /api/cron/robots/{id}
-DELETE /api/cron/robots/{id}
-
-POST   /api/cron/robots/{id}/test
-POST   /api/cron/robots/{id}/enable
-POST   /api/cron/robots/{id}/disable
-```
-
-## 24.2 NodeGroup
-
-```text
-POST /api/cron/node-groups/{groupId}/robot
-DELETE /api/cron/node-groups/{groupId}/robot
-```
-
-或者复用：
-
-```text
-PUT /api/cron/node-groups/{groupId}
-```
-
-直接修改：
-
-```json
-{
-    "robot_id": 3
-}
-```
-
-如果当前项目已有 NodeGroup Update API，优先复用现有接口，避免增加无意义 API。
-
----
-
-# 25. 敏感信息
-
-以下字段必须保护：
-
-```text
-webhook_url
-secret
-config_json
-```
-
-原则：
-
-```text
-数据库
-    ↓
-加密存储
-
-API Response
-    ↓
-永远不返回完整 Secret/Webhook
-```
-
-列表：
-
-```text
-https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=******
-```
-
-编辑接口也不应该直接返回明文 Secret。
-
-如果项目已经存在统一加密组件：
-
-> 优先复用现有加密能力，不重新实现 AES。
-
----
-
-# 26. 审计
-
-机器人：
-
-```text
-CREATE
-UPDATE
-DELETE
-ENABLE
-DISABLE
-TEST
+GET    /api/v1/robots
+GET    /api/v1/robots/detail?id=
+POST   /api/v1/robots
+PUT    /api/v1/robots
+DELETE /api/v1/robots
+POST   /api/v1/robots/test
+PUT    /api/v1/robots/status          // enable/disable，与任务 status 接口风格一致
 ```
 
 节点组：
 
 ```text
-SET_ROBOT
-REMOVE_ROBOT
+PUT /api/v1/node-groups     // body 增加可选 robotId
 ```
 
-全部进入现有操作审计体系。
+列表/详情：`webhookUrl` 打码（保留 scheme/host，query 中 key 变 `******`）；`secret` 只返回是否已配置布尔，不回明文。更新 secret：空字符串表示不改，有值才覆盖。
 
-审计日志中：
-
-```text
-secret
-webhook_url
-```
-
-必须脱敏。
+测试：不创建 Execution；发「机器人连通测试」文案（禁止做成 FAILED 告警样式）。结果只更新 `last_test_*`。
 
 ---
 
-# 27. Metrics
+## 10. 敏感信息
 
-建议：
+`webhook_url` / `secret` / `config_json`：
 
-```text
-cron_robot_send_total
-cron_robot_send_success_total
-cron_robot_send_failure_total
-cron_robot_send_duration_ms
-
-cron_robot_test_total
-cron_robot_test_failure_total
-```
-
-低基数标签：
-
-```text
-platform
-status
-```
-
-不要使用：
-
-```text
-execution_id
-robot_id
-group_id
-```
-
-作为 Prometheus 高基数标签。
+- API 永不回完整 secret、完整 webhook query
+- alert_log.error_message 禁止带 URL/secret
+- 第一版库内明文；若后续加密，密钥走 env，迁移另开
 
 ---
 
-# 28. 异常边界
-
-必须保证：
+## 11. 明确不做（第一版）
 
 ```text
-Robot Exception
-      ↓
-Alert Service
-      ↓
-记录日志
-      ↓
-Execution 不受影响
-```
-
-禁止：
-
-```text
-Robot Exception
-      ↓
-ExecutionService catch
-      ↓
-Workflow failure
-```
-
-更不能进入：
-
-```text
-Saga compensation
-```
-
-机器人告警是旁路能力。
-
----
-
-# 29. 测试方案
-
-## 29.1 权限
-
-```text
-超级管理员新增机器人 → 200
-超级管理员编辑机器人 → 200
-超级管理员测试机器人 → 200
-超级管理员设置 NodeGroup robot → 200
-
-普通管理员新增机器人 → 403
-普通管理员编辑机器人 → 403
-普通管理员测试机器人 → 403
-普通管理员设置 NodeGroup robot → 403
-```
-
----
-
-## 29.2 NodeGroup
-
-```text
-robot_id = 0
-    → 不发送
-
-robot_id = 有效启用机器人
-    → 成功
-
-robot_id = 不存在
-    → 422
-
-robot_id = 禁用机器人
-    → 设置时 422
-```
-
----
-
-## 29.3 Execution Snapshot
-
-必须测试：
-
-```text
-T1:
-Execution 创建
-robot_id = 1
-
-T2:
-NodeGroup.robot_id = 2
-
-T3:
-Execution FAILED
-```
-
-预期：
-
-```text
-告警仍然使用 robot_id = 1
-```
-
-这是 P0 测试。
-
----
-
-## 29.4 CAS 并发
-
-两个 Worker 同时：
-
-```text
-RUNNING → FAILED
-```
-
-预期：
-
-```text
-Worker A
-CAS success
-Event
-
-Worker B
-CAS conflict
-No Event
-```
-
-因此：
-
-```text
-Alert Event = 1
-```
-
-Delivery Log 可以记录：
-
-```text
-1 次发送
-```
-
----
-
-## 29.5 Webhook Timeout
-
-模拟：
-
-```text
-Webhook connect timeout
-Webhook request timeout
-HTTP 500
-HTTP 429
-HTTP 200 + business error
-```
-
-预期：
-
-```text
-Alert = failed
-Execution 状态不变
-```
-
----
-
-## 29.6 Robot 故障
-
-测试：
-
-```text
-Robot disabled
-Robot deleted
-Webhook invalid
-Secret invalid
-Network error
-```
-
-全部要求：
-
-```text
-Execution 不受影响
-```
-
----
-
-# 30. 实施顺序
-
-## P0
-
-### P0-1
-
-数据库：
-
-```text
-cron_agent_node_group.robot_id
-cron_task_log.robot_id
-```
-
-### P0-2
-
-Execution register 时：
-
-```text
-NodeGroup.robot_id
-    ↓
-cron_task_log.robot_id
-```
-
-完成 robot_id snapshot。
-
-### P0-3
-
-Terminal CAS：
-
-```text
-CAS success
-    ↓
-ExecutionFinishedEvent
-```
-
-严格区分：
-
-```text
-Event 唯一性
-```
-
-和：
-
-```text
-Delivery
-```
-
-### P0-4
-
-Alert 不允许阻塞 Execution：
-
-```text
-Event
- ↓
-Coroutine
- ↓
-Alert
-```
-
----
-
-## P1
-
-### P1-1
-
-创建：
-
-```text
-cron_robot
-cron_robot_alert_log
-```
-
-### P1-2
-
-系统设置：
-
-```text
-系统设置
-└── 机器人警告
-```
-
-### P1-3
-
-Robot CRUD：
-
-```text
-CronRobotController
-CronRobotService
+MQ / 独立 Alert Worker
+告警聚合、降噪、升级、恢复通知
+一节点组多机器人
+alert_log 重试 / pending 队列
+Prometheus 指标
+AES 落库
 CronRobotRepository
+写入 cron_task_operation_log
 ```
 
-### P1-4
-
-Strategy：
-
-```text
-RobotStrategyInterface
-WeComRobotStrategy
-DingTalkRobotStrategy
-FeishuRobotStrategy
-RobotStrategyFactory
-```
-
-### P1-5
-
-DTO：
-
-```text
-RobotAlertMessage
-RobotSendResult
-```
-
-### P1-6
-
-NodeGroup：
-
-```text
-setRobot()
-removeRobot()
-```
-
-### P1-7
-
-Webhook timeout：
-
-```text
-connect timeout
-request timeout
-```
-
-### P1-8
-
-Execution Alert：
-
-```text
-ExecutionFinishedEvent
-CronAlertListener
-CronAlertService
-```
-
-### P1-9
-
-权限、审计、Metrics、测试。
+可靠投递、恢复告警、`robot_ids[]` 留后续演进。
 
 ---
 
-# 31. 暂不实现
+## 12. 测试要点
 
-第一版明确不做：
-
-```text
-MQ
-Kafka
-Redis Stream
-独立 Alert Worker
-告警聚合
-告警降噪
-告警升级
-多机器人同时发送
-复杂通知路由
-告警恢复通知
-```
-
-这些都属于后续演进能力。
+1. 非超管 POST robots / 改 robotId → 403；有菜单可看脱敏列表。
+2. 绑定禁用或不存在的 robot → 422；`robotId=0` 保存成功且后续不告警、不写 alert_log。
+3. **快照 P0：** 执行开始时 group.robot_id=1，中途改成 2，失败仍打机器人 1。
+4. 开始时机器人已禁用 → 快照 0，失败不告警。
+5. 两个 CAS 抢 FAILED → 仅一次 go()；alert_log 一行。
+6. Webhook timeout / 500 / 业务码失败 → alert_log.status=2，Execution 仍 FAILED。
+7. Recovery WORKER_CRASH → 告警；用户取消导致的闭合 → 不告警。
+8. 删除仍被节点组引用 → 409。
 
 ---
 
-# 32. 后续演进
+## 13. 实施顺序
 
-如果未来需要可靠投递：
+**P0 库表一次做完**（分组绑定、快照、投递都依赖 `cron_robot` 存在）：
 
-```text
-Execution
-    ↓
-Alert Event
-    ↓
-MQ
-    ↓
-Alert Worker
-    ↓
-cron_robot_alert_log
-    ↓
-Robot
-```
+1. `cron_robot` + `node_group.robot_id` + `cron_task_log.robot_id` + `cron_robot_alert_log`
+2. `insertExecution` 写入快照
+3. CAS 成功出口 `go(CronAlertService)`（可先打日志，Strategy 随后补）
 
-如果需要告警恢复：
+**P1 管理面与发送：**
 
-```text
-FAILED
-   ↓
-ALERT
-
-后续 SUCCESS
-   ↓
-RECOVERY ALERT
-```
-
-如果需要多机器人：
-
-```text
-NodeGroup
-   ↓
-robot_ids[]
-```
-
-但当前需求：
-
-```text
-NodeGroup
-   ↓
-一个 robot_id
-```
-
-不提前设计。
+4. 菜单 `/system` `/robots` + CRUD/测试/脱敏 + 超管校验  
+5. 节点组 `robotId`  
+6. 三个 Strategy + timeout  
+7. 权限与快照/CAS/取消/Crash 用例
 
 ---
 
-# 33. 最终架构
+## 14. 设计原则（落地检查清单）
 
-```text
-                          系统设置
-                             │
-                       机器人警告
-                             │
-                             ↓
-                      ┌─────────────┐
-                      │ cron_robot  │
-                      │ Global      │
-                      └──────┬──────┘
-                             ↑
-                             │ robot_id
-                             │
-                    cron_agent_node_group
-                             │
-                             ↓
-                       Execution 创建
-                             │
-                             ↓
-                  cron_task_log.robot_id
-                       （Snapshot）
-                             │
-                             ↓
-                     FAILED / TIMEOUT
-                             │
-                             ↓
-                       Terminal CAS
-                             │
-                   affected_rows = 1
-                             │
-                             ↓
-                  ExecutionFinishedEvent
-                             │
-                             ↓
-                     CronAlertService
-                             │
-                             ↓
-                    RobotAlertMessage
-                             │
-                             ↓
-                  RobotStrategyFactory
-                     ┌───────┼───────┐
-                     ↓       ↓       ↓
-                    企微     钉钉     飞书
-                             │
-                             ↓
-                    Webhook Timeout
-                             │
-                             ↓
-                  cron_robot_alert_log
-                             │
-                      ┌──────┴──────┐
-                      ↓             ↓
-                   SUCCESS        FAILED
-```
-
----
-
-# 34. 最终设计原则
-
-本方案最终遵循：
-
-```text
-① Robot 是全局资源
-② NodeGroup 只保存 robot_id
-③ Execution 创建时 Snapshot robot_id
-④ Execution 状态机不依赖 Robot
-⑤ Terminal CAS 只负责 Event 唯一性
-⑥ Delivery 独立记录
-⑦ Alert 不阻塞 Execution
-⑧ Webhook 必须有 timeout
-⑨ Strategy 隔离平台差异
-⑩ RobotAlertMessage 隔离业务数据与平台格式
-⑪ 不引入 MQ 等复杂基础设施
-⑫ 超级管理员负责机器人配置与节点组关联
-```
-
-最终形成：
-
-```text
-                    Execution Core
-                         │
-                         │ Event
-                         ↓
-                   Alert Sidecar
-                         │
-                         ↓
-                  Robot Strategy
-                         │
-             ┌───────────┼───────────┐
-             ↓           ↓           ↓
-            企微         钉钉         飞书
-```
-
-**核心状态机保持稳定，机器人告警作为旁路能力接入。**
+1. Robot 全局；NodeGroup 只存一个 `robot_id`。  
+2. Execution **创建时**快照；只快照启用中的机器人。  
+3. 状态机不依赖 Robot；告警在 CAS 之后协程旁路。  
+4. CAS 负责「最多触发一次」；`uk_execution_id` 负责「最多一行投递记录」。  
+5. 投递结果与 Execution.status 独立。  
+6. Webhook 必须有连接/请求超时。  
+7. Strategy 不查库。  
+8. 不引入 MQ / Repository / 任务操作审计表。  
+9. 写 webhook 与绑定节点组：超级管理员。  
+10. SQL 新增字段、索引全部 `COMMENT`。
