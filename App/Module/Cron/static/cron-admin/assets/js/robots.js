@@ -29,6 +29,13 @@
       platformLabel: function (platform) {
         return PLATFORM_LABELS[Number(platform)] || '未知';
       },
+      goNodeGroups: function () {
+        if (!common.isViewerSuper()) {
+          this.$message.warning('仅超级管理员可管理节点分组绑定');
+          return;
+        }
+        this.$router.push({ path: '/nodes', query: { tab: 'groups' } });
+      },
       load: async function () {
         this.loading = true;
         try {

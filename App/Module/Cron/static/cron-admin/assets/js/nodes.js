@@ -37,6 +37,9 @@
       };
     },
     created: function () {
+      if (this.$route.query && this.$route.query.tab === 'groups') {
+        this.activeTab = 'groups';
+      }
       this.load();
       this.loadGroups();
     },

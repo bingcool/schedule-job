@@ -942,7 +942,7 @@
             <el-option v-for="r in enabledRobots" :key="'rb-'+r.id" :value="r.id" :label="r.name + '（' + platformLabel(r.platform) + '）'"></el-option>
           </el-select>
         </el-form-item>
-        <p class="section-desc" style="margin:0 0 0 90px">任务失败或超时（非取消）时，向该组当前绑定的群机器人发告警。仅超级管理员可修改。</p>
+        <p class="section-desc" style="margin:0 0 0 90px">选择机器人警告后，节点分组内所有节点的任务失败或超时（非取消）时，将向该组当前选择绑定的群机器人发告警。仅超级管理员可修改。</p>
       </el-form>
       <span slot="footer"><el-button @click="robotDlg=false">取消</el-button><el-button type="primary" @click="saveGroupRobot">保存</el-button></span>
     </el-dialog>
@@ -954,6 +954,7 @@
     <div class="page-head">
       <div></div>
       <div class="actions">
+        <el-button v-if="isSuper" icon="el-icon-collection-tag" @click="goNodeGroups">节点分组</el-button>
         <el-button v-if="isSuper" type="primary" icon="el-icon-plus" @click="open()">新增机器人</el-button>
       </div>
     </div>
@@ -1460,8 +1461,8 @@
 <script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
 <script defer src="/cron-admin/assets/js/executions.js?v=exec-log-task-name-1"></script>
-<script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-1"></script>
-<script defer src="/cron-admin/assets/js/robots.js?v=1"></script>
+<script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-2"></script>
+<script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js?v=login-menu-1"></script>
 <script defer src="/cron-admin/assets/js/users.js?v=roles-2"></script>

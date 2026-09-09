@@ -279,8 +279,8 @@ RobotStrategyFactory::make(platform): match 1/2/3
 签名：钉钉/飞书用 `secret` 算 sign；`secret=''` 则不签名。超时集中读取：
 
 ```text
-ROBOT_CONNECT_TIMEOUT   不设置默认 2
-ROBOT_REQUEST_TIMEOUT   不设置默认 5
+ROBOT_CONNECT_TIMEOUT   不设置默认 10
+ROBOT_REQUEST_TIMEOUT   不设置默认 20
 ```
 
 写入 `App/.env.example`，不要三个 Strategy 各写一套数字。

@@ -171,11 +171,17 @@ flowchart TB
 
 ## 环境要求
 
-- PHP >= 8.1（推荐 8.2+）
+- PHP >= 8.4
 - 扩展：`swoole`、`pdo_mysql`、`json`、`mbstring`、`openssl`
 - Composer 2.x
 - MySQL 5.7+ 或 8.x
 - Linux / macOS（生产环境建议 Linux）
+- swoole 扩展要求swoole >=6.1+。可以直接下载最新的swoole-cli v6.2.2。这样php都不需要安装了。
+- 把swoole-cli复制到linux的/usr/local/bin/下，然后创建软链：
+```
+
+ln -s /usr/local/bin/swoole-cli /usr/local/bin/php
+```
 
 ---
 
@@ -191,13 +197,13 @@ composer install
 
 | 包 | 分支       |
 |---|----------|
-| `bingcool/swoolefy` | `~6.3.3` |
+| `bingcool/swoolefy` | `~6.3.4` |
 | `bingcool/library` | `^6.0.1` |
 
 若安装或升级报错，请一次性指定两个包：
 
 ```bash
-composer require bingcool/swoolefy:~6.3.3 bingcool/library:^6.0.1
+composer require bingcool/swoolefy:~6.3.4 bingcool/library:^6.0.1
 ```
 
 ### 2. 配置环境变量
@@ -214,7 +220,7 @@ cp App/.env.example App/.env
 ```bash
 mysql -h <host> -u <user> -p <database> < migrations/cron.sql
 
-// 获取直接复制sql在面板执行    
+// 或者直接复制cron.sql在面板执行        
 
 ```
 
@@ -309,8 +315,8 @@ php cron.php start App
 
 | 配置 | 不设置 | 说明 |
 |------|--------|------|
-| `ROBOT_CONNECT_TIMEOUT` | 2 秒 | 连接超时 |
-| `ROBOT_REQUEST_TIMEOUT` | 5 秒 | 请求总超时 |
+| `ROBOT_CONNECT_TIMEOUT` | 10 秒 | 连接超时 |
+| `ROBOT_REQUEST_TIMEOUT` | 20 秒 | 请求总超时 |
 
 官方对接：企微 [群机器人消息推送](https://developer.work.weixin.qq.com/document/path/91770)；钉钉 [自定义机器人安全设置](https://open.dingtalk.com/document/orgapp/customize-robot-security-settings)（加签 HMAC-SHA256）；飞书 [自定义机器人](https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot)（签名校验 HMAC-SHA256）。
 
@@ -471,8 +477,8 @@ CRON_HEARTBEAT_INTERVAL=15
 # EXECUTION_LEASE_RECOVERY_INTERVAL=30
 # EXECUTION_TERMINATE_GRACE_PERIOD=10
 
-# ROBOT_CONNECT_TIMEOUT=2
-# ROBOT_REQUEST_TIMEOUT=5
+# ROBOT_CONNECT_TIMEOUT=10
+# ROBOT_REQUEST_TIMEOUT=20
 ```
 
 3. **部署目标业务代码**  

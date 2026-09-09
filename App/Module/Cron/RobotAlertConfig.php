@@ -9,9 +9,9 @@ namespace App\Module\Cron;
  */
 final class RobotAlertConfig
 {
-    public const CONNECT_DEFAULT = 2;
+    public const CONNECT_DEFAULT = 10;
 
-    public const REQUEST_DEFAULT = 5;
+    public const REQUEST_DEFAULT = 20;
 
     public static function connectTimeout(): int
     {
