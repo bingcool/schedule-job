@@ -19,7 +19,7 @@ final class RobotPlatform
     public const ALL = [self::WECOM, self::DINGTALK, self::FEISHU];
 
     /**
-     * 各平台官方 Webhook 主机（防 SSRF）。
+     * 各平台官方 Webhook 主机（防 SSRF）。未设置对应 env 时用这些默认值。
      *
      * @var array<int, list<string>>
      */
@@ -27,6 +27,13 @@ final class RobotPlatform
         self::WECOM => ['qyapi.weixin.qq.com'],
         self::DINGTALK => ['oapi.dingtalk.com'],
         self::FEISHU => ['open.feishu.cn', 'open.larkoffice.com'],
+    ];
+
+    /** @var array<int, string> */
+    private const WEBHOOK_HOST_ENV = [
+        self::WECOM => 'WEBHOOK_HOST_WECOM',
+        self::DINGTALK => 'WEBHOOK_HOST_DINGTALK',
+        self::FEISHU => 'WEBHOOK_HOST_FEISHU',
     ];
 
     public static function isValid(int $platform): bool
@@ -49,6 +56,34 @@ final class RobotPlatform
      */
     public static function webhookHosts(int $platform): array
     {
-        return self::WEBHOOK_HOSTS[$platform] ?? [];
+        $defaults = self::WEBHOOK_HOSTS[$platform] ?? [];
+        $envKey = self::WEBHOOK_HOST_ENV[$platform] ?? null;
+        if ($envKey === null) {
+            return $defaults;
+        }
+        $raw = env($envKey);
+        if ($raw === null || $raw === '') {
+            return $defaults;
+        }
+        $hosts = self::parseWebhookHosts((string) $raw);
+
+        return $hosts !== [] ? $hosts : $defaults;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function parseWebhookHosts(string $raw): array
+    {
+        $hosts = [];
+        foreach (explode(',', $raw) as $item) {
+            $host = strtolower(trim($item));
+            if ($host === '') {
+                continue;
+            }
+            $hosts[] = $host;
+        }
+
+        return array_values(array_unique($hosts));
     }
 }

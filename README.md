@@ -317,6 +317,9 @@ php cron.php start App
 |------|--------|------|
 | `ROBOT_CONNECT_TIMEOUT` | 10 秒 | 连接超时 |
 | `ROBOT_REQUEST_TIMEOUT` | 20 秒 | 请求总超时 |
+| `WEBHOOK_HOST_WECOM` | `qyapi.weixin.qq.com` | 企微 Webhook 允许主机，逗号分隔 |
+| `WEBHOOK_HOST_DINGTALK` | `oapi.dingtalk.com` | 钉钉 Webhook 允许主机，逗号分隔 |
+| `WEBHOOK_HOST_FEISHU` | `open.feishu.cn,open.larkoffice.com` | 飞书 Webhook 允许主机，逗号分隔 |
 
 官方对接：企微 [群机器人消息推送](https://developer.work.weixin.qq.com/document/path/91770)；钉钉 [自定义机器人安全设置](https://open.dingtalk.com/document/orgapp/customize-robot-security-settings)（加签 HMAC-SHA256）；飞书 [自定义机器人](https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot)（签名校验 HMAC-SHA256）。
 
@@ -479,6 +482,9 @@ CRON_HEARTBEAT_INTERVAL=15
 
 # ROBOT_CONNECT_TIMEOUT=10
 # ROBOT_REQUEST_TIMEOUT=20
+# WEBHOOK_HOST_WECOM=qyapi.weixin.qq.com
+# WEBHOOK_HOST_DINGTALK=oapi.dingtalk.com
+# WEBHOOK_HOST_FEISHU=open.feishu.cn,open.larkoffice.com
 ```
 
 3. **部署目标业务代码**  

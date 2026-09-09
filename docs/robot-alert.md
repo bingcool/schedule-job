@@ -281,6 +281,9 @@ RobotStrategyFactory::make(platform): match 1/2/3
 ```text
 ROBOT_CONNECT_TIMEOUT   不设置默认 10
 ROBOT_REQUEST_TIMEOUT   不设置默认 20
+WEBHOOK_HOST_WECOM      不设置默认 qyapi.weixin.qq.com
+WEBHOOK_HOST_DINGTALK   不设置默认 oapi.dingtalk.com
+WEBHOOK_HOST_FEISHU     不设置默认 open.feishu.cn,open.larkoffice.com
 ```
 
 写入 `App/.env.example`，不要三个 Strategy 各写一套数字。
