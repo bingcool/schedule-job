@@ -7,9 +7,9 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
-  <link rel="stylesheet" href="/cron-admin/assets/css/common.css?v=sidebar-fixed-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/common.css?v=app-header-3">
   <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-log-task-name-2">
-  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=menu-sort-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=app-header-2">
 </head>
 <body>
 <div id="app" v-cloak>
@@ -32,68 +32,68 @@
         </div>
       </nav>
     </aside>
-    <main class="main">
-      <div class="top">
-        <div class="top-bar">
-          <div>
-            <div class="top-inner">
-              <div class="breadcrumb">{{ breadcrumbPath }}</div>
-              <h1 class="title">{{ pageTitle }}</h1>
-              <p class="subtitle" v-if="pageSubtitle">{{ pageSubtitle }}</p>
-            </div>
-            <div class="top-skeleton" aria-hidden="true">
-              <span class="top-skeleton-line"></span>
-              <span class="top-skeleton-line lg"></span>
-              <span class="top-skeleton-line sm"></span>
-            </div>
-          </div>
-          <div class="user-bar" v-if="currentUser">
-            <el-dropdown trigger="click" @command="onUserCommand">
-              <span class="name user-name-link">{{ currentUser.userName || currentUser.account }}<i class="el-icon-arrow-down el-icon--right"></i></span>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item command="password"><i class="el-icon-key"></i> 重置密码</el-dropdown-item>
-                <el-dropdown-item command="profile"><i class="el-icon-user"></i> 个人设置</el-dropdown-item>
-              </el-dropdown-menu>
-            </el-dropdown>
-            <el-button size="mini" plain @click="logout">退出</el-button>
-          </div>
-          <el-dialog title="重置密码" :visible.sync="settingsDlg" width="440px" append-to-body @closed="resetPasswordForm">
-            <p class="section-desc" style="margin:0 0 14px">修改当前账号密码，需校验旧密码。</p>
-            <el-form class="reset-password-form" label-width="108px" size="small" @submit.native.prevent="submitPassword">
-              <el-form-item label="旧密码" required>
-                <el-input v-model="passwordForm.oldPassword" type="password" show-password autocomplete="current-password"></el-input>
-              </el-form-item>
-              <el-form-item label="新密码" required>
-                <el-input v-model="passwordForm.newPassword" type="password" show-password autocomplete="new-password" placeholder="至少 8 位"></el-input>
-              </el-form-item>
-              <el-form-item label="确认新密码" required>
-                <el-input v-model="passwordForm.newPasswordConfirm" type="password" show-password autocomplete="new-password" @keyup.enter.native="submitPassword"></el-input>
-              </el-form-item>
-            </el-form>
-            <div slot="footer">
-              <el-button @click="settingsDlg = false">取消</el-button>
-              <el-button type="primary" :loading="passwordSaving" @click="submitPassword">提交</el-button>
-            </div>
-          </el-dialog>
-          <el-dialog title="个人设置" :visible.sync="profileDlg" width="440px" append-to-body>
-            <p class="section-desc" style="margin:0 0 14px">可修改显示名称。账号仅能由有用户编辑权限的人在用户管理中修改。</p>
-            <el-form class="reset-password-form" label-width="108px" size="small" @submit.native.prevent="submitProfile">
-              <el-form-item label="账号">
-                <el-input :value="profileForm.account" disabled></el-input>
-              </el-form-item>
-              <el-form-item label="用户名称" required>
-                <el-input v-model="profileForm.userName" autocomplete="name" placeholder="显示名称" @keyup.enter.native="submitProfile"></el-input>
-              </el-form-item>
-            </el-form>
-            <div slot="footer">
-              <el-button @click="profileDlg = false">取消</el-button>
-              <el-button type="primary" :loading="profileSaving" @click="submitProfile">保存</el-button>
-            </div>
-          </el-dialog>
+    <div class="app-main">
+      <header class="app-header">
+        <div class="user-bar" v-if="currentUser">
+          <el-dropdown trigger="click" @command="onUserCommand">
+            <span class="name user-name-link">{{ currentUser.userName || currentUser.account }}<i class="el-icon-arrow-down el-icon--right"></i></span>
+            <el-dropdown-menu slot="dropdown">
+              <el-dropdown-item command="password"><i class="el-icon-key"></i> 重置密码</el-dropdown-item>
+              <el-dropdown-item command="profile"><i class="el-icon-user"></i> 个人设置</el-dropdown-item>
+            </el-dropdown-menu>
+          </el-dropdown>
+          <el-button size="mini" plain @click="logout">退出</el-button>
         </div>
-      </div>
-      <div class="content-area"><router-view></router-view></div>
-    </main>
+        <el-dialog title="重置密码" :visible.sync="settingsDlg" width="440px" append-to-body @closed="resetPasswordForm">
+          <p class="section-desc" style="margin:0 0 14px">修改当前账号密码，需校验旧密码。</p>
+          <el-form class="reset-password-form" label-width="108px" size="small" @submit.native.prevent="submitPassword">
+            <el-form-item label="旧密码" required>
+              <el-input v-model="passwordForm.oldPassword" type="password" show-password autocomplete="current-password"></el-input>
+            </el-form-item>
+            <el-form-item label="新密码" required>
+              <el-input v-model="passwordForm.newPassword" type="password" show-password autocomplete="new-password" placeholder="至少 8 位"></el-input>
+            </el-form-item>
+            <el-form-item label="确认新密码" required>
+              <el-input v-model="passwordForm.newPasswordConfirm" type="password" show-password autocomplete="new-password" @keyup.enter.native="submitPassword"></el-input>
+            </el-form-item>
+          </el-form>
+          <div slot="footer">
+            <el-button @click="settingsDlg = false">取消</el-button>
+            <el-button type="primary" :loading="passwordSaving" @click="submitPassword">提交</el-button>
+          </div>
+        </el-dialog>
+        <el-dialog title="个人设置" :visible.sync="profileDlg" width="440px" append-to-body>
+          <p class="section-desc" style="margin:0 0 14px">可修改显示名称。账号仅能由有用户编辑权限的人在用户管理中修改。</p>
+          <el-form class="reset-password-form" label-width="108px" size="small" @submit.native.prevent="submitProfile">
+            <el-form-item label="账号">
+              <el-input :value="profileForm.account" disabled></el-input>
+            </el-form-item>
+            <el-form-item label="用户名称" required>
+              <el-input v-model="profileForm.userName" autocomplete="name" placeholder="显示名称" @keyup.enter.native="submitProfile"></el-input>
+            </el-form-item>
+          </el-form>
+          <div slot="footer">
+            <el-button @click="profileDlg = false">取消</el-button>
+            <el-button type="primary" :loading="profileSaving" @click="submitProfile">保存</el-button>
+          </div>
+        </el-dialog>
+      </header>
+      <main class="main">
+        <div class="top">
+          <div class="top-inner">
+            <div class="breadcrumb">{{ breadcrumbPath }}</div>
+            <h1 class="title">{{ pageTitle }}</h1>
+            <p class="subtitle" v-if="pageSubtitle">{{ pageSubtitle }}</p>
+          </div>
+          <div class="top-skeleton" aria-hidden="true">
+            <span class="top-skeleton-line"></span>
+            <span class="top-skeleton-line lg"></span>
+            <span class="top-skeleton-line sm"></span>
+          </div>
+        </div>
+        <div class="content-area"><router-view></router-view></div>
+      </main>
+    </div>
   </div>
 </div>
 

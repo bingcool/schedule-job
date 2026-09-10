@@ -135,6 +135,10 @@
   gap: 16px;
 }
 
+.app-header .user-bar {
+  margin-left: 0;
+}
+
 .perm-tree-panel {
   max-height: 480px;
   overflow-y: auto;

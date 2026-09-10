@@ -44,6 +44,29 @@ body {
   overflow: hidden;
 }
 
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  min-height: 56px;
+  padding: 10px 32px;
+  background: var(--bg);
+  color: var(--text);
+  flex-shrink: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--line);
+}
+
 .sidebar {
   width: 236px;
   background: var(--dark);
@@ -93,10 +116,11 @@ body {
 
 .main {
   flex: 1;
-  padding: 26px 32px;
+  padding: 8px 32px 26px;
   max-width: 1450px;
   min-width: 0;
-  height: 100%;
+  min-height: 0;
+  height: auto;
   overflow-y: auto;
 }
 
@@ -293,6 +317,10 @@ body {
 @media (max-width: 720px) {
   .sidebar {
     display: none;
+  }
+
+  .app-header {
+    padding: 8px 16px;
   }
 
   .main {
