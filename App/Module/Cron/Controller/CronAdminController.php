@@ -45,9 +45,16 @@ class CronAdminController extends BController
         $this->renderStaticFile($relativePath, $response);
     }
 
-    private function renderStaticFile(string $relativePath, ResponseOutput $response): void
+    /**
+     * 允许通过 /cron-admin/{path} 下发的相对路径（含本地 vendor）。
+     *
+     * vendor 版本：vue@2.7.16、vue-router@3.6.5、element-ui@2.15.14、sortablejs@1.15.2。
+     *
+     * @return list<string>
+     */
+    public static function staticFiles(): array
     {
-        $allowed = [
+        return [
             'index.html',
             'task.html',
             'execution.html',
@@ -72,10 +79,20 @@ class CronAdminController extends BController
             'assets/js/roles.js',
             'assets/js/role-editor.js',
             'assets/js/menus.js',
+            'assets/vendor/vue.min.js',
+            'assets/vendor/vue-router.min.js',
+            'assets/vendor/sortable.min.js',
+            'assets/vendor/element-ui/index.js',
+            'assets/vendor/element-ui/theme-chalk/index.css',
+            'assets/vendor/element-ui/theme-chalk/fonts/element-icons.woff',
+            'assets/vendor/element-ui/theme-chalk/fonts/element-icons.ttf',
         ];
+    }
 
+    private function renderStaticFile(string $relativePath, ResponseOutput $response): void
+    {
         $normalized = trim(str_replace('\\', '/', $relativePath), '/');
-        if ($normalized === '' || !in_array($normalized, $allowed, true)) {
+        if ($normalized === '' || !in_array($normalized, self::staticFiles(), true)) {
             throw new DispatchException('Cron admin resource not found: ' . $relativePath, HttpStatus::NOT_FOUND);
         }
 

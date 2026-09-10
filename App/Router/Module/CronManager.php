@@ -13,78 +13,11 @@ use App\Module\Staff\Middleware\MenuPagePermissionMiddleware;
 Route::get('/cron-admin', [
     'dispatch_route' => [CronAdminController::class, 'index'],
 ]);
-Route::get('/cron-admin/index.html', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/task.html', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/execution.html', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/log.html', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/css/common.css', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/css/pages.css', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/common.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/app.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/dashboard.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/tasks.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/editor.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/detail.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/executions.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/nodes.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/robots.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/runtime.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/css/auth.css', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/login.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/users.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/user-editor.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/roles.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/role-editor.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/menus.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
-Route::get('/cron-admin/assets/js/task-operation-logs.js', [
-    'dispatch_route' => [CronAdminController::class, 'assets'],
-]);
+foreach (CronAdminController::staticFiles() as $staticFile) {
+    Route::get('/cron-admin/' . $staticFile, [
+        'dispatch_route' => [CronAdminController::class, 'assets'],
+    ]);
+}
 
 Route::group([
     'prefix' => 'api/v1',
