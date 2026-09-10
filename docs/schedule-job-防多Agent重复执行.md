@@ -1,7 +1,7 @@
 # schedule-job HTTP Cron 同一 Slot 去重
 
-> 版本：v1.2（时钟偏差用 ±2s 窗口；UNIQUE 仍挡精确重复）  
-> 状态：设计方案，尚未落地  
+> 版本：v1.4（输家直接跳过，不写 Execution 日志）  
+> 状态：已按本方案落地  
 > 目标：同一个任务、同一个调度点，最多一次 HTTP / `proc_open`。  
 > 不解决跨 Slot 重叠（那是 `with_block_lapping`），不引入 Leader / Redis Lock。
 
@@ -163,7 +163,8 @@ CronManager::runExecutionPipeline
     ▼
 claim(cron_id, plannedAt)     ← 行锁 + ±2s 窗口 + INSERT，仅 trigger
     │
-    ├─ DUPLICATE → return skip，不写 RUNNING，不执行
+    ├─ DUPLICATE → 直接 return，不执行
+    │              不写 Scheduled Record，不写 cron_task_log，不调 recordSkip
     ├─ FAILED    → 记错误，不执行
     └─ CREATED   → 事务内已写 Record + RUNNING Execution
     │
@@ -171,7 +172,9 @@ claim(cron_id, plannedAt)     ← 行锁 + ±2s 窗口 + INSERT，仅 trigger
 HTTP / proc_open（现有 Executor，事务已提交）
 ```
 
-Duplicate（精确冲突或窗口内已有）是正常竞争，INFO/DEBUG，不要当 ERROR。
+Duplicate（精确冲突或窗口内已有）是正常竞争：**输家直接跳过**，不要当 ERROR，也 **不要** 写 SKIPPED 执行记录。时间窗 / `with_block_lapping` 仍走 `recordSkip()`，和抢占失败分开。
+
+进程内最多 DEBUG，文案仅供排查，例如 `抢不过任务执行权，其他 Agent 实例已抢占该调度点`。不要 Error，不要落 `cron_task_log`。
 
 HTTP / `proc_open` 在 COMMIT 之后。失败 / Timeout 只更新 `cron_task_log`，**不删** Scheduled Record。
 
@@ -184,7 +187,7 @@ CronScheduledTaskRecordService::claim(cronId, scheduledAt): CREATED|DUPLICATE|FA
 
 `ExecutionService` 继续管 CAS / Lease。不要把 Slot 唯一性塞进状态机。
 
-Vendor `CronManager` 只需在 `writeLog(RUNNING)` 之前加一个可空回调（类似已有 `run_once_precheck`），Duplicate 时按 skip 返回。不要写 Controller。
+Vendor `CronManager` 在 `writeLog(RUNNING)` 之前加可空回调（类似已有 `run_once_precheck`）。Duplicate 时 **直接 return**（可 `ExecutionResult::skipped`，但 **禁止** `recordSkip` / `writeLog`）。不要写 Controller。
 
 ---
 
@@ -208,7 +211,7 @@ Scheduler 不再给停用任务 arm Timer（现有 Runtime Diff）。历史 Reco
 ① 表 + UNIQUE(cron_id, scheduled_at)
 ② trigger 用 plannedAt 做 Slot
 ③ claim：行锁 + ±2s 窗口 + INSERT；CREATED 才执行
-④ DUPLICATE（精确或窗口内）→ skip，不当异常
+④ DUPLICATE → 直接跳过，不写 cron_task_log，不当异常
 ⑤ 失败不删 Record
 ⑥ RunOnce / 手工不走本表
 ```
@@ -236,8 +239,8 @@ Metrics（可后补）
 | 场景 | 预期 |
 |------|------|
 | 单 Worker 触发一次 | Record=1 Execution=1 HTTP=1 |
-| 两个 Worker / 两个同 node_id 进程 | Record=1 Execution=1 执行=1，另一个 DUPLICATE skip |
-| plannedAt 相差 1s（时钟偏差） | 后到的窗口命中，skip，不执行 |
+| 两个 Worker / 两个同 node_id 进程 | Record=1；赢家执行 1 次；输家无 Execution 行 |
+| plannedAt 相差 1s（时钟偏差） | 后到的窗口命中，直接跳过，不写日志 |
 | plannedAt 相差 5s（合法下一格） | 两条 Record，两次执行 |
 | 同一进程重复扫描同一 Slot | 第二次 DUPLICATE |
 | HTTP 失败后再扫同一 Slot | 不重发 |

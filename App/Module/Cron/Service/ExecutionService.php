@@ -343,12 +343,34 @@ class ExecutionService
         $saved = $this->findByBatch((int) $row['cron_id'], (string) $row['exec_batch_id']);
         if ($saved && $status === ExecutionStatus::RUNNING) {
             $id = (int) $saved['id'];
+            $this->bindScheduleSlot($row, $id);
             ExecutionRuntimeGuard::watch(
                 $id,
                 (int) ($saved['pid'] ?? 0),
                 isset($saved['timeout_at']) ? (string) $saved['timeout_at'] : null,
             );
         }
+    }
+
+    /**
+     * 调度触发的 RUNNING 行回写 Slot Record；RunOnce 不绑。
+     *
+     * @param array<string, mixed> $row
+     */
+    private function bindScheduleSlot(array $row, int $executionId): void
+    {
+        if ((int) ($row['trigger_type'] ?? 0) !== ExecutionStatus::TRIGGER_SCHEDULER) {
+            return;
+        }
+        $scheduledAt = trim((string) ($row['scheduled_at'] ?? ''));
+        if ($scheduledAt === '') {
+            return;
+        }
+        (new CronScheduledTaskRecordService())->bindExecution(
+            (int) ($row['cron_id'] ?? 0),
+            $scheduledAt,
+            $executionId,
+        );
     }
 
     /**

@@ -30,6 +30,10 @@ return [
             'run_once_precheck' => static function (int $requestId): string {
                 return (new \App\Module\Cron\Service\ExecutionService())->precheckRunOnce($requestId);
             },
+            // 同一 cron_id + 调度点只允许一个赢家；返回 CronScheduleSlotClaimConst::CREATED|DUPLICATE|FAILED。RunOnce 不走。
+            'schedule_slot_claim' => static function (int $cronTaskId, int $plannedAt): string {
+                return (new \App\Module\Cron\Service\CronScheduledTaskRecordService())->claim($cronTaskId, $plannedAt);
+            },
             // 节点心跳落库：upsert cron_agent_node.last_heartbeat_at / heartbeat_interval
             'node_heartbeat_ack' => static function (string $nodeId, int $heartbeatInterval = 15): void {
                 (new \App\Module\Cron\Service\CronTaskService())->ackNodeHeartbeat($nodeId, $heartbeatInterval);

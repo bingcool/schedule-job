@@ -133,6 +133,17 @@ CREATE TABLE `cron_task_log` (
     KEY `idx_node_status` (`node_id`, `status`) COMMENT '按节点过滤进行中/过期 Execution'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行记录（Execution Record）';
 
+CREATE TABLE `cron_scheduled_task_record` (
+    `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `cron_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task.id',
+    `scheduled_at` datetime NOT NULL COMMENT 'Cron Slot，等于 CronManager plannedAt',
+    `execution_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT '关联 cron_task_log.id',
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_cron_scheduled_at` (`cron_id`, `scheduled_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Cron调度Slot占位';
+
 CREATE TABLE `cron_task_operation_log` (
     `id` bigint unsigned NOT NULL AUTO_INCREMENT,
     `cron_id` bigint unsigned NOT NULL DEFAULT '0' COMMENT 'cron_task.id',
