@@ -64,7 +64,7 @@ body {
   color: var(--text);
   flex-shrink: 0;
   z-index: 20;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 2px solid var(--line);
 }
 
 .sidebar {
