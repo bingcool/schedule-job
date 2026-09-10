@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Service;
 
+use App\Module\Cron\Entity\CronScheduledTaskRecordEntity;
 use Swoolefy\Core\Runtime\RuntimeRegistry;
 use Swoolefy\Library\Db\Query;
 use Swoolefy\Library\Db\Raw;
@@ -661,6 +662,27 @@ class CronTaskManagerService
         $cutoff = date('Y-m-d H:i:s', strtotime('-' . $days . ' days'));
 
         return CronTaskLogEntity::withoutTrashed()
+            ->where('created_at', '<', $cutoff)
+            ->delete();
+    }
+
+    /**
+     * 硬删除早于保留天数的 cron_scheduled_task_record 行（含已软删行）。
+     *
+     * 保留天数来自环境变量 CRON_TASK_LOG_DELETE_DAY，默认 7；≤0 时不删除。
+     *
+     * @return int 实际删除行数
+     */
+    public function purgeExpiredScheduleRecordTask(?int $days = null): int
+    {
+        $days = $days ?? (int) env('CRON_TASK_LOG_DELETE_DAY', 7);
+        if ($days <= 0) {
+            return 0;
+        }
+
+        $cutoff = date('Y-m-d H:i:s', strtotime('-' . $days . ' days'));
+
+        return CronScheduledTaskRecordEntity::query()
             ->where('created_at', '<', $cutoff)
             ->delete();
     }

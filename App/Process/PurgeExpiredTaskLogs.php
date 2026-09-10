@@ -13,6 +13,7 @@ class PurgeExpiredTaskLogs extends AbstractProcess {
     {
         $purge = static function (): void {
             (new CronTaskManagerService())->purgeExpiredTaskLogs();
+            (new CronTaskManagerService())->purgeExpiredScheduleRecordTask();
         };
 
         $purge();

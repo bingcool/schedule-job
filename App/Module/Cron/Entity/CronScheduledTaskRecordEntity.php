@@ -22,6 +22,7 @@ use App\Model\ClientModel;
  */
 class CronScheduledTaskRecordEntity extends ClientModel
 {
+
     protected static $table = 'cron_scheduled_task_record';
 
     protected $pk = 'id';
