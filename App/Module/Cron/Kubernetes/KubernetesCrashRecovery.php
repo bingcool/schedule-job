@@ -7,14 +7,13 @@ namespace App\Module\Cron\Kubernetes;
 use App\Module\Cron\Entity\CronTaskEntity;
 use App\Module\Cron\FailureReason;
 use Swoolefy\Worker\Cron\CronProcess;
-use Swoolefy\Worker\Cron\ExecutionResult;
 use Swoolefy\Worker\Cron\ExecutionStatus;
-use Swoolefy\Worker\Cron\KubernetesApiException;
-use Swoolefy\Worker\Cron\KubernetesClient;
-use Swoolefy\Worker\Cron\KubernetesClientInterface;
 use Swoolefy\Worker\Cron\KubernetesExecutor;
-use Swoolefy\Worker\Cron\KubernetesJobStatus;
-use Swoolefy\Worker\Cron\KubernetesJobTemplateBuilder;
+use Swoolefy\Worker\Kubernetes\ApiException;
+use Swoolefy\Worker\Kubernetes\Client;
+use Swoolefy\Worker\Kubernetes\ClientInterface;
+use Swoolefy\Worker\Kubernetes\JobStatus;
+use Swoolefy\Worker\Kubernetes\JobTemplateBuilder;
 
 /**
  * Lease 过期后按集群 Job 真实状态收尾（方案 §11.3）。
@@ -25,7 +24,7 @@ use Swoolefy\Worker\Cron\KubernetesJobTemplateBuilder;
  */
 final class KubernetesCrashRecovery
 {
-    public function __construct(private readonly ?KubernetesClientInterface $client = null)
+    public function __construct(private readonly ?ClientInterface $client = null)
     {
     }
 
@@ -54,14 +53,14 @@ final class KubernetesCrashRecovery
         }
 
         try {
-            $client = $this->client ?? KubernetesClient::fromEnv();
+            $client = $this->client ?? Client::fromEnv();
         } catch (\Throwable) {
             return null;
         }
 
         try {
             $job = $this->loadJob($client, $namespace, $jobName, $context['exec_batch_id']);
-        } catch (KubernetesApiException $e) {
+        } catch (ApiException $e) {
             if ($e->isNotFound()) {
                 return $this->decision(
                     $from,
@@ -76,12 +75,12 @@ final class KubernetesCrashRecovery
             return null;
         }
 
-        $outcome = KubernetesJobStatus::classify($job);
+        $outcome = JobStatus::classify($job);
         if ($outcome !== null) {
             [$resultStatus, $reason] = $outcome;
             $status = match ($resultStatus) {
-                ExecutionResult::SUCCESS => ExecutionStatus::SUCCESS,
-                ExecutionResult::TIMEOUT => ExecutionStatus::TIMEOUT,
+                JobStatus::COMPLETE => ExecutionStatus::SUCCESS,
+                JobStatus::DEADLINE_EXCEEDED => ExecutionStatus::TIMEOUT,
                 default => ExecutionStatus::FAILED,
             };
             $failureReason = match ($status) {
@@ -160,14 +159,14 @@ final class KubernetesCrashRecovery
      * @return array<string, mixed>
      */
     private function loadJob(
-        KubernetesClientInterface $client,
+        ClientInterface $client,
         string $namespace,
         string $jobName,
         string $execBatchId,
     ): array {
         try {
             return $client->getJob($namespace, $jobName);
-        } catch (KubernetesApiException $e) {
+        } catch (ApiException $e) {
             if (!$e->isNotFound() || $execBatchId === '') {
                 throw $e;
             }
@@ -175,13 +174,13 @@ final class KubernetesCrashRecovery
 
         $jobs = $client->listJobs($namespace, sprintf(
             '%s=%s,%s=%s',
-            KubernetesJobTemplateBuilder::LABEL_MANAGED_BY,
-            KubernetesJobTemplateBuilder::MANAGED_BY,
-            KubernetesJobTemplateBuilder::LABEL_EXEC_BATCH_ID,
+            JobTemplateBuilder::LABEL_MANAGED_BY,
+            JobTemplateBuilder::MANAGED_BY,
+            JobTemplateBuilder::LABEL_EXEC_BATCH_ID,
             $execBatchId,
         ));
         if ($jobs === []) {
-            throw new KubernetesApiException('not found', 404, 'NotFound');
+            throw new ApiException('not found', 404, 'NotFound');
         }
 
         return $jobs[0];

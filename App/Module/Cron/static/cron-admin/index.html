@@ -6,7 +6,7 @@
   <title>Schedule Job Admin</title>
   <link rel="stylesheet" href="/cron-admin/assets/vendor/element-ui/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css?v=app-header-4">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-log-task-name-2">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=editor-sticky-actions-1">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=app-header-2">
 </head>
 <body>
@@ -458,6 +458,7 @@
             </div>
           </div>
           <div v-if="form.execType===3">
+            <div class="k8s-principle">到点后 Agent 读取该 Deployment 当前的 Pod 模板，派生一次性 Job 跑下面的命令；不保存镜像，发布只改 Deployment。</div>
             <div class="grid">
               <div class="field">
                 <label>Namespace <span class="required-mark">*</span></label>

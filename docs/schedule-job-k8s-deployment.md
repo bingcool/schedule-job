@@ -484,8 +484,8 @@ CronManager.runExecutionPipeline
         │
         ▼
 KubernetesExecutor          implements CronExecutorInterface
-        ├── KubernetesClientInterface     只做 HTTP API
-        └── KubernetesJobTemplateBuilder  Deep Copy + 消毒 + 覆盖 argv
+        ├── Swoolefy\Worker\Kubernetes\ClientInterface
+        └── Swoolefy\Worker\Kubernetes\JobTemplateBuilder
 ```
 
 不要：
@@ -596,15 +596,15 @@ Secret/ConfigMap：只继承 Template 里的 **引用名**，Cron 配置不存 S
 |---|---|---|
 | P0-1 | `exec_type=3` + `k8s_spec` JSON + PayloadBuilder / fetchCronTask | `migrations/upgrade_kubernetes_exec_type.sql`、`CronTaskPayloadBuilder`、`CronTaskService::fetchK8sCronTask` |
 | P0-2 | Worker `schedule-k8s-task-cron`（`worker_num=1`，独立 life_time / 协程上限） | `App/WorkerCron/conf/schedule_k8s_conf.php`、`ScheduleK8sCronProcess` |
-| P0-3 | `KubernetesExecutor` + Kubernetes HTTP Client（禁止 kubectl） | `Swoolefy\Worker\Cron\KubernetesExecutor` / `KubernetesClient` |
-| P0-4 | Template Deep Copy + 只留目标容器 + §7.1 消毒 | `KubernetesJobTemplateBuilder` |
-| P0-5 | command/args 数组覆盖（三态语义） | `KubernetesJobSpec` + `KubernetesJobTemplateBuilder::applyArgv` |
+| P0-3 | `KubernetesExecutor` + Kubernetes HTTP Client（禁止 kubectl） | `Swoolefy\Worker\Cron\KubernetesExecutor` / `Swoolefy\Worker\Kubernetes\Client` |
+| P0-4 | Template Deep Copy + 只留目标容器 + §7.1 消毒 | `Swoolefy\Worker\Kubernetes\JobTemplateBuilder` |
+| P0-5 | command/args 数组覆盖（三态语义） | `KubernetesJobSpec` + `JobTemplateBuilder::applyArgv` |
 | P0-6 | `ExecutionSnapshot::withAttempt()`；Job 名 `sj-{execBatchId}-a{attempt}`；409 幂等 | `ExecutionSnapshot`、`CronManager::runWithRetry`、`KubernetesExecutor::createJobIdempotent` |
-| P0-7 | `backoffLimit=0`；Retry 走 CronManager 同批次 | `KubernetesJobTemplateBuilder::build` |
+| P0-7 | `backoffLimit=0`；Retry 走 CronManager 同批次 | `JobTemplateBuilder::build` |
 | P0-8 | Executor 自己盯 timeout_at；Guard 取消路径先 Delete Job 再收尾 | `KubernetesExecutionHook::stopSignal`、`ExecutionRuntimeGuard::attachTerminator` |
 | P0-9 | Create 前落 Job 名；`task_item` 写 Job/Pod 元数据；message 写日志摘要 | `KubernetesExecutionHook::onJobPlanned`、`ExecutionService::mergeTaskItemMeta` |
-| P0-10 | Namespace 白名单 + 最小 RBAC | `KubernetesExecutorOptions::isNamespaceAllowed`、`deploy/kubernetes/schedule-job-agent-rbac.yaml` |
-| P0-11 | K8s 任务强制 `timeout>0` + Executor 等待硬上限 | `CronTaskPayloadBuilder`（写入时拒绝）、`KubernetesExecutorOptions::resolveWaitSeconds`（执行时兜底） |
+| P0-10 | Namespace 白名单 + 最小 RBAC | `ExecutorOptions::isNamespaceAllowed`、`deploy/kubernetes/schedule-job-agent-rbac.yaml` |
+| P0-11 | K8s 任务强制 `timeout>0` + Executor 等待硬上限 | `CronTaskPayloadBuilder`（写入时拒绝）、`ExecutorOptions::resolveWaitSeconds`（执行时兜底） |
 | P0-12 | Lease 过期按 Job 终态收尾；仍 Active 则删 Job，不补 Create | `KubernetesCrashRecovery`、`ExecutionService::recoverRow` |
 
 回归测试：`PHPUintTest/Unit/Worker/Cron/KubernetesJobSpecTest.php`、

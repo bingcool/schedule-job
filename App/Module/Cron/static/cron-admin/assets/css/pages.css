@@ -12,6 +12,20 @@
   flex-shrink: 0;
 }
 
+.task-editor-page .page-head {
+  position: sticky;
+  top: 0;
+  z-index: 16;
+  margin-bottom: 12px;
+  padding: 8px 0 10px;
+  background: var(--bg);
+  box-shadow: 0 10px 12px -10px rgba(25, 35, 60, 0.12);
+}
+
+.task-editor-page .preview-card {
+  top: 70px;
+}
+
 .stat-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -244,6 +258,17 @@
 
 .task-editor-page .field-gap-bottom {
   margin-bottom: 16px;
+}
+
+.task-editor-page .k8s-principle {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f4f8ff;
+  border: 1px solid #d6e4ff;
+  color: #3d5a80;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .task-editor-page .toggle-row-gap-bottom {
