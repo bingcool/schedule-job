@@ -174,6 +174,7 @@ class CronTaskManagerService
             'http_body',
             'http_headers',
             'http_request_time_out',
+            'k8s_spec',
             'created_by',
             'created_at',
             'updated_at',
@@ -824,8 +825,8 @@ class CronTaskManagerService
     /**
      * Agent 拉取待执行任务。
      *
-     * - execType 为 shell(1)/http(2)：只返回该类型列表（{@see AgentTasksResultDto::forExecType}）
-     * - 其它/未指定：同时返回 shell + http（{@see AgentTasksResultDto::forAllTypes}）
+     * - execType 为 shell(1)/http(2)/kubernetes(3)：只返回该类型列表（{@see AgentTasksResultDto::forExecType}）
+     * - 其它/未指定：同时返回 shell + http + kubernetes（{@see AgentTasksResultDto::forAllTypes}）
      * 仅 status=1 且绑定 nodeId 的任务由 CronTaskService 查询并转成调度元数据。
      */
     public function agentTasks(AgentTasksQueryDto $query): AgentTasksResultDto
@@ -838,7 +839,7 @@ class CronTaskManagerService
         }
         $this->assertAgentNodeCredential($nodeId, $apiKey);
 
-        if (in_array($execType, [CronTaskPayloadDto::EXEC_TYPE_SHELL, CronTaskPayloadDto::EXEC_TYPE_HTTP], true)) {
+        if (in_array($execType, CronTaskPayloadDto::EXEC_TYPES, true)) {
             $list = $this->cronTaskService->fetchCronTask($execType, $nodeId, $apiKey);
 
             return AgentTasksResultDto::forExecType($nodeId, $execType, $list);
@@ -846,8 +847,9 @@ class CronTaskManagerService
 
         $shellTasks = $this->cronTaskService->fetchCronTask(CronTaskPayloadDto::EXEC_TYPE_SHELL, $nodeId, $apiKey);
         $httpTasks = $this->cronTaskService->fetchCronTask(CronTaskPayloadDto::EXEC_TYPE_HTTP, $nodeId, $apiKey);
+        $k8sTasks = $this->cronTaskService->fetchCronTask(CronTaskPayloadDto::EXEC_TYPE_K8S, $nodeId, $apiKey);
 
-        return AgentTasksResultDto::forAllTypes($nodeId, $shellTasks, $httpTasks);
+        return AgentTasksResultDto::forAllTypes($nodeId, $shellTasks, $httpTasks, $k8sTasks);
     }
 
     /**

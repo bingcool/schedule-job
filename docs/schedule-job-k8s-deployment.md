@@ -1,7 +1,7 @@
 # schedule-job Kubernetes：用 Deployment Template 派生一次性 Job
 
-> 状态：已对照现网代码修订（Admin / Agent / CronManager / Slot / Retry / Lease）。  
-> 本文件是设计方案，不是已落地实现。
+> 状态：**P0 已实现**（swoolefy 框架 + schedule-job 应用 + Admin UI + RBAC 清单）。  
+> 落地清单见 §18，环境变量与部署步骤见 §22。P1（§19）仍未开始。
 
 ---
 
@@ -438,8 +438,8 @@ P1 可以改成「提交 + 收割」两段式：Executor 只 Create Job 就返�
 
 - 读 `k8s_job_name` → GET Job
 - Job 已 Complete/Failed → 回写对应终态
-- Job 仍 Active → **本节点**才能续监控；异节点只标记 `WORKER_CRASH`（现网 Recovery「禁止异节点重跑」）
-- 没记到 Job 名 → 用 `exec_batch_id` 反推 `sj-{execBatchId}-a*`（`idx_cron_exec_batch` 可查）；集群里也没有则视为 Create 前崩溃 → FAILED，**不补 Create**（Slot 已占，补跑会打乱「该 Slot 只跑一次」；RunOnce 另议）
+- Job 仍 Active → P0 同步模型无法把已死协程续上，**删除 Job** 后记 `WORKER_CRASH`，不补 Create（避免孤儿）。P1 两段式收割后再做本节点续监控
+- 没记到 Job 名 → 用 `exec_batch_id` 反推 `sj-{execBatchId}-a*`，再用 label 列 Job；集群里也没有则视为 Create 前崩溃 → FAILED，**不补 Create**（Slot 已占，补跑会打乱「该 Slot 只跑一次」；RunOnce 另议）
 
 Worker reboot（`life_time`）与崩溃不同：reboot 会等协程跑完，正常情况下 Job 能自然收尾。真正需要 re-attach 的是 kill -9 / OOM / 机器宕机。
 
@@ -590,21 +590,26 @@ Secret/ConfigMap：只继承 Template 里的 **引用名**，Cron 配置不存 S
 
 ---
 
-## 18. P0 实施范围
+## 18. P0 实施范围（已完成）
 
-```text
-P0-1  exec_type=3 + k8s_spec JSON + PayloadBuilder / fetchCronTask
-P0-2  Worker schedule-k8s-task-cron（worker_num=1，独立 life_time / 协程上限）
-P0-3  KubernetesExecutor + Kubernetes HTTP Client（禁止 kubectl）
-P0-4  Template Deep Copy + 只留目标容器 + §7.1 消毒
-P0-5  command/args 数组覆盖
-P0-6  ExecutionSnapshot 加 attempt（swoolefy 改动）；Job 名 sj-{execBatchId}-a{attempt}；409 幂等
-P0-7  backoffLimit=0；Retry 走 CronManager 同批次
-P0-8  Executor 自己盯 timeout_at；Guard 取消路径先 Delete Job 再收尾（修孤儿 Job）
-P0-9  Create 前落 Job 名；task_item 写 Job/Pod 元数据；message 写日志摘要
-P0-10 Namespace 白名单 + 最小 RBAC
-P0-11 K8s 任务强制 timeout>0 + Executor 等待硬上限
-```
+| # | 内容 | 落地位置 |
+|---|---|---|
+| P0-1 | `exec_type=3` + `k8s_spec` JSON + PayloadBuilder / fetchCronTask | `migrations/upgrade_kubernetes_exec_type.sql`、`CronTaskPayloadBuilder`、`CronTaskService::fetchK8sCronTask` |
+| P0-2 | Worker `schedule-k8s-task-cron`（`worker_num=1`，独立 life_time / 协程上限） | `App/WorkerCron/conf/schedule_k8s_conf.php`、`ScheduleK8sCronProcess` |
+| P0-3 | `KubernetesExecutor` + Kubernetes HTTP Client（禁止 kubectl） | `Swoolefy\Worker\Cron\KubernetesExecutor` / `KubernetesClient` |
+| P0-4 | Template Deep Copy + 只留目标容器 + §7.1 消毒 | `KubernetesJobTemplateBuilder` |
+| P0-5 | command/args 数组覆盖（三态语义） | `KubernetesJobSpec` + `KubernetesJobTemplateBuilder::applyArgv` |
+| P0-6 | `ExecutionSnapshot::withAttempt()`；Job 名 `sj-{execBatchId}-a{attempt}`；409 幂等 | `ExecutionSnapshot`、`CronManager::runWithRetry`、`KubernetesExecutor::createJobIdempotent` |
+| P0-7 | `backoffLimit=0`；Retry 走 CronManager 同批次 | `KubernetesJobTemplateBuilder::build` |
+| P0-8 | Executor 自己盯 timeout_at；Guard 取消路径先 Delete Job 再收尾 | `KubernetesExecutionHook::stopSignal`、`ExecutionRuntimeGuard::attachTerminator` |
+| P0-9 | Create 前落 Job 名；`task_item` 写 Job/Pod 元数据；message 写日志摘要 | `KubernetesExecutionHook::onJobPlanned`、`ExecutionService::mergeTaskItemMeta` |
+| P0-10 | Namespace 白名单 + 最小 RBAC | `KubernetesExecutorOptions::isNamespaceAllowed`、`deploy/kubernetes/schedule-job-agent-rbac.yaml` |
+| P0-11 | K8s 任务强制 `timeout>0` + Executor 等待硬上限 | `CronTaskPayloadBuilder`（写入时拒绝）、`KubernetesExecutorOptions::resolveWaitSeconds`（执行时兜底） |
+| P0-12 | Lease 过期按 Job 终态收尾；仍 Active 则删 Job，不补 Create | `KubernetesCrashRecovery`、`ExecutionService::recoverRow` |
+
+回归测试：`PHPUintTest/Unit/Worker/Cron/KubernetesJobSpecTest.php`、
+`KubernetesJobTemplateBuilderTest.php`、`KubernetesExecutorTest.php`、
+`KubernetesJobStatusTest.php`。
 
 ---
 
@@ -651,3 +656,53 @@ Kubernetes Job  → 独立 Pod 跑 /app/bin/task
 
 > Cron 配置一次，Deployment 持续发布，到点执行用 **当时** 的 spec.template。  
 > Service Pod 与 Cron Pod 镜像环境尽量一致，**标签与探针必须分开**，生命周期完全独立。
+
+---
+
+## 22. 部署
+
+### 22.1 迁移
+
+```bash
+mysql < migrations/upgrade_kubernetes_exec_type.sql
+kubectl apply -f deploy/kubernetes/schedule-job-agent-rbac.yaml   # 按目标 Namespace 改
+```
+
+### 22.2 K8s Agent 环境变量
+
+集群凭证（二选一）：
+
+| 变量 | 说明 |
+|---|---|
+| —（集群内） | 自动读 `KUBERNETES_SERVICE_HOST/PORT` 与 ServiceAccount token / ca.crt，token 按 60s TTL 重读以兼容轮换 |
+| `K8S_API_SERVER` + `K8S_TOKEN` | 集群外。可选 `K8S_CA_CERT_FILE`；`K8S_VERIFY_TLS=0` 只用于本地调试 |
+
+执行策略：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `K8S_ALLOWED_NAMESPACES` | 空（不限制） | **生产必填**，逗号分隔。为空时任何写错的 namespace 都能塞 Pod |
+| `K8S_MAX_WAIT_SECONDS` | 3600 | Executor 等待单个 Job 的硬上限，夹住 `cron_task.timeout` |
+| `K8S_POLL_INTERVAL` | 3 | 轮询 Job 状态的间隔秒 |
+| `K8S_JOB_TTL_SECONDS` | 3600 | Job 完成后由 K8s 回收的 TTL |
+| `K8S_DEADLINE_PADDING` | 100 | `activeDeadlineSeconds = timeout + 该值`，保证 schedule-job 先判超时 |
+| `K8S_LOG_TAIL_LINES` | 50 | 写进 message 的 Pod 日志行数 |
+| `K8S_REQUIRE_TIMEOUT` | 1 | 是否拒绝 `timeout=0` 的 K8s 任务 |
+| `K8S_API_TIMEOUT` | 15 | 单次 API 调用超时秒 |
+
+Worker 规格：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `CRON_K8S_WORKER_LIFE_TIME` | 3600 | 比 fork Worker 短：reboot 会等在跑的协程，长 Job 会把 reboot 拖住 |
+| `CRON_K8S_MAX_CONCURRENCY` | 50 | ≈ 本节点允许同时在跑的 Job 数 |
+
+### 22.3 上线顺序
+
+1. 迁移 DB 与 RBAC。
+2. 在**具备集群凭证**的机器上配好上表环境变量，启动 Agent：`php cron.php start App`。
+   `schedule-k8s-task-cron` 会随另外两个 Worker 一起拉起。
+3. Admin 里新建 `exec_type=3` 任务，`node_id` 必须指向第 2 步那台 Agent ——
+   Agent 是按 `node_id + exec_type` 拉任务的，绑错节点会「保存成功但永远不执行」。
+4. 先用一个 `timeout` 较小的任务点「立即执行」验证，确认 `cron_task_log.task_item`
+   里能看到 `k8s_job_name` / `k8s_pod_name`，再放开表达式。

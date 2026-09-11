@@ -23,11 +23,14 @@ class CronTaskCreateRequest extends BaseRequest
     #[ValidationRule(rule: 'required|string', message: 'expression 不能为空')]
     protected string $expression = '';
 
-    #[ApiProperty(description: '执行命令或 URL')]
-    #[ValidationRule(rule: 'required|string', message: 'command 不能为空')]
+    /**
+     * exec_type=1 是 shell 命令，=2 是 URL，=3 只是展示摘要（留空则由 k8sSpec 自动生成）。
+     * 因此这里不能标 required，必填性交给 CronTaskPayloadBuilder 统一判定。
+     */
+    #[ApiProperty(description: '执行命令或 URL；exec_type=3 可留空，由 k8sSpec 生成摘要')]
     protected string $command = '';
 
-    #[ApiProperty(description: '执行类型：1 shell，2 http')]
+    #[ApiProperty(description: '执行类型：1 shell，2 http，3 kubernetes')]
     #[ValidationRule(rule: 'required|int', message: 'execType 不能为空')]
     protected int $execType = 0;
 
@@ -82,6 +85,12 @@ class CronTaskCreateRequest extends BaseRequest
      */
     #[ApiProperty(description: 'HTTP 请求头（JSON 对象）')]
     protected ?array $httpHeaders = null;
+
+    /**
+     * @var array<string, mixed>|null
+     */
+    #[ApiProperty(description: 'exec_type=3 的 Kubernetes 配置：namespace/deployment/container/command/args')]
+    protected ?array $k8sSpec = null;
 
     public function getName(): string
     {
@@ -314,6 +323,40 @@ class CronTaskCreateRequest extends BaseRequest
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function getK8sSpec(): ?array
+    {
+        return $this->k8sSpec;
+    }
+
+    /**
+     * 结构校验留给 {@see \Swoolefy\Worker\Cron\KubernetesJobSpec}，这里只负责把
+     * JSON 字符串形式也接住（表单直接 POST 字符串时不至于静默丢字段）。
+     *
+     * @param array<string, mixed>|string|stdClass|null $k8sSpec
+     */
+    public function setK8sSpec(mixed $k8sSpec): static
+    {
+        if (is_string($k8sSpec)) {
+            $decoded = json_decode($k8sSpec, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new InvalidArgumentException('k8sSpec must be a JSON object');
+            }
+            $k8sSpec = $decoded;
+        }
+        if ($k8sSpec instanceof stdClass) {
+            $k8sSpec = get_object_vars($k8sSpec);
+        }
+        if ($k8sSpec !== null && !is_array($k8sSpec)) {
+            throw new InvalidArgumentException('k8sSpec must be an object or null');
+        }
+        $this->k8sSpec = $k8sSpec;
+
+        return $this;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toPayloadArray(): array
@@ -335,6 +378,7 @@ class CronTaskCreateRequest extends BaseRequest
             'cron_skip' => $this->serializeTimeRanges($this->getCronSkip()),
             'http_body' => $this->getHttpBody(),
             'http_headers' => $this->getHttpHeaders(),
+            'k8s_spec' => $this->getK8sSpec(),
         ];
     }
 

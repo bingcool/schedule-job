@@ -26,6 +26,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
      *
      * - execType = {@see CronProcess::EXEC_FORK_TYPE}（shell/fork）→ {@see fetchShellCronTask}
      * - execType = {@see CronProcess::EXEC_URL_TYPE}（http）→ {@see fetchHttpCronTask}
+     * - execType = {@see CronProcess::EXEC_K8S_TYPE}（kubernetes）→ {@see fetchK8sCronTask}
      * - 其它类型抛 Exception
      *
      * 查询条件：node_id + api_key 鉴权通过后，按 exec_type 拉取未软删任务。
@@ -60,6 +61,9 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             return $taskList;
         } elseif ($execType == CronProcess::EXEC_URL_TYPE) {
             $taskList = $this->fetchHttpCronTask($list, $pendingByTaskId);
+            return $taskList;
+        } elseif ($execType == CronProcess::EXEC_K8S_TYPE) {
+            $taskList = $this->fetchK8sCronTask($list, $pendingByTaskId);
             return $taskList;
         } else {
             throw new \Exception('exec_type error');
@@ -119,6 +123,64 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
 
             $arr = $cronForkTask->toArray();
             $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
+            $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
+            $arr['run_once_request_ids'] = $pendingIds;
+            $arr['run_once_request_id'] = $pendingIds[0] ?? null;
+            $arr['run_once_requested'] = $pendingIds !== [];
+            $newTaskList[] = $arr;
+        }
+
+        return $newTaskList;
+    }
+
+    /**
+     * 将 DB 行转为 Kubernetes 调度元数据（exec_type=3）。
+     *
+     * 复用 {@see ScheduleEvent} 承载调度字段（表达式、时间窗、retry、timeout），
+     * 真正的执行参数走 `k8s_spec` 透传给 {@see \Swoolefy\Worker\Cron\KubernetesExecutor}——
+     * 它由 {@see \Swoolefy\Worker\Cron\TaskDefinition::fromArray} 解析成 `k8sSpec` 字段。
+     *
+     * 这里刻意不做结构校验：Admin 写入时已经用 KubernetesJobSpec 校验过，
+     * Agent 侧再校验一次只会把「配置坏了」变成「任务拉不下来」，比逐条执行报 FAILED 更难排查。
+     *
+     * `command` 只当展示摘要透传，run_type 恒为空（不是本机 swoolefy 脚本）。
+     *
+     * @param list<array<string, mixed>> $taskList
+     * @param array<int, list<int>> $pendingByTaskId key=cron_task.id，value=未消费 request_id 列表
+     * @return list<array<string, mixed>>
+     */
+    public function fetchK8sCronTask(&$taskList, array $pendingByTaskId = [])
+    {
+        $newTaskList = [];
+        foreach ($taskList as $item) {
+            $cronK8sTask = ScheduleEvent::load($item);
+            $cronK8sTask->cron_task_id = $item['id'];
+            $cronK8sTask->cron_db_log_class = static::class;
+            $cronK8sTask->cron_meta_origin = ScheduleEvent::CRON_META_ORIGIN_DB;
+            $taskName = (string)($item['cron_name'] ?? $item['name'] ?? '');
+            if ($taskName !== '') {
+                $cronK8sTask->cron_name = $taskName;
+            }
+
+            if (!empty($item['expression'])) {
+                $cronK8sTask->cron_expression = $item['expression'];
+            }
+            $cronK8sTask->status = (int) ($item['status'] ?? 0);
+            $cronK8sTask->with_block_lapping = (int) ($item['with_block_lapping'] ?? 0);
+            $cronK8sTask->retry = max(0, (int) ($item['retry'] ?? 0));
+            $cronK8sTask->node_id = $item['node_id'] ?? null;
+            $cronK8sTask->cron_between = $item['cron_between'] ?? [];
+            $cronK8sTask->cron_skip = $item['cron_skip'] ?? [];
+            $cronK8sTask->command = (string) ($item['command'] ?? '');
+            // 不是本机脚本，绝不能被当成 swoolefy script 走 fork 分支
+            $cronK8sTask->exec_script = '';
+            $cronK8sTask->run_type = '';
+
+            $arr = $cronK8sTask->toArray();
+            $arr['exec_type'] = CronProcess::EXEC_K8S_TYPE;
+            $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
+            $k8sSpec = $item['k8s_spec'] ?? [];
+            $arr['k8s_spec'] = is_array($k8sSpec) ? $k8sSpec : [];
             $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
             $arr['run_once_request_ids'] = $pendingIds;
             $arr['run_once_request_id'] = $pendingIds[0] ?? null;

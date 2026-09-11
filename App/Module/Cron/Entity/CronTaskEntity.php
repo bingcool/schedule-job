@@ -11,8 +11,8 @@ use App\Model\ClientModel;
  * @property int node_id 节点ID
  * @property string cron_name 任务名称
  * @property string expression cron表达式
- * @property string command 执行命令
- * @property int exec_type 执行类型 1-shell，2-http
+ * @property string command 执行命令（exec_type=3 时仅为展示摘要，不是执行来源）
+ * @property int exec_type 执行类型 1-shell，2-http，3-kubernetes
  * @property int status 状态 0-禁用，1-启用
  * @property int with_block_lapping 是否阻塞执行 0-否，1->是
  * @property int retry 失败后重试次数（不含首次；0=不重试）
@@ -24,6 +24,7 @@ use App\Model\ClientModel;
  * @property string http_body json类型-http请求体
  * @property string http_headers json类型-http请求头
  * @property int http_request_time_out http请求超时时间，单位：秒
+ * @property array k8s_spec exec_type=3 的 Kubernetes 配置 {namespace,deployment,container,command[],args[]}
  * @property int created_by 创建人 staff_user.id
  * @property string created_at 创建时间
  * @property string updated_at 修改时间
@@ -50,6 +51,7 @@ class CronTaskEntity extends ClientModel
         'cron_skip'    => 'array',
         'http_body'    => 'array',
         'http_headers' => 'array',
+        'k8s_spec'     => 'array',
     ];
 
     /**

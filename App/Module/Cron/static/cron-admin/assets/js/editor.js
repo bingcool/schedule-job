@@ -17,6 +17,11 @@
         cronExpr: '*/5 * * * *',
         headersText: '',
         bodyText: '',
+        // Kubernetes（execType=3）配置。命令与参数在表单里是多行文本，提交前拆成 argv 数组：
+        // 集群侧不过 Shell，必须由这里明确切分，不能让用户写 sh -c "..."。
+        k8s: { namespace: '', deployment: '', container: '' },
+        k8sCommandText: '',
+        k8sArgsText: '',
         betweenItems: [],
         skipItems: [],
         preview: { valid: true, description: '', nextRuns: [] },
@@ -58,6 +63,17 @@
       },
       pageActions: function () {
         return true;
+      },
+      execTypeLabel: function () {
+        if (this.form.execType === 2) return 'HTTP';
+        if (this.form.execType === 3) return 'Kubernetes';
+        return 'GLUE模式';
+      },
+      k8sSummary: function () {
+        var ns = this.k8s.namespace || '?';
+        var dep = this.k8s.deployment || '?';
+        var argv = this.splitArgv(this.k8sCommandText).concat(this.splitArgv(this.k8sArgsText));
+        return ns + '/' + dep + (argv.length ? ' ' + argv.join(' ') : '');
       }
     },
     watch: {
@@ -122,6 +138,7 @@
             }
             this.headersText = row.httpHeaders ? JSON.stringify(row.httpHeaders, null, 2) : '';
             this.bodyText = row.httpBody ? JSON.stringify(row.httpBody, null, 2) : '';
+            this.loadK8sSpec(row.k8sSpec != null ? row.k8sSpec : row.k8s_spec);
             this.betweenItems = this.deserializeRangeItems(
               row.cronBetween != null ? row.cronBetween : row.cron_between,
               'cron_between'
@@ -146,7 +163,49 @@
         this.previewExpr();
       },
       setExecType: function (type) {
-        this.form.execType = type === 'http' ? 2 : 1;
+        if (type === 'http') this.form.execType = 2;
+        else if (type === 'k8s') {
+          this.form.execType = 3;
+          if (!this.form.timeout || this.form.timeout <= 0) this.form.timeout = 600;
+        } else this.form.execType = 1;
+      },
+      // 多行文本 → argv 数组。空行丢弃，每行原样作为一个参数（不做 Shell 分词）
+      splitArgv: function (text) {
+        if (!text) return [];
+        return String(text).split(/\r?\n/).reduce(function (acc, line) {
+          var v = line.trim();
+          if (v) acc.push(v);
+          return acc;
+        }, []);
+      },
+      loadK8sSpec: function (spec) {
+        if (!spec || typeof spec !== 'object') {
+          this.k8s = { namespace: '', deployment: '', container: '' };
+          this.k8sCommandText = '';
+          this.k8sArgsText = '';
+          return;
+        }
+        this.k8s = {
+          namespace: spec.namespace || '',
+          deployment: spec.deployment || '',
+          container: spec.container || ''
+        };
+        this.k8sCommandText = (spec.command || []).join('\n');
+        this.k8sArgsText = (spec.args || []).join('\n');
+      },
+      // 只在真的填了才带 command/args：留空表示沿用镜像 ENTRYPOINT/CMD，
+      // 与「显式设为空数组」是两种不同语义，不能混为一谈
+      buildK8sSpec: function () {
+        var spec = {
+          namespace: (this.k8s.namespace || '').trim(),
+          deployment: (this.k8s.deployment || '').trim(),
+          container: (this.k8s.container || '').trim()
+        };
+        var command = this.splitArgv(this.k8sCommandText);
+        var args = this.splitArgv(this.k8sArgsText);
+        if (command.length) spec.command = command;
+        if (args.length) spec.args = args;
+        return spec;
       },
       addBetweenItem: function () {
         this.betweenItems.push({ start: '', end: '' });
@@ -241,9 +300,21 @@
           return;
         }
         this.syncExpr();
-        if (!this.form.name || !this.form.command || !this.form.nodeId) {
+        var isK8s = this.form.execType === 3;
+        // K8s 的 command 只是展示摘要，缺了后端会按 k8s_spec 自动生成，不作为必填
+        if (!this.form.name || !this.form.nodeId || (!isK8s && !this.form.command)) {
           this.$message.warning('请填写名称、节点与 Command/URL');
           return;
+        }
+        if (isK8s) {
+          if (!this.k8s.namespace || !this.k8s.deployment) {
+            this.$message.warning('请填写 Kubernetes Namespace 与 Deployment');
+            return;
+          }
+          if (!this.form.timeout || this.form.timeout <= 0) {
+            this.$message.warning('Kubernetes 任务必须设置 Job 超时（秒）');
+            return;
+          }
         }
         if (this.selectedGroupId === null || this.selectedGroupId === '') {
           this.$message.warning('请先选择节点分组');
@@ -258,7 +329,8 @@
             httpHeaders: common.parseJsonOrNull(this.headersText, 'Headers'),
             httpBody: common.parseJsonOrNull(this.bodyText, 'Body'),
             cronBetween: this.serializeRangeItems(this.betweenItems, 'cron_between'),
-            cronSkip: this.serializeRangeItems(this.skipItems, 'cron_skip')
+            cronSkip: this.serializeRangeItems(this.skipItems, 'cron_skip'),
+            k8sSpec: isK8s ? this.buildK8sSpec() : null
           });
           this.saving = true;
           if (this.isEdit) {

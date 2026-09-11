@@ -36,7 +36,7 @@ class CronTaskUpdateRequest extends BaseRequest
     #[StringToInt]
     protected ?int $nodeId = null;
 
-    #[ApiProperty(description: '执行类型：1 shell，2 http')]
+    #[ApiProperty(description: '执行类型：1 shell，2 http，3 kubernetes')]
     protected ?int $execType = null;
 
     #[ApiProperty(description: '状态：0 禁用，1 启用')]
@@ -82,6 +82,12 @@ class CronTaskUpdateRequest extends BaseRequest
      */
     #[ApiProperty(description: 'HTTP 请求头')]
     protected ?array $httpHeaders = null;
+
+    /**
+     * @var array<string, mixed>|null
+     */
+    #[ApiProperty(description: 'exec_type=3 的 Kubernetes 配置：namespace/deployment/container/command/args')]
+    protected ?array $k8sSpec = null;
 
     public function getId(): int
     {
@@ -332,6 +338,39 @@ class CronTaskUpdateRequest extends BaseRequest
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function getK8sSpec(): ?array
+    {
+        return $this->k8sSpec;
+    }
+
+    /**
+     * 结构校验留给 {@see \Swoolefy\Worker\Cron\KubernetesJobSpec}，这里只接住 JSON 字符串形式。
+     *
+     * @param array<string, mixed>|string|stdClass|null $k8sSpec
+     */
+    public function setK8sSpec(mixed $k8sSpec): static
+    {
+        if (is_string($k8sSpec)) {
+            $decoded = json_decode($k8sSpec, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new InvalidArgumentException('k8sSpec must be a JSON object');
+            }
+            $k8sSpec = $decoded;
+        }
+        if ($k8sSpec instanceof stdClass) {
+            $k8sSpec = get_object_vars($k8sSpec);
+        }
+        if ($k8sSpec !== null && !is_array($k8sSpec)) {
+            throw new InvalidArgumentException('k8sSpec must be an object or null');
+        }
+        $this->k8sSpec = $k8sSpec;
+
+        return $this;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toPayloadArray(): array
@@ -384,6 +423,9 @@ class CronTaskUpdateRequest extends BaseRequest
         }
         if ($this->httpHeaders !== null) {
             $out['http_headers'] = $this->httpHeaders;
+        }
+        if ($this->k8sSpec !== null) {
+            $out['k8s_spec'] = $this->k8sSpec;
         }
 
         return $out;

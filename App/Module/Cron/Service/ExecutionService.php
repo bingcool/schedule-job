@@ -9,6 +9,7 @@ use App\Module\Cron\Entity\CronTaskLogEntity;
 use App\Module\Cron\ExecutionLeaseConfig;
 use App\Module\Cron\ExecutionWorkerIdentity;
 use App\Module\Cron\FailureReason;
+use App\Module\Cron\Kubernetes\KubernetesCrashRecovery;
 use Swoolefy\Core\Schedule\ScheduleEvent;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
@@ -107,6 +108,60 @@ class ExecutionService
         $n = CronTaskLogEntity::query()
             ->where('id', $logId)
             ->update(['message' => $merged]);
+
+        return $this->affected($n) || $n === 0;
+    }
+
+    /**
+     * 把执行器产生的运行时元数据并入 `task_item` JSON。
+     *
+     * 用于 Kubernetes 这类「执行体不在本机」的类型：Job 名 / UID / Pod 名 / 镜像
+     * 需要能被崩溃恢复和人工排查读到（方案 §12）。
+     *
+     * 为什么并进 `task_item` 而不是加独立列：第一版不想为一个执行类型改 5 个列 + 索引；
+     * 恢复路径只需要「按 id 读出来」，JSON 足够。P1 再拆列。
+     *
+     * 只做浅合并，且不动 status/lease：这是纯附加信息，不能影响状态机。
+     *
+     * @param array<string, mixed> $meta 空值键会被忽略，避免用空串覆盖已写入的 Job 名
+     */
+    public function mergeTaskItemMeta(int $logId, array $meta): bool
+    {
+        if ($logId <= 0 || $meta === []) {
+            return false;
+        }
+        $row = $this->findById($logId);
+        if ($row === null) {
+            return false;
+        }
+
+        $taskItem = $row['task_item'] ?? [];
+        if (is_string($taskItem)) {
+            $decoded = json_decode($taskItem, true);
+            $taskItem = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($taskItem)) {
+            $taskItem = [];
+        }
+
+        $changed = false;
+        foreach ($meta as $key => $value) {
+            if ($value === null || $value === '' || $value === []) {
+                continue;
+            }
+            if (($taskItem[$key] ?? null) === $value) {
+                continue;
+            }
+            $taskItem[$key] = $value;
+            $changed = true;
+        }
+        if (!$changed) {
+            return true;
+        }
+
+        $n = CronTaskLogEntity::query()
+            ->where('id', $logId)
+            ->update(['task_item' => $taskItem]);
 
         return $this->affected($n) || $n === 0;
     }
@@ -307,15 +362,29 @@ class ExecutionService
         $from = (int) ($row['status'] ?? 0);
         $now = date('Y-m-d H:i:s');
         $to = ExecutionStatus::FAILED;
+        $message = 'RECOVERED ' . $reason;
+        try {
+            $k8s = (new KubernetesCrashRecovery())->resolve($row);
+        } catch (\Throwable) {
+            $k8s = null;
+        }
+        if ($k8s !== null) {
+            $to = (int) $k8s['status'];
+            $reason = (string) $k8s['failure_reason'];
+            $message = 'RECOVERED ' . $k8s['message'];
+        }
         if ($from === ExecutionStatus::CANCEL_REQUESTED) {
             $to = ExecutionStatus::CANCELLED;
             $reason = FailureReason::CANCELLED;
         }
-        $ok = $this->transition($id, $from, $to, [
-            'failure_reason' => $reason,
+        $extra = [
             'finished_at' => $now,
-            'message' => $this->mergeMessage((string) ($row['message'] ?? ''), 'RECOVERED ' . $reason),
-        ]);
+            'message' => $this->mergeMessage((string) ($row['message'] ?? ''), $message),
+        ];
+        if ($reason !== '') {
+            $extra['failure_reason'] = $reason;
+        }
+        $ok = $this->transition($id, $from, $to, $extra);
 
         return $ok;
     }
@@ -493,9 +562,15 @@ class ExecutionService
     }
 
     /**
+     * 按 (cron_id, exec_batch_id) 反查 Execution 行。走 `idx_cron_exec_batch`。
+     *
+     * 对外公开的原因：Executor 只拿得到 {@see \Swoolefy\Worker\Cron\ExecutionSnapshot}，
+     * 里面没有 `cron_task_log.id`。需要 execution_id（写元数据、注册取消句柄）时
+     * 只能用这两个字段反查。
+     *
      * @return array<string, mixed>|null
      */
-    private function findByBatch(int $cronId, string $execBatchId): ?array
+    public function findByBatch(int $cronId, string $execBatchId): ?array
     {
         if ($cronId <= 0 || $execBatchId === '') {
             return null;

@@ -119,6 +119,17 @@ class CronTaskRowDto extends AbstractDto
     #[ApiProperty(description: 'HTTP 请求超时时间（秒）')]
     protected int $httpRequestTimeOut = 30;
 
+    /**
+     * exec_type=3 的 Kubernetes 配置。
+     *
+     * 里面只有 namespace/deployment/container/command/args，不含镜像与凭证，
+     * 因此不需要像 http_headers 那样做敏感信息脱敏。
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ApiProperty(description: 'Kubernetes 配置：namespace/deployment/container/command/args')]
+    protected ?array $k8sSpec = null;
+
     #[ApiProperty(description: '创建人 staff_user.id')]
     protected int $createdBy = 0;
 
@@ -178,6 +189,8 @@ class CronTaskRowDto extends AbstractDto
         $hh = $row['http_headers'] ?? null;
         $dto->setHttpHeaders(self::maskSensitiveHeaders(is_array($hh) ? $hh : null));
         $dto->setHttpRequestTimeOut((int)($row['http_request_time_out'] ?? 30));
+        $ks = $row['k8s_spec'] ?? null;
+        $dto->setK8sSpec(is_array($ks) ? $ks : null);
         $dto->setCreatedBy((int) self::pick($row, 'created_by', 'createdBy', 0));
         $dto->setCreatedByName((string) self::pick($row, 'created_by_name', 'createdByName', ''));
         $dto->setCreatedAt((string)($row['created_at'] ?? ''));
@@ -591,6 +604,28 @@ class CronTaskRowDto extends AbstractDto
     public function setHttpHeaders(?array $httpHeaders): static
     {
         $this->httpHeaders = $httpHeaders;
+
+        return $this;
+    }
+
+    /**
+     * 获取 Kubernetes 配置。
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getK8sSpec(): ?array
+    {
+        return $this->k8sSpec;
+    }
+
+    /**
+     * 设置 Kubernetes 配置。
+     *
+     * @param array<string, mixed>|null $k8sSpec
+     */
+    public function setK8sSpec(?array $k8sSpec): static
+    {
+        $this->k8sSpec = $k8sSpec;
 
         return $this;
     }

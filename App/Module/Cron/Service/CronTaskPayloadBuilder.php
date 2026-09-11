@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Cron\Service;
 
 use Swoolefy\Worker\Cron\ExpressionParser;
+use Swoolefy\Worker\Cron\KubernetesJobSpec;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskPayloadBuildResultDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskPayloadDto;
 use App\Module\Cron\ShellCommandGuard;
@@ -17,10 +18,14 @@ use App\Module\Cron\ShellCommandGuard;
  * - 创建态（$isCreate=true）：强制 name/expression/command、合法 exec_type、node_id
  * - 更新态：仅 put 有值/合法字段，空更新由上层根据 {@see CronTaskPayloadDto::isEmpty} 拒绝
  * - Shell（exec_type=1）command 经 {@see ShellCommandGuard} 黑名单检查，拒绝则不写库
+ * - Kubernetes（exec_type=3）走 {@see KubernetesJobSpec} 结构校验，并强制 timeout>0
  * - 成功/失败统一包在 {@see CronTaskPayloadBuildResultDto}，不抛异常
  */
 class CronTaskPayloadBuilder
 {
+    /** exec_type=3 的 command 只是展示摘要，长度受表列 varchar(256) 约束。 */
+    private const COMMAND_MAX_LENGTH = 256;
+
     /**
      * 构建可持久化的任务字段集合。
      *
@@ -46,16 +51,46 @@ class CronTaskPayloadBuilder
         $cronSkip = $this->normalizeTimeRanges($payload['cron_skip'] ?? null);
         $httpBody = $this->normalizeJsonField($payload['http_body'] ?? null);
         $httpHeaders = $this->normalizeJsonField($payload['http_headers'] ?? null);
+        $rawK8sSpec = $this->normalizeJsonField($payload['k8s_spec'] ?? null);
+
+        // Kubernetes 配置在两个地方都要用：校验结构 + 在 command 为空时生成展示摘要
+        $k8sSpec = null;
+        if (is_array($rawK8sSpec) && $rawK8sSpec !== []) {
+            try {
+                $parsed = KubernetesJobSpec::fromArray($rawK8sSpec);
+            } catch (\Throwable $e) {
+                return CronTaskPayloadBuildResultDto::fail($e->getMessage());
+            }
+            $k8sSpec = $this->canonicalK8sSpec($parsed);
+            if ($command === '') {
+                // command 对 type 3 不是执行来源，只是列表页看得懂的一行摘要
+                $command = mb_substr($parsed->summary(), 0, self::COMMAND_MAX_LENGTH);
+            }
+        }
 
         if ($isCreate) {
             if ($name === '' || $expression === '' || $command === '') {
                 return CronTaskPayloadBuildResultDto::fail('name/expression/command为必填');
             }
-            if (!in_array($execType, [CronTaskPayloadDto::EXEC_TYPE_SHELL, CronTaskPayloadDto::EXEC_TYPE_HTTP], true)) {
-                return CronTaskPayloadBuildResultDto::fail('exec_type仅支持1(shell)和2(http)');
+            if (!in_array($execType, CronTaskPayloadDto::EXEC_TYPES, true)) {
+                return CronTaskPayloadBuildResultDto::fail('exec_type仅支持1(shell)、2(http)和3(kubernetes)');
             }
             if ($nodeId <= 0) {
                 return CronTaskPayloadBuildResultDto::fail('node_id为必填');
+            }
+        }
+
+        if ($execType === CronTaskPayloadDto::EXEC_TYPE_K8S) {
+            if ($isCreate && $k8sSpec === null) {
+                return CronTaskPayloadBuildResultDto::fail('exec_type=3时k8s_spec为必填');
+            }
+            // Executor 是「一个协程等到 Job 结束」的同步模型，没有上限就等于永久占用
+            // 一个协程和该任务的 with_block_lapping 执行权，因此这里硬性要求 timeout
+            if ($isCreate && ($timeout === null || $timeout <= 0)) {
+                return CronTaskPayloadBuildResultDto::fail('exec_type=3时timeout必须>0，用于界定等待Job的上限');
+            }
+            if (!$isCreate && $timeout !== null && $timeout <= 0) {
+                return CronTaskPayloadBuildResultDto::fail('exec_type=3时timeout必须>0，用于界定等待Job的上限');
             }
         }
 
@@ -97,7 +132,7 @@ class CronTaskPayloadBuilder
         if ($nodeId !== null && $nodeId > 0) {
             $dto->putNodeId($nodeId);
         }
-        if ($execType !== null && in_array($execType, [CronTaskPayloadDto::EXEC_TYPE_SHELL, CronTaskPayloadDto::EXEC_TYPE_HTTP], true)) {
+        if ($execType !== null && in_array($execType, CronTaskPayloadDto::EXEC_TYPES, true)) {
             $dto->putExecType($execType);
         }
         if ($status !== null && in_array($status, [0, 1], true)) {
@@ -139,7 +174,37 @@ class CronTaskPayloadBuilder
             $dto->putHttpHeaders(is_array($httpHeaders) ? $httpHeaders : null);
         }
 
+        // 创建时始终落一次（type 1/2 写 null，避免残留脏配置）；更新时只在提交了才动
+        if ($k8sSpec !== null || $isCreate) {
+            $dto->putK8sSpec($k8sSpec);
+        }
+
         return CronTaskPayloadBuildResultDto::ok($dto);
+    }
+
+    /**
+     * 把校验通过的 {@see KubernetesJobSpec} 收敛成落库用的规范结构。
+     *
+     * 只写回被识别的字段，UI 传来的多余键不入库；`command`/`args` 只在真的覆盖时才写，
+     * 保留「未设置」与「显式设为空数组」的区别（前者沿用镜像 ENTRYPOINT/CMD）。
+     *
+     * @return array<string, mixed>
+     */
+    protected function canonicalK8sSpec(KubernetesJobSpec $spec): array
+    {
+        $canonical = [
+            'namespace' => $spec->namespace,
+            'deployment' => $spec->deployment,
+            'container' => $spec->container,
+        ];
+        if ($spec->overridesCommand) {
+            $canonical['command'] = $spec->command;
+        }
+        if ($spec->overridesArgs) {
+            $canonical['args'] = $spec->args;
+        }
+
+        return $canonical;
     }
 
     /**
@@ -207,7 +272,11 @@ class CronTaskPayloadBuilder
     }
 
     /**
-     * Shell 任务才检查 command；HTTP URL 跳过。
+     * Shell 任务才检查 command；HTTP URL 与 Kubernetes 跳过。
+     *
+     * Kubernetes 跳过的理由：{@see ShellCommandGuard} 是**本机 Shell** 黑名单，
+     * 而 type 3 的 command 只是展示摘要，真正执行的是集群里的 argv 数组（不过 Shell）。
+     *
      * 部分更新未带 exec_type 时，以 http(s) URL 判断，避免误伤。
      */
     protected function shouldCheckShellCommand(?int $execType, string $command): bool
@@ -215,7 +284,7 @@ class CronTaskPayloadBuilder
         if ($command === '') {
             return false;
         }
-        if ($execType === CronTaskPayloadDto::EXEC_TYPE_HTTP) {
+        if ($execType === CronTaskPayloadDto::EXEC_TYPE_HTTP || $execType === CronTaskPayloadDto::EXEC_TYPE_K8S) {
             return false;
         }
         if ($execType === CronTaskPayloadDto::EXEC_TYPE_SHELL) {

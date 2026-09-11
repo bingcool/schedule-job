@@ -37,6 +37,12 @@ class CronAgentTasksResponse extends BaseResponse
     protected ?array $httpTasks = null;
 
     /**
+     * @var array<int, mixed>|null
+     */
+    #[ApiProperty(description: 'Kubernetes 任务列表')]
+    protected ?array $k8sTasks = null;
+
+    /**
      * @param array<int, mixed> $list
      */
     public static function forExecType(int $nodeId, int $execType, array $list): self
@@ -48,6 +54,7 @@ class CronAgentTasksResponse extends BaseResponse
         $self->setTotal(count($list));
         $self->setShellTasks(null);
         $self->setHttpTasks(null);
+        $self->setK8sTasks(null);
 
         return $self;
     }
@@ -55,8 +62,9 @@ class CronAgentTasksResponse extends BaseResponse
     /**
      * @param array<int, mixed> $shellTasks
      * @param array<int, mixed> $httpTasks
+     * @param array<int, mixed> $k8sTasks
      */
-    public static function forAllTypes(int $nodeId, array $shellTasks, array $httpTasks): self
+    public static function forAllTypes(int $nodeId, array $shellTasks, array $httpTasks, array $k8sTasks = []): self
     {
         $self = new self();
         $self->setNodeId($nodeId);
@@ -64,7 +72,8 @@ class CronAgentTasksResponse extends BaseResponse
         $self->setList(null);
         $self->setShellTasks($shellTasks);
         $self->setHttpTasks($httpTasks);
-        $self->setTotal(count($shellTasks) + count($httpTasks));
+        $self->setK8sTasks($k8sTasks);
+        $self->setTotal(count($shellTasks) + count($httpTasks) + count($k8sTasks));
 
         return $self;
     }
@@ -159,6 +168,24 @@ class CronAgentTasksResponse extends BaseResponse
         return $this;
     }
 
+    /**
+     * @return array<int, mixed>|null
+     */
+    public function getK8sTasks(): ?array
+    {
+        return $this->k8sTasks;
+    }
+
+    /**
+     * @param array<int, mixed>|null $k8sTasks
+     */
+    public function setK8sTasks(?array $k8sTasks): static
+    {
+        $this->k8sTasks = $k8sTasks;
+
+        return $this;
+    }
+
     public function getData(): array
     {
         if ($this->getList() !== null) {
@@ -175,6 +202,7 @@ class CronAgentTasksResponse extends BaseResponse
             'total' => $this->getTotal(),
             'shellTasks' => $this->getShellTasks() ?? [],
             'httpTasks' => $this->getHttpTasks() ?? [],
+            'k8sTasks' => $this->getK8sTasks() ?? [],
         ];
     }
 }

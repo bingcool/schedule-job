@@ -462,6 +462,7 @@ class CronTaskManagerController extends BController
             $result->getNodeId(),
             $result->getShellTasks() ?? [],
             $result->getHttpTasks() ?? [],
+            $result->getK8sTasks() ?? [],
         );
     }
 

@@ -31,6 +31,17 @@ class CronTaskPayloadDto extends AbstractDto
     /** HTTP 执行类型常量 */
     public const EXEC_TYPE_HTTP = 2;
 
+    /**
+     * Kubernetes 一次性 Job 执行类型常量。
+     *
+     * 执行参数在 {@see $k8sSpec}，`command` 对该类型只是展示摘要。
+     * 与 {@see \Swoolefy\Worker\Cron\CronProcess::EXEC_K8S_TYPE} 对齐。
+     */
+    public const EXEC_TYPE_K8S = 3;
+
+    /** 支持的全部执行类型，供校验与 UI 复用。 */
+    public const EXEC_TYPES = [self::EXEC_TYPE_SHELL, self::EXEC_TYPE_HTTP, self::EXEC_TYPE_K8S];
+
     #[ApiProperty(description: '任务名称')]
     protected ?string $name = null;
 
@@ -46,7 +57,7 @@ class CronTaskPayloadDto extends AbstractDto
     #[ApiProperty(description: '绑定的 Agent 节点 ID')]
     protected ?int $nodeId = null;
 
-    #[ApiProperty(description: '执行类型：1=shell，2=http')]
+    #[ApiProperty(description: '执行类型：1=shell，2=http，3=kubernetes')]
     protected ?int $execType = null;
 
     #[ApiProperty(description: '任务状态：0=禁用，1=启用')]
@@ -90,6 +101,17 @@ class CronTaskPayloadDto extends AbstractDto
      */
     #[ApiProperty(description: 'HTTP 请求头')]
     protected ?array $httpHeaders = null;
+
+    /**
+     * exec_type=3 的 Kubernetes 配置。
+     *
+     * 只存「跑什么」（namespace/deployment/container/command/args），不存 image/env/volumes——
+     * 那些的权威来源是执行当下的 `Deployment.spec.template`。
+     *
+     * @var array{namespace?: string, deployment?: string, container?: string, command?: array<int, string>, args?: array<int, string>}|null
+     */
+    #[ApiProperty(description: 'Kubernetes 配置：namespace/deployment/container/command/args')]
+    protected ?array $k8sSpec = null;
 
     /**
      * @var array<string, true>
@@ -276,6 +298,19 @@ class CronTaskPayloadDto extends AbstractDto
     }
 
     /**
+     * 标记并设置 Kubernetes 配置。
+     *
+     * @param array<string, mixed>|null $k8sSpec null 表示显式清空（切换回 shell/http 时）
+     */
+    public function putK8sSpec(?array $k8sSpec): static
+    {
+        $this->k8sSpec = $k8sSpec;
+        $this->presentFields['k8sSpec'] = true;
+
+        return $this;
+    }
+
+    /**
      * 判断是否无任何已 put 字段（更新场景下表示空更新）。
      */
     public function isEmpty(): bool
@@ -310,6 +345,7 @@ class CronTaskPayloadDto extends AbstractDto
             'cronSkip' => 'cron_skip',
             'httpBody' => 'http_body',
             'httpHeaders' => 'http_headers',
+            'k8sSpec' => 'k8s_spec',
         ];
 
         $out = [];

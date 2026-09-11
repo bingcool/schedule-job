@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------------------
+# schedule-job Kubernetes Agent 的最小权限（方案 §15）
+#
+# 适用范围：跑 `php cron.php start App` 且承载 exec_type=3 任务的那个 Agent。
+# Admin 进程（cli.php）不调用 Kubernetes API，不需要任何这里的权限。
+#
+# 三条原则：
+#   1. 按 Namespace 授权（Role + RoleBinding），不用 ClusterRole。目标 Namespace
+#      有几个就复制几份，并与 Agent 的 K8S_ALLOWED_NAMESPACES 保持一致。
+#   2. Deployment 只给 get。schedule-job 只读模板派生 Job，永远不改 Deployment；
+#      给了 update/patch 就等于把发布权交给了 Cron 系统。
+#   3. 不给 secrets。模板里只继承 Secret 的**引用名**，真正的取值由 kubelet 用
+#      业务 Pod 自己的 ServiceAccount 完成。
+#
+# 用法：把 production 换成目标 Namespace，Agent 所在 Namespace 换成实际值。
+#   kubectl apply -f deploy/kubernetes/schedule-job-agent-rbac.yaml
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: schedule-job-agent
+  namespace: schedule-job
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: schedule-job-agent
+  # 目标业务 Namespace，即 k8s_spec.namespace
+  namespace: production
+rules:
+  # 读取 spec.template：执行当下即时 GET，不缓存、不改写
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get"]
+  # 一次性 Job 的完整生命周期。delete 是必须的：超时 / 取消要真的把 Job 删掉，
+  # 否则会留下孤儿 Pod 继续消耗资源、继续写业务数据
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  # 定位本次执行的 Pod（按 label），读退出码与 OOMKilled 等终止原因
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # 只取尾部若干行写进 cron_task_log.message，完整日志留在集群
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: schedule-job-agent
+  namespace: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: schedule-job-agent
+subjects:
+  - kind: ServiceAccount
+    name: schedule-job-agent
+    namespace: schedule-job

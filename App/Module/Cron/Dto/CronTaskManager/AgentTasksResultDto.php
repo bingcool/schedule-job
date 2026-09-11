@@ -19,8 +19,8 @@ use Swoolefy\Core\Dto\AbstractDto;
  * {@see isSingleExecType} 判断形态后组装 {@see \App\Module\Cron\Response\CronTaskManager\CronAgentTasksResponse}。
  *
  * **关键字段语义**（互斥填充）：
- * - 指定 execType（1 或 2）时：list 有值，shellTasks / httpTasks 为 null
- * - 未指定 execType 时：shellTasks / httpTasks 有值，list 为 null
+ * - 指定 execType（1 / 2 / 3）时：list 有值，shellTasks / httpTasks / k8sTasks 为 null
+ * - 未指定 execType 时：shellTasks / httpTasks / k8sTasks 有值，list 为 null
  * - 列表元素为 ScheduleEvent / CronUrlTaskMeta 的 toArray() 调度元数据
  */
 class AgentTasksResultDto extends AbstractDto
@@ -50,13 +50,19 @@ class AgentTasksResultDto extends AbstractDto
     protected ?array $httpTasks = null;
 
     /**
+     * @var array<int, mixed>|null
+     */
+    #[ApiProperty(description: '全类型模式下的 kubernetes 任务列表')]
+    protected ?array $k8sTasks = null;
+
+    /**
      * 构造单执行类型查询结果。
      *
-     * 当 Agent 指定 execType=1（shell）或 2（http）时使用；
-     * 仅填充 list，shellTasks / httpTasks 保持 null。
+     * 当 Agent 指定 execType=1（shell）/ 2（http）/ 3（kubernetes）时使用；
+     * 仅填充 list，其余分类列表保持 null。
      *
      * @param int $nodeId Agent 节点 ID
-     * @param int $execType 执行类型：1=shell，2=http
+     * @param int $execType 执行类型：1=shell，2=http，3=kubernetes
      * @param array<int, mixed> $list 该类型的调度元数据列表
      */
     public static function forExecType(int $nodeId, int $execType, array $list): self
@@ -73,18 +79,20 @@ class AgentTasksResultDto extends AbstractDto
      * 构造全类型查询结果。
      *
      * 当 Agent 未指定合法 execType 时使用；
-     * 同时返回 shell 与 http 两类任务，list 保持 null。
+     * 同时返回 shell / http / kubernetes 三类任务，list 保持 null。
      *
      * @param int $nodeId Agent 节点 ID
      * @param array<int, mixed> $shellTasks shell 类型调度元数据列表
      * @param array<int, mixed> $httpTasks http 类型调度元数据列表
+     * @param array<int, mixed> $k8sTasks kubernetes 类型调度元数据列表
      */
-    public static function forAllTypes(int $nodeId, array $shellTasks, array $httpTasks): self
+    public static function forAllTypes(int $nodeId, array $shellTasks, array $httpTasks, array $k8sTasks = []): self
     {
         $dto = new self();
         $dto->nodeId = $nodeId;
         $dto->shellTasks = $shellTasks;
         $dto->httpTasks = $httpTasks;
+        $dto->k8sTasks = $k8sTasks;
 
         return $dto;
     }
@@ -129,6 +137,16 @@ class AgentTasksResultDto extends AbstractDto
     public function getHttpTasks(): ?array
     {
         return $this->httpTasks;
+    }
+
+    /**
+     * 获取 kubernetes 任务列表（仅 forAllTypes 模式有值）。
+     *
+     * @return array<int, mixed>|null
+     */
+    public function getK8sTasks(): ?array
+    {
+        return $this->k8sTasks;
     }
 
     /**

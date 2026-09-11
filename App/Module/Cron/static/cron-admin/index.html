@@ -186,6 +186,7 @@
           <el-select v-model="query.execType" clearable placeholder="全部" style="width:130px">
             <el-option :value="1" label="GLUE 模式"></el-option>
             <el-option :value="2" label="HTTP"></el-option>
+            <el-option :value="3" label="Kubernetes"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="创建人">
@@ -242,7 +243,7 @@
           </template>
         </el-table-column>
         <el-table-column label="Type" width="110">
-          <template slot-scope="s"><el-tag size="mini" :type="s.row.execType===2?'warning':'primary'">{{ s.row.execType===2?'HTTP':'GLUE模式' }}</el-tag></template>
+          <template slot-scope="s"><el-tag size="mini" :type="s.row.execType===2?'warning':(s.row.execType===3?'success':'primary')">{{ s.row.execType===2?'HTTP':(s.row.execType===3?'Kubernetes':'GLUE模式') }}</el-tag></template>
         </el-table-column>
         <el-table-column label="Status" width="120">
           <template slot-scope="s">
@@ -453,9 +454,44 @@
             <div class="segmented">
               <label><input type="radio" name="execType" :checked="form.execType===1" @change="setExecType('shell')"><span>GLUE模式</span></label>
               <label><input type="radio" name="execType" :checked="form.execType===2" @change="setExecType('http')"><span>HTTP</span></label>
+              <label><input type="radio" name="execType" :checked="form.execType===3" @change="setExecType('k8s')"><span>Kubernetes</span></label>
             </div>
           </div>
-          <div v-if="form.execType===1">
+          <div v-if="form.execType===3">
+            <div class="grid">
+              <div class="field">
+                <label>Namespace <span class="required-mark">*</span></label>
+                <input class="form-control mono" v-model="k8s.namespace" placeholder="production">
+                <div class="help">必须在该 Agent 节点的 K8S_ALLOWED_NAMESPACES 白名单内。</div>
+              </div>
+              <div class="field">
+                <label>Deployment <span class="required-mark">*</span></label>
+                <input class="form-control mono" v-model="k8s.deployment" placeholder="order-service">
+                <div class="help">执行时即时读取它的 spec.template，不保存镜像版本。</div>
+              </div>
+              <div class="field full">
+                <label>Container</label>
+                <input class="form-control mono" v-model="k8s.container" placeholder="order-service">
+                <div class="help">多容器 Deployment 必填；单容器可留空自动选中。Sidecar 不会被复制。</div>
+              </div>
+              <div class="field">
+                <label>Command（每行一个参数）</label>
+                <textarea class="form-textarea mono" v-model="k8sCommandText" placeholder="/app/bin/task"></textarea>
+                <div class="help">留空则沿用镜像 ENTRYPOINT。不要写 <span class="mono">sh -c "..."</span>，参数不过 Shell。</div>
+              </div>
+              <div class="field">
+                <label>Args（每行一个参数）</label>
+                <textarea class="form-textarea mono" v-model="k8sArgsText" placeholder="reconcile"></textarea>
+                <div class="help">填写后整体替换镜像 CMD，不是追加。</div>
+              </div>
+              <div class="field full">
+                <label>执行摘要 command</label>
+                <input class="form-control mono" v-model="form.command" placeholder="留空则自动生成">
+                <div class="help">仅用于列表展示，不参与执行；留空保存时会按上面的配置自动生成。</div>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="form.execType===1">
             <div class="field">
               <label>Command <span class="required-mark">*</span></label>
               <textarea class="form-textarea mono" v-model="form.command" placeholder="/bin/bash /opt/scripts/task.sh"></textarea>
@@ -547,6 +583,14 @@
               <div class="help">除非很明确任务可能跑很长时间的，否则不建议设置这个超时，容易误杀正在运行的脚本。</div>
             </div>
           </div>
+          <div class="field field-gap-top" v-if="form.execType===3">
+            <label>Job 超时（秒） <span class="required-mark">*</span></label>
+            <input class="form-control" type="number" min="1" v-model.number="form.timeout">
+            <div class="help-stack">
+              <div class="help">Kubernetes 任务必须填写：Agent 用一个协程等 Job 结束，没有上限就会被永久占用。</div>
+              <div class="help">到期后 schedule-job 会删除该 Job（连带删 Pod），并记为 TIMEOUT。</div>
+            </div>
+          </div>
         </section>
 
         <section class="section">
@@ -574,10 +618,13 @@
         <div class="kv"><span>执行节点</span><b>{{ nodeLabel }}</b></div>
         <div class="kv"><span>调度类型</span><b>{{ exprType==='interval'?'每 N 秒':'Linux Cron' }}</b></div>
         <div class="kv"><span>表达式</span><b class="mono">{{ form.expression }}</b></div>
-        <div class="kv"><span>执行类型</span><b>{{ form.execType===2?'HTTP':'GLUE模式' }}</b></div>
+        <div class="kv"><span>执行类型</span><b>{{ execTypeLabel }}</b></div>
         <div class="kv"><span>防重叠</span><b>{{ form.withBlockLapping?'是':'否' }}</b></div>
         <div class="kv"><span>Retry</span><b>{{ form.retry }}</b></div>
         <div class="kv" v-if="form.execType===1"><span>Shell 超时</span><b>{{ form.timeout > 0 ? (form.timeout + 's') : '不限制' }}</b></div>
+        <div class="kv" v-if="form.execType===3"><span>Job 超时</span><b>{{ form.timeout > 0 ? (form.timeout + 's') : '未设置' }}</b></div>
+        <div class="kv" v-if="form.execType===3"><span>目标</span><b class="mono">{{ k8sSummary }}</b></div>
+        <div class="kv" v-if="form.execType===3"><span>镜像</span><b>执行当下从 Deployment 读取，不保存在任务配置中</b></div>
         <div class="callout">
           <b>配置链路</b><br>
           保存后只写入 <span class="mono">cron_task</span>。Cron Worker 通过数据库 Polling 发现配置变化，再更新 Runtime Job / Timer。
@@ -605,10 +652,14 @@
         <el-descriptions-item label="ID">{{ row.id }}</el-descriptions-item>
         <el-descriptions-item label="节点">{{ row.nodeName || row.node_name || row.nodeId || '-' }}</el-descriptions-item>
         <el-descriptions-item label="表达式"><span class="mono">{{ row.expression }}</span> <el-tag size="mini">{{ row.expressionType }}</el-tag></el-descriptions-item>
-        <el-descriptions-item label="类型">{{ row.execType===2?'HTTP':'GLUE模式' }}</el-descriptions-item>
+        <el-descriptions-item label="类型">{{ row.execType===2?'HTTP':(row.execType===3?'Kubernetes':'GLUE模式') }}</el-descriptions-item>
         <el-descriptions-item label="状态"><el-tag :type="row.status===1?'success':'info'" size="mini">{{ row.status===1?'启用':'禁用' }}</el-tag></el-descriptions-item>
         <el-descriptions-item label="Retry">{{ row.retry }}</el-descriptions-item>
-        <el-descriptions-item v-if="row.execType!==2" label="Shell 超时">{{ row.timeout > 0 ? (row.timeout + 's') : '不限制' }}</el-descriptions-item>
+        <el-descriptions-item v-if="row.execType!==2" :label="row.execType===3?'Job 超时':'Shell 超时'">{{ row.timeout > 0 ? (row.timeout + 's') : '不限制' }}</el-descriptions-item>
+        <el-descriptions-item v-if="row.execType===3" label="Kubernetes" :span="2">
+          <span class="mono">{{ k8sSpecText }}</span>
+          <div class="help">镜像不在此保存；Create Job 时即时读取 Deployment.spec.template，此处不是执行用的 image。</div>
+        </el-descriptions-item>
         <el-descriptions-item label="防重叠">{{ row.withBlockLapping?'是':'否' }}</el-descriptions-item>
         <el-descriptions-item label="允许执行时段" :span="2">
           <div v-if="cronBetweenItems.length" class="detail-range-list">
@@ -721,6 +772,7 @@
             <el-option :value="''" label="全部"></el-option>
             <el-option :value="1" label="GLUE模式"></el-option>
             <el-option :value="2" label="HTTP"></el-option>
+            <el-option :value="3" label="Kubernetes"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="触发类型">

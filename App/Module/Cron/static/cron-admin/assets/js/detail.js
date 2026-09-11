@@ -17,6 +17,15 @@
     computed: {
       id: function () {
         return this.$route.params.id;
+      },
+      // exec_type=3 的目标与 argv。镜像不在这里——执行时才从 Deployment 模板取
+      k8sSpecText: function () {
+        var spec = this.row.k8sSpec || this.row.k8s_spec;
+        if (!spec || typeof spec !== 'object') return '-';
+        var argv = (spec.command || []).concat(spec.args || []);
+        return (spec.namespace || '?') + '/' + (spec.deployment || '?')
+          + '[' + (spec.container || 'auto') + ']'
+          + (argv.length ? ' ' + argv.join(' ') : '');
       }
     },
     created: function () {
