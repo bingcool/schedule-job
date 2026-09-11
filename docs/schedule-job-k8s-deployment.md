@@ -25,7 +25,9 @@
 | `ExecutionService → KubernetesTaskExecutor` | `ExecutionService` 只写 `cron_task_log` / Lease / Cancel，**从不执行** Shell/HTTP | Executor 挂在 **Agent** `CronExecutorInterface`，与 `ShellExecutor` / `HttpExecutor` 同级 |
 | 所有 schedule-job 副本都抢同一 Slot | 任务按 `node_id = CRON_NODE_ID` 拉取；Admin（`cli.php :9502`）不执行 | 只有绑定该节点的 Agent（`cron.php :9506`）会拉到任务并 Create Job |
 | Retry = 新的 Execution + 新 Job | `CronManager::runWithRetry` 复用同一 `exec_batch_id` / 同一 `cron_task_log` 行 | K8s 也走管线 Retry；Job 名必须带 **attempt**，否则 Failed Job 对象无法复用 |
-| Job 名 `schedule-job-{execution_id}` | 同一 Execution 可能 retry 多次 | `sj-{logId}-a{attempt}` |
+| Job 名 `schedule-job-{execution_id}` | **Executor 拿不到 `cron_task_log.id`**：`ExecutionSnapshot` 只有 jobId / execBatchId / definition / plannedAt | `sj-{execBatchId}-a{attempt}`，并需给 Snapshot 加 attempt（§9） |
+| Cancel 时删 Job | `ExecutionRuntimeGuard` 在 `pid<=0` 时直接 `finishOwned(CANCELLED)` | 会留下**孤儿 Job**，必须先删 Job 再收尾（§11.1） |
+| Executor 同步等到 Job 结束 | Worker 有 `life_time` tick reboot、`limit_run_coroutine_num` 上限 | 长跑任务需显式约束（§11.2） |
 | Job/Pod 继承 `app: order-service` | Service selector 会把流量打到 Cron Pod | **禁止**复制 Deployment `spec.selector` 匹配的 labels |
 | 原样 Deep Copy template | 健康检查、Istio 注入、hostPort 会让 Job 永远不结束或杀错进程 | 必须剥离 probe / lifecycle / sidecar 注入注解 / hostPort |
 | 把 k8s 配置塞进现有 `command` | `cron_task.command` 是 `varchar(256)`，且 Shell 与 HTTP 已占用 | 独立 JSON 列 `k8s_spec`，`exec_type=3` |
@@ -186,15 +188,17 @@ arm 下一轮 Timer
   → ExecutionSnapshot（新 exec_batch_id）
   → claimScheduleSlot（cron_scheduled_task_record）
         DUPLICATE / FAILED → 不写 log、不 Create Job
-  → writeLog(RUNNING) → cron_task_log.id = execution_id
+  → writeLog(RUNNING) → cron_task_log 行落库（Guard 开始心跳续租）
   → bindScheduleSlot(execution_id)
   → KubernetesExecutor.run(snapshot)
-        内部：GET Deployment → Build Job → Create → 等待终态
-        等待期间必须续租 Execution Lease（见 §11）
+        内部：GET Deployment → Build Job → 落 Job 名 → Create → 等待终态
+        Lease 由 Guard tick 自动续（见 §11）
   → writeExecutionResult SUCCESS|FAILED|TIMEOUT|CANCELLED
 ```
 
-`runOnceNow`：**不抢 Slot**（与现网一致）。会 Create 独立 Job，Job 名仍带该次 `execution_id`。
+Executor 只拿到 `ExecutionSnapshot`；需要 `execution_id` 时用 `(cron_id, exec_batch_id)` 查（`ExecutionService::findByBatch`，有 `idx_cron_exec_batch`）。Job 名不依赖它（§9.1）。
+
+`runOnceNow`：**不抢 Slot**（与现网一致）。会 Create 独立 Job，Job 名用该轮自己的 `exec_batch_id`，天然不冲突。
 
 ---
 
@@ -247,8 +251,9 @@ Pod / Job labels **只允许**：
 app.kubernetes.io/managed-by: schedule-job
 app.kubernetes.io/name: schedule-job-cron
 schedule-job.cron-id: "100"
-schedule-job.execution-id: "90001"
-schedule-job.attempt: "0"
+schedule-job.exec-batch-id: "3f9a1c8e2b7d0456"   # Executor 手上一定有
+schedule-job.attempt: "1"
+schedule-job.execution-id: "90001"               # 可选，需查库才知道
 ```
 
 禁止把 `app: order-service` 原样拷到 Job Pod。
@@ -264,13 +269,13 @@ Deployment 404 → `KUBERNETES_DEPLOYMENT_NOT_FOUND`。
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: sj-90001-a0          # 见 §9
+  name: sj-3f9a1c8e2b7d0456-a1     # 见 §9
   namespace: production
   labels:
     app.kubernetes.io/managed-by: schedule-job
     schedule-job.cron-id: "100"
-    schedule-job.execution-id: "90001"
-    schedule-job.attempt: "0"
+    schedule-job.exec-batch-id: "3f9a1c8e2b7d0456"
+    schedule-job.attempt: "1"
 spec:
   backoffLimit: 0
   parallelism: 1
@@ -282,8 +287,8 @@ spec:
       labels:
         app.kubernetes.io/managed-by: schedule-job
         schedule-job.cron-id: "100"
-        schedule-job.execution-id: "90001"
-        schedule-job.attempt: "0"
+        schedule-job.exec-batch-id: "3f9a1c8e2b7d0456"
+        schedule-job.attempt: "1"
     spec:
       restartPolicy: Never
       # 其余来自消毒后的 Deployment template
@@ -302,19 +307,42 @@ spec:
 
 ## 9. Job 名与 Retry
 
-Kubernetes Job 名不可复用：第一次 Failed 后对象还在（TTL 之前），同名 Create 只会 409 到 **已经失败的 Job**。
+### 9.1 Executor 能拿到什么（决定了命名方案）
 
-现网 `cron_task.retry` = 失败后再试 N 次，**同一** `exec_batch_id` / **同一** `cron_task_log` 行（`CronManager::runWithRetry`，无 retry_delay）。
+`CronExecutorInterface::run()` 的唯一入参是 `ExecutionSnapshot`：
 
-因此 Job 名：
-
-```text
-sj-{execution_id}-a{attempt}
+```php
+public readonly string $jobId;
+public readonly string $execBatchId;   // bin2hex(random_bytes(8))，16 位小写 hex
+public readonly TaskDefinition $definition;
+public readonly int $plannedAt;
 ```
 
-- `execution_id` = `cron_task_log.id`（RUNNING 插入之后才有，Create Job 必须在这之后）
-- `attempt` 从 0 开始；`retry=2` 最多 `a0` `a1` `a2`
-- DNS-1123：小写、数字、`-`，最长 63。`sj-` 前缀短于 `schedule-job-`。
+**没有 `cron_task_log.id`**，也**没有 attempt**——`runWithRetry` 每轮都传同一个 `$snapshot`。
+
+所以 Job 名不能用 `execution_id`。`execBatchId` 是 Executor 手上唯一全局唯一、且天然符合 DNS-1123 的键：
+
+```text
+sj-{execBatchId}-a{attempt}
+例：sj-3f9a1c8e2b7d0456-a1        （3 + 16 + 3 = 22 字符，上限 63）
+attempt 从 1 起，与 runWithRetry 的 for 循环一致；retry=2 时为 a1 / a2 / a3
+```
+
+反查：`cron_task_log` 有 `exec_batch_id` 列和 `idx_cron_exec_batch` 索引，Recovery 可由 Execution 行反推 Job 名。
+
+### 9.2 attempt 需要一处框架改动
+
+Kubernetes Job 名不可复用：第一次 Failed 后对象还在（TTL 之前），同名 Create 只会 409 到**已经失败的 Job**，Executor 会把上一次的失败当成本次结果。
+
+现网 `cron_task.retry` = 失败后再试 N 次，**同一** `exec_batch_id` / **同一** `cron_task_log` 行（`CronManager::runWithRetry`，无 retry_delay）。attempt 只存在于 CronManager 的 for 循环里，没传给 Executor。
+
+三种做法，推荐第一种：
+
+| 方案 | 评价 |
+|---|---|
+| **给 `ExecutionSnapshot` 加 `readonly int $attempt`（默认 1）+ `withAttempt()`，`runWithRetry` 传 `$snapshot->withAttempt($attempt)`** | 推荐。改动小、不破坏冻结语义（execBatchId/definition 不变），性质同当初加 `scheduleSlotClaim` |
+| Executor 内存里按 execBatchId 自己计数 | Worker 重启后计数归零，会撞到旧 Job 名 |
+| 撞名先 Delete 再 Create | 有竞态，且可能删掉正在跑的 Job |
 
 `backoffLimit: 0`：单次 Job 失败立即结束，由 schedule-job 再 Create `a{n+1}`。
 
@@ -324,7 +352,7 @@ Create 409：
 
 ```text
 AlreadyExists → GET Job
-  若 labels.execution-id / attempt 匹配 → 继续监控（幂等）
+  若 labels.exec-batch-id / attempt 匹配 → 继续监控（幂等）
   否则 → FAILED（名字冲突，属配置/脏数据）
 ```
 
@@ -350,17 +378,70 @@ stdout/stderr：
 
 ## 11. Lease 与崩溃恢复
 
-现网 `ExecutionRuntimeGuard` 按 **pid** 看护 Shell。K8s 没有本机子进程。
+现网 `ExecutionRuntimeGuard` 按 **pid** 看护 Shell。K8s 没有本机子进程，pid 恒为 0。
 
-P0：
+**续租不用改**：`ExecutionService::insertExecution` 在 RUNNING 时会 `ExecutionRuntimeGuard::watch($id, $pid, $timeout_at)`，Guard 的 5s tick 是独立 `Swoole\Timer`，只要 `lease_owner` 匹配就自动 `heartbeat`，与 Executor 协程无关。pid=0 不影响心跳。
 
-1. `KubernetesExecutor` 在 `run()` 等待 Job 期间，按 `EXECUTION_LEASE_DURATION` 续租（`heartbeat_at` / `lease_until`），否则 Recovery 会把 RUNNING 当成 Worker 崩溃。
-2. Guard 对 type 3 不走 SIGKILL；超时/取消改为通知 Executor 删 Job（或 Executor 自己轮询 `status=CANCEL_REQUESTED` / `timeout_at`）。
-3. Crash Recovery：`RUNNING` 且 Lease 过期时，**不要**在异节点用 Shell 语义重跑。应：
-   - 读 `k8s_job_name` → GET Job
-   - Job 已 Complete/Failed → 回写对应终态
-   - Job 仍 Active → **本节点** 才能续监控；异节点只标记 `WORKER_CRASH`（现网 Recovery「禁止异节点重跑」）
-   - 无 Job 名但有 `execution_id` → 按确定性名字 GET `sj-{id}-a{attempt}`；没有则视为创建前崩溃 → FAILED，不补 Create（Slot 已占，补跑会打乱「该 Slot 只跑一次」；RunOnce 另议）
+### 11.1 pid=0 的两个坑（读代码得出，必须处理）
+
+`ExecutionRuntimeGuard::onTick()` 的判断是：
+
+```php
+$stopping = $status === CANCEL_REQUESTED || ... || $timedOut || ...;
+if ($stopping && ($pid > 0 || $status === ExecutionStatus::CANCEL_REQUESTED)) {
+    self::terminate(...);
+}
+```
+
+**坑 1：超时不会被 Guard 接管。**  
+`timeout_at` 到点时 `$timedOut=true`，但 pid=0 且 status 仍是 RUNNING → 条件不成立 → 不进 `terminate()`。也就是说 **Guard 不会替 K8s 结束超时 Execution**。  
+→ `KubernetesExecutor` 必须自己盯 `timeout_at`：到点 DELETE Job，返回 `ExecutionResult::timeout()`。
+
+**坑 2：取消会产生孤儿 Job。**  
+status 变 `CANCEL_REQUESTED` 时条件成立 → `terminate()` → `pid <= 0` 分支直接：
+
+```php
+$service->finishOwned($logId, $owner, CANCELLED, ..., '收到取消请求（无 PID 可杀）');
+self::unwatch($logId);
+```
+
+Execution 立刻变 CANCELLED，**但 Kubernetes Job 还在跑**，继续占资源、继续写业务数据。HTTP 今天也走这条路（请求终会自己结束，影响小），K8s 不能照搬。
+
+两种改法，选一：
+
+- **A（推荐）**：Guard 增加「删 Job 钩子」——`watch()` 时可注册 `terminator` 回调；`pid<=0` 且有 terminator 时先执行回调（DELETE Job）再 `finishOwned`。对 HTTP 无影响（不注册即维持现状）。
+- **B**：Guard 对 `exec_type=3` 完全不接管，由 Executor 轮询 `status`/`timeout_at` 自行收尾。需要 Guard 能识别 type 3 并跳过，否则 A/B 会互相打架。
+
+无论 A 还是 B，**都不要保留现状**：现状 = 取消即孤儿 Job。
+
+### 11.2 长跑 Job 与 Worker 生命周期
+
+现网 Executor 是「一个协程从头等到尾」的同步模型（`ShellExecutor` 轮询 `proc_get_status`，`HttpExecutor` 等 Guzzle）。K8s Job 可能跑几十分钟到几小时，把它塞进同一模型有三处约束：
+
+| 约束 | 现状 | 影响 |
+|---|---|---|
+| `life_time = 3600*24` | `AbstractBaseWorker::registerTickReboot()` 只对 `CronLocalProcess` 豁免，fork/url Worker 会按 `life_time` tick reboot | reboot 走 `runtimeCoroutineWait()`，会**一直等**在跑的协程。一个 6 小时的 Job 会把 reboot 拖 6 小时 |
+| `limit_run_coroutine_num`（fork 200 / url 100） | 长跑 Job 期间协程不释放 | 并发 K8s 任务多时会触顶 |
+| `with_block_lapping` | Guard 全程持有 | 同一任务不会重叠——这个行为是对的，保留 |
+
+P0 的现实取舍：
+
+- 建议 K8s 任务按 **分钟级** 设计，并强制配置 `cron_task.timeout`（K8s Worker 上不允许 `timeout=0`，给一个上限如 3600s）。
+- Executor 的等待循环必须有硬上限（`timeout` 或全局 `K8S_MAX_WAIT_SECONDS`），到点 DELETE Job 并返回 TIMEOUT，不允许无限等。
+- 新 Worker `schedule-k8s-task-cron` 单独配 `life_time`（建议 ≥ 最大 timeout 的数倍）和 `limit_run_coroutine_num`，不要直接抄 fork 的配置。
+
+P1 可以改成「提交 + 收割」两段式：Executor 只 Create Job 就返回，另一个 reconcile Timer 扫 RUNNING 的 Execution 去 GET Job 并收尾。那样协程不被长期占用，但要重构 `CronExecutorInterface` 的同步返回语义，不适合第一版。
+
+### 11.3 Crash Recovery
+
+`RUNNING` 且 Lease 过期时，**不要**在异节点用 Shell 语义重跑。应：
+
+- 读 `k8s_job_name` → GET Job
+- Job 已 Complete/Failed → 回写对应终态
+- Job 仍 Active → **本节点**才能续监控；异节点只标记 `WORKER_CRASH`（现网 Recovery「禁止异节点重跑」）
+- 没记到 Job 名 → 用 `exec_batch_id` 反推 `sj-{execBatchId}-a*`（`idx_cron_exec_batch` 可查）；集群里也没有则视为 Create 前崩溃 → FAILED，**不补 Create**（Slot 已占，补跑会打乱「该 Slot 只跑一次」；RunOnce 另议）
+
+Worker reboot（`life_time`）与崩溃不同：reboot 会等协程跑完，正常情况下 Job 能自然收尾。真正需要 re-attach 的是 kill -9 / OOM / 机器宕机。
 
 Slot 已占但 RUNNING 行还没插入就崩溃：该 Slot 丢失。这是现网 Shell/HTTP 已有不变量，K8s 第一版不单独修复。
 
@@ -372,12 +453,14 @@ P0 写入 `cron_task_log.task_item` JSON（避免第一版就改很多列），R
 
 ```text
 k8s_namespace
-k8s_job_name
+k8s_job_name       # sj-{execBatchId}-a{attempt}
 k8s_job_uid
 k8s_pod_name
 k8s_attempt
 k8s_image          # 实际用的 image，便于审计；仍不是配置源
 ```
+
+Job 名必须在 **Create 之前**先落库（`appendLog` 或 `task_item` 预写），否则「Create 成功但紧接着崩溃」会丢失句柄。有 `exec_batch_id` 可反推是兜底，不是主路径。
 
 P1 再拆独立列并加索引。
 
@@ -390,7 +473,7 @@ Complete 条件      → SUCCESS
 Failed 条件        → FAILED
 ```
 
-Pod 用于日志、exitCode、OOMKilled。用 label `schedule-job.execution-id` + `schedule-job.attempt` 找 Pod，不依赖 Pod Name 前缀。
+Pod 用于日志、exitCode、OOMKilled。用 label `schedule-job.exec-batch-id` + `schedule-job.attempt` 找 Pod，不依赖 Pod Name 前缀。
 
 ---
 
@@ -511,15 +594,16 @@ Secret/ConfigMap：只继承 Template 里的 **引用名**，Cron 配置不存 S
 
 ```text
 P0-1  exec_type=3 + k8s_spec JSON + PayloadBuilder / fetchCronTask
-P0-2  Worker schedule-k8s-task-cron（worker_num=1）+ KubernetesExecutor
-P0-3  Kubernetes HTTP Client（禁止 kubectl）
+P0-2  Worker schedule-k8s-task-cron（worker_num=1，独立 life_time / 协程上限）
+P0-3  KubernetesExecutor + Kubernetes HTTP Client（禁止 kubectl）
 P0-4  Template Deep Copy + 只留目标容器 + §7.1 消毒
 P0-5  command/args 数组覆盖
-P0-6  Job 名 sj-{logId}-a{attempt}；409 幂等
+P0-6  ExecutionSnapshot 加 attempt（swoolefy 改动）；Job 名 sj-{execBatchId}-a{attempt}；409 幂等
 P0-7  backoffLimit=0；Retry 走 CronManager 同批次
-P0-8  等待 Job 期间续租 Lease；Timeout/Cancel → Delete Job
-P0-9  task_item 写入 Job/Pod 元数据；message 写日志摘要
+P0-8  Executor 自己盯 timeout_at；Guard 取消路径先 Delete Job 再收尾（修孤儿 Job）
+P0-9  Create 前落 Job 名；task_item 写 Job/Pod 元数据；message 写日志摘要
 P0-10 Namespace 白名单 + 最小 RBAC
+P0-11 K8s 任务强制 timeout>0 + Executor 等待硬上限
 ```
 
 ---
