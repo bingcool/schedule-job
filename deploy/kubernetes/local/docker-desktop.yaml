@@ -1,4 +1,4 @@
-# 这时一个swoolefy的http基于k8s的部署demo。schedule-job调用k8s的job能力执行任务
+# 这是一个swoolefy的http基于k8s的部署demo。schedule-job调用k8s的job能力执行任务
 
 # Docker Desktop 本机联调：swoolefy Test Deployment + Agent RBAC
 #
@@ -7,11 +7,25 @@
 #   kubectl apply -f deploy/kubernetes/local/docker-desktop.yaml
 #   kubectl -n swoolefy get pods,svc,sa
 #   kubectl create token schedule-job-agent -n swoolefy --duration=8760h
-#
+#   其中schedule-job-agent是k8s一个授权访问账号
 # 运行时用本机镜像 swoolefy-php85-swoole62:v1（PHP 8.5 + Swoole 6.2）。
 # 代码用 hostPath 挂进来：Docker Desktop VM 上的
 #   /host_mnt/Users/macbook/Documents/wwwphp  →  /home/wwwroot
 # 容器工作目录是 /home/wwwroot/swoolefy，启动 php cli.php start Test。
+# 整体流程：
+#  创建命名空间 swoolefy，隔离资源。
+#
+#  创建 ServiceAccount schedule-job-agent，并赋予 RBAC 权限，使其能够操作 Job、Pod 等。
+#
+#  部署 swoolefy-test：使用本机镜像，通过 hostPath 挂载本机代码，启动 HTTP 服务，监听 9501 端口。
+#
+#  创建 Service：通过 NodePort 30501 对外暴露服务。
+#
+#  调度任务（schedule-job）：可以使用 schedule-job-agent 这个 ServiceAccount 的 Token，在 Pod 内调用 K8s API，动态创建 Job 来执行后台任务。注释中给出了创建 Token 的命令：
+#
+#  bash
+#  kubectl create token schedule-job-agent -n swoolefy --duration=8760h
+#  这个 Token 可以配置到调度程序中，使其具备创建 Job 的权限。
 apiVersion: v1
 kind: Namespace
 metadata:
