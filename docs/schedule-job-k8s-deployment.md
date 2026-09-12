@@ -679,16 +679,16 @@ kubectl apply -f deploy/kubernetes/schedule-job-agent-rbac.yaml   # 按目标 Na
 
 执行策略：
 
-| 变量 | 默认 | 说明 |
-|---|---|---|
+| 变量 | 默认     | 说明 |
+|---|--------|---|
 | `K8S_ALLOWED_NAMESPACES` | 空（不限制） | **生产必填**，逗号分隔。为空时任何写错的 namespace 都能塞 Pod |
-| `K8S_MAX_WAIT_SECONDS` | 3600 | Executor 等待单个 Job 的硬上限，夹住 `cron_task.timeout` |
-| `K8S_POLL_INTERVAL` | 3 | 轮询 Job 状态的间隔秒 |
-| `K8S_JOB_TTL_SECONDS` | 120 | Job 完成后由 K8s 回收的 TTL |
-| `K8S_DEADLINE_PADDING` | 100 | `activeDeadlineSeconds = timeout + 该值`，保证 schedule-job 先判超时 |
-| `K8S_LOG_TAIL_LINES` | 50 | 写进 message 的 Pod 日志行数 |
-| `K8S_REQUIRE_TIMEOUT` | 1 | 是否拒绝 `timeout=0` 的 K8s 任务 |
-| `K8S_API_TIMEOUT` | 15 | 单次 API 调用超时秒 |
+| `K8S_MAX_WAIT_SECONDS` | 3600   | Executor 等待单个 Job 的硬上限，夹住 `cron_task.timeout` |
+| `K8S_POLL_INTERVAL` | 3      | 轮询 Job 状态的间隔秒 |
+| `K8S_JOB_TTL_SECONDS` | 120    | Job 完成后由 K8s 回收的 TTL |
+| `K8S_DEADLINE_PADDING` | 100    | `activeDeadlineSeconds = timeout + 该值`，保证 schedule-job 先判超时 |
+| `K8S_LOG_TAIL_LINES` | 50     | 写进 message 的 Pod 日志行数 |
+| `K8S_REQUIRE_TIMEOUT` | 1      | 是否拒绝 `timeout=0` 的 K8s 任务 |
+| `K8S_API_TIMEOUT` | 15     | 单次 API 调用超时秒 |
 
 Worker 规格：
 
