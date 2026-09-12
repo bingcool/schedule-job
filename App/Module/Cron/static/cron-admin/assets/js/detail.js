@@ -18,14 +18,25 @@
       id: function () {
         return this.$route.params.id;
       },
-      // exec_type=3 的目标与 argv。镜像不在这里——执行时才从 Deployment 模板取
-      k8sSpecText: function () {
+      k8sSpec: function () {
         var spec = this.row.k8sSpec || this.row.k8s_spec;
-        if (!spec || typeof spec !== 'object') return '-';
-        var argv = (spec.command || []).concat(spec.args || []);
-        return (spec.namespace || '?') + '/' + (spec.deployment || '?')
-          + '[' + (spec.container || 'auto') + ']'
-          + (argv.length ? ' ' + argv.join(' ') : '');
+        return spec && typeof spec === 'object' ? spec : {};
+      },
+      commandText: function () {
+        if (Number(this.row.execType) === 3) {
+          var spec = this.k8sSpec;
+          var argv = (spec.command || []).concat(spec.args || []);
+          return argv.length ? argv.join(' ') : '-';
+        }
+        return this.row.command || '-';
+      },
+      avgDurationText: function () {
+        var ms = this.stats && this.stats.avgDurationMs;
+        var n = Number(ms);
+        if (!isFinite(n) || n < 0) {
+          return '平均耗时约0.00秒';
+        }
+        return '平均耗时约' + (n / 1000).toFixed(2) + '秒';
       }
     },
     created: function () {

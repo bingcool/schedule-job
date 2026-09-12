@@ -301,7 +301,7 @@
         }
         this.syncExpr();
         var isK8s = this.form.execType === 3;
-        // K8s 的 command 只是展示摘要，缺了后端会按 k8s_spec 自动生成，不作为必填
+        // K8s 的 command 列由后端按 k8s_spec 的 argv 写入，不作为必填
         if (!this.form.name || !this.form.nodeId || (!isK8s && !this.form.command)) {
           this.$message.warning('请填写名称、节点与 Command/URL');
           return;
@@ -336,7 +336,8 @@
             httpBody: common.parseJsonOrNull(this.bodyText, 'Body'),
             cronBetween: this.serializeRangeItems(this.betweenItems, 'cron_between'),
             cronSkip: this.serializeRangeItems(this.skipItems, 'cron_skip'),
-            k8sSpec: isK8s ? this.buildK8sSpec() : null
+            k8sSpec: isK8s ? this.buildK8sSpec() : null,
+            command: isK8s ? '' : this.form.command
           });
           this.saving = true;
           if (this.isEdit) {

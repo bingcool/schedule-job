@@ -23,7 +23,7 @@ use App\Module\Cron\ShellCommandGuard;
  */
 class CronTaskPayloadBuilder
 {
-    /** exec_type=3 的 command 只是展示摘要，长度受表列 varchar(256) 约束。 */
+    /** exec_type=3 的 command 只存 argv，长度受表列 varchar(256) 约束。 */
     private const COMMAND_MAX_LENGTH = 256;
 
     /**
@@ -53,7 +53,7 @@ class CronTaskPayloadBuilder
         $httpHeaders = $this->normalizeJsonField($payload['http_headers'] ?? null);
         $rawK8sSpec = $this->normalizeJsonField($payload['k8s_spec'] ?? null);
 
-        // Kubernetes 配置在两个地方都要用：校验结构 + 在 command 为空时生成展示摘要
+        // Kubernetes 配置：校验结构，并把 command 列写成 argv（不拼 namespace/deployment）
         $k8sSpec = null;
         if (is_array($rawK8sSpec) && $rawK8sSpec !== []) {
             try {
@@ -62,14 +62,12 @@ class CronTaskPayloadBuilder
                 return CronTaskPayloadBuildResultDto::fail($e->getMessage());
             }
             $k8sSpec = $this->canonicalK8sSpec($parsed);
-            if ($command === '') {
-                // command 对 type 3 不是执行来源，只是列表页看得懂的一行摘要
-                $command = mb_substr($parsed->summary(), 0, self::COMMAND_MAX_LENGTH);
-            }
+            $command = $this->k8sCommandLine($parsed);
         }
 
         if ($isCreate) {
-            if ($name === '' || $expression === '' || $command === '') {
+            $commandRequired = $execType !== CronTaskPayloadDto::EXEC_TYPE_K8S;
+            if ($name === '' || $expression === '' || ($commandRequired && $command === '')) {
                 return CronTaskPayloadBuildResultDto::fail('name/expression/command为必填');
             }
             if (!in_array($execType, CronTaskPayloadDto::EXEC_TYPES, true)) {
@@ -123,7 +121,7 @@ class CronTaskPayloadBuilder
         if ($expression !== '') {
             $dto->putExpression($expression);
         }
-        if ($command !== '') {
+        if ($command !== '' || $k8sSpec !== null) {
             $dto->putCommand($command);
         }
         if ($description !== '' || $isCreate) {
@@ -180,6 +178,19 @@ class CronTaskPayloadBuilder
         }
 
         return CronTaskPayloadBuildResultDto::ok($dto);
+    }
+
+    /**
+     * type 3 的 command 列只存 argv，不拼 Namespace / Deployment / Container。
+     */
+    protected function k8sCommandLine(KubernetesJobSpec $spec): string
+    {
+        $argv = array_merge($spec->command, $spec->args);
+        if ($argv === []) {
+            return '';
+        }
+
+        return mb_substr(implode(' ', $argv), 0, self::COMMAND_MAX_LENGTH);
     }
 
     /**
@@ -275,7 +286,7 @@ class CronTaskPayloadBuilder
      * Shell 任务才检查 command；HTTP URL 与 Kubernetes 跳过。
      *
      * Kubernetes 跳过的理由：{@see ShellCommandGuard} 是**本机 Shell** 黑名单，
-     * 而 type 3 的 command 只是展示摘要，真正执行的是集群里的 argv 数组（不过 Shell）。
+     * 而 type 3 的 command 列只是 argv 展示，真正执行的是集群里的 argv 数组（不过 Shell）。
      *
      * 部分更新未带 exec_type 时，以 http(s) URL 判断，避免误伤。
      */

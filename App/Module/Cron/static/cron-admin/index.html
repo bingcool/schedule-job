@@ -499,6 +499,7 @@
               <div class="help-stack">
                 <div class="help">Shell Command 将由目标 Agent Cron Node 执行，请确认命令来源可信。</div>
                 <div class="help">支持java、python、go，php</div>
+                <div class="help">如需异步执行脚本，可以使用 nohup，例如 <span class="mono">nohup /path/python3 async_task.py &gt; /path/to/logs/async_task.log 2&gt;&amp;1 &amp;</span>。请先验证脚本可行后，再添加。</div>
               </div>
             </div>
           </div>
@@ -658,10 +659,6 @@
         <el-descriptions-item label="状态"><el-tag :type="row.status===1?'success':'info'" size="mini">{{ row.status===1?'启用':'禁用' }}</el-tag></el-descriptions-item>
         <el-descriptions-item label="Retry">{{ row.retry }}</el-descriptions-item>
         <el-descriptions-item v-if="row.execType!==2" :label="row.execType===3?'Job 超时':'Shell 超时'">{{ row.timeout > 0 ? (row.timeout + 's') : '不限制' }}</el-descriptions-item>
-        <el-descriptions-item v-if="row.execType===3" label="Kubernetes" :span="2">
-          <span class="mono">{{ k8sSpecText }}</span>
-          <div class="help">镜像不在此保存；Create Job 时即时读取 Deployment.spec.template，此处不是执行用的 image。</div>
-        </el-descriptions-item>
         <el-descriptions-item label="防重叠">{{ row.withBlockLapping?'是':'否' }}</el-descriptions-item>
         <el-descriptions-item label="允许执行时段" :span="2">
           <div v-if="cronBetweenItems.length" class="detail-range-list">
@@ -679,13 +676,19 @@
           </div>
           <span v-else class="detail-range-empty">无</span>
         </el-descriptions-item>
-        <el-descriptions-item label="Command" :span="2"><span class="mono">{{ row.command }}</span></el-descriptions-item>
+        <el-descriptions-item v-if="row.execType===3" label="Namespace" :span="2"><span class="mono">{{ k8sSpec.namespace || '-' }}</span></el-descriptions-item>
+        <el-descriptions-item v-if="row.execType===3" label="Deployment" :span="2"><span class="mono">{{ k8sSpec.deployment || '-' }}</span></el-descriptions-item>
+        <el-descriptions-item v-if="row.execType===3" label="Container" :span="2">
+          <span class="mono">{{ k8sSpec.container || '-' }}</span>
+          <div class="help">镜像不在此保存；Create Job 时即时读取 Deployment.spec.template，此处不是执行用的 image。</div>
+        </el-descriptions-item>
+        <el-descriptions-item label="Command" :span="2"><span class="mono">{{ commandText }}</span></el-descriptions-item>
         <el-descriptions-item label="描述" :span="2">{{ row.description || '-' }}</el-descriptions-item>
       </el-descriptions>
     </div>
     <div class="panel" style="margin-top:16px" v-if="stats">
       <h3 style="margin-top:0">执行统计</h3>
-      总计 {{ stats.total }} · 成功 {{ stats.success }} · 失败 {{ stats.failed }} · 跳过 {{ stats.skipped }} · 超时 {{ stats.timeout || 0 }} · 取消 {{ stats.cancelled || 0 }} · 成功率 {{ stats.successRate }}% · 平均 {{ stats.avgDurationMs }}ms
+      总计 {{ stats.total }} · 成功 {{ stats.success }} · 失败 {{ stats.failed }} · 跳过 {{ stats.skipped }} · 超时 {{ stats.timeout || 0 }} · 取消 {{ stats.cancelled || 0 }} · 成功率 {{ stats.successRate }}% · {{ avgDurationText }}
     </div>
   </div>
 </script>
@@ -1514,8 +1517,8 @@
 <script defer src="/cron-admin/assets/js/common.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js?v=dashboard-today-date-1"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
-<script defer src="/cron-admin/assets/js/editor.js?v=task-manage-auth-1"></script>
-<script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
+<script defer src="/cron-admin/assets/js/editor.js?v=k8s-command-argv-1"></script>
+<script defer src="/cron-admin/assets/js/detail.js?v=avg-duration-sec-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
 <script defer src="/cron-admin/assets/js/executions.js?v=exec-type-col-1"></script>
 <script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-2"></script>
