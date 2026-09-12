@@ -12,7 +12,7 @@ return [
         'handler' => \App\WorkerCron\ScheduleForkCronProcess::class,
         'description' => '系统fork模式任务调度',
         'worker_num' => 1, // 默认动态进程数量
-        'max_handle' => 100, //消费达到10000后reboot进程
+        'max_handle' => 1000, //消费达到10000后reboot进程
         'life_time'  => 3600 * 24, // 每隔3600s重启进程
         'limit_run_coroutine_num' => 200, // 当前进程的实时协程数量，如果协程数量超过此设置的数量，则禁止继续消费队列处理业务，而是在等待
         'extend_data' => [],

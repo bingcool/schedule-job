@@ -25,8 +25,8 @@ return [
         'handler' => \App\WorkerCron\ScheduleK8sCronProcess::class,
         'worker_num' => 1, // 必须为 1：同一节点只允许一个 Scheduler
         'max_handle' => 500,
-        'life_time'  => (int) env('CRON_K8S_WORKER_LIFE_TIME', 3600),
-        'limit_run_coroutine_num' => (int) env('CRON_K8S_MAX_CONCURRENCY', 50),
+        'life_time'  => (int) env('CRON_K8S_WORKER_LIFE_TIME', 86400),
+        'limit_run_coroutine_num' => (int) env('CRON_K8S_MAX_CONCURRENCY', 1000),
         'extend_data' => [],
         'args' => [
             // CronManager 唯一调度：配置轮询间隔（秒）。
