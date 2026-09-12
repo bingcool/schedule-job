@@ -438,7 +438,7 @@ P1 可以改成「提交 + 收割」两段式：Executor 只 Create Job 就返�
 
 - 读 `k8s_job_name` → GET Job
 - Job 已 Complete/Failed → 回写对应终态
-- Job 仍 Active → P0 同步模型无法把已死协程续上，**删除 Job** 后记 `WORKER_CRASH`，不补 Create（避免孤儿）。P1 两段式收割后再做本节点续监控
+- Job 仍 Active → **不删 Job、不改执行记录**，等下一轮扫到终态再落库。Admin 已取消的除外（仍 DELETE）。不补 Create
 - 没记到 Job 名 → 用 `exec_batch_id` 反推 `sj-{execBatchId}-a*`，再用 label 列 Job；集群里也没有则视为 Create 前崩溃 → FAILED，**不补 Create**（Slot 已占，补跑会打乱「该 Slot 只跑一次」；RunOnce 另议）
 
 Worker reboot（`life_time`）与崩溃不同：reboot 会等协程跑完，正常情况下 Job 能自然收尾。真正需要 re-attach 的是 kill -9 / OOM / 机器宕机。
@@ -605,7 +605,7 @@ Secret/ConfigMap：只继承 Template 里的 **引用名**，Cron 配置不存 S
 | P0-9 | Create 前落 Job 名；`task_item` 写 Job/Pod 元数据；message 写日志摘要 | `KubernetesExecutionHook::onJobPlanned`、`ExecutionService::mergeTaskItemMeta` |
 | P0-10 | Namespace 白名单 + 最小 RBAC | `ExecutorOptions::isNamespaceAllowed`、`deploy/kubernetes/schedule-job-agent-rbac.yaml` |
 | P0-11 | K8s 任务强制 `timeout>0` + Executor 等待硬上限 | `CronTaskPayloadBuilder`（写入时拒绝）、`ExecutorOptions::resolveWaitSeconds`（执行时兜底） |
-| P0-12 | Lease 过期按 Job 终态收尾；仍 Active 则删 Job，不补 Create | `KubernetesCrashRecovery`、`ExecutionService::recoverRow` |
+| P0-12 | Lease 过期按 Job 终态收尾；仍 Active 则保留 Job，下一轮再收割 | `KubernetesCrashRecovery`、`ExecutionService::recoverRow` |
 
 回归测试：`PHPUintTest/Unit/Worker/Cron/KubernetesJobSpecTest.php`、
 `KubernetesJobTemplateBuilderTest.php`、`KubernetesExecutorTest.php`、

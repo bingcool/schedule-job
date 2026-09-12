@@ -19,18 +19,23 @@ use Swoolefy\Support\Kubernetes\JobTemplateBuilder;
  * Lease 过期后按集群 Job 真实状态收尾（方案 §11.3）。
  *
  * 不能走 Shell 语义「过期 = WORKER_CRASH」：Job 可能已经 Complete，
- * 也可能还在跑。异节点不得接管监控；本节点在 P0 同步模型下也无法把
- * 已死协程续上，因此仍 Active 的 Job 只能删除，避免孤儿，且**不补 Create**。
+ * 也可能还在跑。仍 Active 时不删 Job、不改执行记录（{@see self::KEY_DEFER}），
+ * 等下一轮扫到终态再落库。Admin 已取消的除外：Active 仍要 DELETE。
+ * 不补 Create。
  */
 final class KubernetesCrashRecovery
 {
+    /** resolve() 返回此键为 true 时：Job 仍在跑，本轮不收尾。 */
+    public const KEY_DEFER = 'defer';
+
     public function __construct(private readonly ?ClientInterface $client = null)
     {
     }
 
     /**
      * @param array<string, mixed> $row cron_task_log 行
-     * @return array{status:int,failure_reason:string,message:string}|null null=不是 K8s 执行或无法访问集群，走默认 Recovery
+     * @return array{status:int,failure_reason:string,message:string,defer?:bool}|null
+     *         null=不是 K8s 执行或无法访问集群，走默认 Recovery
      */
     public function resolve(array $row): ?array
     {
@@ -97,17 +102,26 @@ final class KubernetesCrashRecovery
             );
         }
 
-        try {
-            $client->deleteJob($namespace, $jobName);
-        } catch (\Throwable) {
+        if ($from === ExecutionStatus::CANCEL_REQUESTED) {
+            try {
+                $client->deleteJob($namespace, $jobName);
+            } catch (\Throwable) {
+            }
+
+            return $this->decision(
+                $from,
+                ExecutionStatus::CANCELLED,
+                FailureReason::CANCELLED,
+                sprintf('取消请求已生效，已删除仍在运行的 Kubernetes Job %s/%s', $namespace, $jobName),
+            );
         }
 
-        return $this->decision(
-            $from,
-            ExecutionStatus::FAILED,
-            FailureReason::WORKER_CRASH,
-            sprintf('Lease 过期时 Job %s/%s 仍在运行，已删除以避免孤儿，不续监控、不补创建', $namespace, $jobName),
-        );
+        return [
+            'status' => ExecutionStatus::RUNNING,
+            'failure_reason' => '',
+            'message' => sprintf('Lease 过期时 Job %s/%s 仍在运行，保留 Job 与执行记录，下一轮再收割', $namespace, $jobName),
+            self::KEY_DEFER => true,
+        ];
     }
 
     /**

@@ -198,7 +198,13 @@ class ExecutionService
             if ($this->leaseValid($row)) {
                 return 'defer';
             }
-            $this->recoverRow($row, FailureReason::WORKER_CRASH);
+            if ($this->recoverRow($row, FailureReason::WORKER_CRASH)) {
+                return 'execute';
+            }
+            $fresh = $this->findLatestByRequestId($requestId);
+            if ($fresh !== null && (int) ($fresh['status'] ?? 0) === ExecutionStatus::RUNNING) {
+                return 'defer';
+            }
 
             return 'execute';
         }
@@ -354,6 +360,8 @@ class ExecutionService
     }
 
     /**
+     * 收尾一条过期租约。返回 false 表示本轮不改记录（K8s Job 仍在跑，或 CAS 失败）。
+     *
      * @param array<string, mixed> $row
      */
     private function recoverRow(array $row, string $reason): bool
@@ -367,6 +375,9 @@ class ExecutionService
             $k8s = (new KubernetesCrashRecovery())->resolve($row);
         } catch (\Throwable) {
             $k8s = null;
+        }
+        if (is_array($k8s) && !empty($k8s[KubernetesCrashRecovery::KEY_DEFER])) {
+            return false;
         }
         if ($k8s !== null) {
             $to = (int) $k8s['status'];
