@@ -21,6 +21,7 @@ use Swoolefy\Worker\Cron\ExecutionStatus;
  *
  * **关键字段语义**：
  * - cronId：关联的 cron_task 主键
+ * - execType：1=shell，2=http，3=kubernetes（来自关联任务，任务已删时回落 taskItem）
  * - execBatchId：同一次调度触发的批次号
  * - taskItem：执行时的任务元数据快照（JSON 列）
  * - message：人类可读运行信息，禁止用于统计
@@ -51,6 +52,9 @@ class CronTaskLogRowDto extends AbstractDto
 
     #[ApiProperty(description: '触发类型：1-scheduler 2-run_once')]
     protected int $triggerType = 0;
+
+    #[ApiProperty(description: '执行类型：1=shell, 2=http, 3=kubernetes')]
+    protected int $execType = 0;
 
     #[ApiProperty(description: '手动执行请求 ID')]
     protected ?int $requestId = null;
@@ -130,6 +134,7 @@ class CronTaskLogRowDto extends AbstractDto
         $dto->setStatus($status);
         $dto->setStatusName(ExecutionStatus::name($status));
         $dto->setTriggerType((int)($row['trigger_type'] ?? 0));
+        $dto->setExecType(self::resolveExecType($row));
         $rid = $row['request_id'] ?? null;
         $dto->requestId = $rid !== null && $rid !== '' ? (int) $rid : null;
         $dto->nodeId = (int) ($row['node_id'] ?? 0);
@@ -166,6 +171,25 @@ class CronTaskLogRowDto extends AbstractDto
         }
 
         return null;
+    }
+
+    /**
+     * 优先用关联任务的 exec_type；任务已删时回落到执行快照。
+     *
+     * @param array<string, mixed> $row
+     */
+    private static function resolveExecType(array $row): int
+    {
+        $execType = (int) ($row['exec_type'] ?? $row['execType'] ?? 0);
+        if ($execType > 0) {
+            return $execType;
+        }
+        $item = self::normalizeTaskItem(self::pick($row, 'task_item', 'taskItem'));
+        if ($item === null) {
+            return 0;
+        }
+
+        return (int) ($item['exec_type'] ?? $item['execType'] ?? 0);
     }
 
     /**
@@ -291,6 +315,18 @@ class CronTaskLogRowDto extends AbstractDto
     public function setTriggerType(int $triggerType): static
     {
         $this->triggerType = $triggerType;
+
+        return $this;
+    }
+
+    public function getExecType(): int
+    {
+        return $this->execType;
+    }
+
+    public function setExecType(int $execType): static
+    {
+        $this->execType = $execType;
 
         return $this;
     }

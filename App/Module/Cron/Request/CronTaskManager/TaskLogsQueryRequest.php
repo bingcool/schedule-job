@@ -25,7 +25,7 @@ class TaskLogsQueryRequest extends BasePageRequest
     #[ApiProperty(description: '结果状态：register/running/success/failed/skipped/timeout/cancelled/unregister（兼容 pending）')]
     protected ?string $status = null;
 
-    #[ApiProperty(description: '执行类型：1=shell, 2=http')]
+    #[ApiProperty(description: '执行类型：1=shell, 2=http, 3=kubernetes')]
     #[ValidationRule(rule: 'nullable|int', message: 'execType 必须是整数')]
     #[StringToInt]
     protected ?int $execType = null;

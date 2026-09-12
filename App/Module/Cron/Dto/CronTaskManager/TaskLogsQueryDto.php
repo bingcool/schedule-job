@@ -39,7 +39,7 @@ class TaskLogsQueryDto extends AbstractDto
     #[ApiProperty(description: '结果状态：register/running/success/failed/skipped/timeout/cancelled/cancel_requested/unregister（兼容 pending），空表示不过滤')]
     protected ?string $status = null;
 
-    #[ApiProperty(description: '执行类型：1=shell, 2=http；null 表示不过滤')]
+    #[ApiProperty(description: '执行类型：1=shell, 2=http, 3=kubernetes；null 表示不过滤')]
     protected ?int $execType = null;
 
     #[ApiProperty(description: '触发类型：1=定时, 2=手动执行；null 表示不过滤')]
@@ -139,7 +139,7 @@ class TaskLogsQueryDto extends AbstractDto
 
     public function setExecType(?int $execType): static
     {
-        $this->execType = in_array($execType, [1, 2], true) ? $execType : null;
+        $this->execType = in_array($execType, CronTaskPayloadDto::EXEC_TYPES, true) ? $execType : null;
 
         return $this;
     }

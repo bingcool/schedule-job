@@ -112,6 +112,13 @@
         if (triggerType === 2) return '手动执行';
         return '未知';
       },
+      execTypeText: function (row) {
+        var execType = Number(row && row.execType);
+        if (execType === 2) return 'HTTP';
+        if (execType === 3) return 'Kubernetes';
+        if (execType === 1) return 'GLUE模式';
+        return '-';
+      },
       validateTimeRange: function () {
         var range = this.query.executionTimeRange;
         if (!Array.isArray(range) || range.length === 0) {

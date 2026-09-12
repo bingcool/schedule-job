@@ -634,11 +634,13 @@ class CronTaskManagerService
         }
         $total = $qb->clone()->count();
         $list = $qb->order('id', 'desc')->limit($query->getOffset(), $query->getPageSize())->select()->toArray();
-        $taskNameMap = $this->mapTaskNamesByCronIds($this->collectCronIds($list));
+        $taskMetaMap = $this->mapTaskMetaByCronIds($this->collectCronIds($list));
 
         $pageResult = new TaskLogsPageResult();
         foreach ($list as $row) {
-            $row['task_name'] = (string) ($taskNameMap[(int) ($row['cron_id'] ?? 0)] ?? '');
+            $meta = $taskMetaMap[(int) ($row['cron_id'] ?? 0)] ?? [];
+            $row['task_name'] = (string) ($meta['task_name'] ?? '');
+            $row['exec_type'] = (int) ($meta['exec_type'] ?? 0);
             $pageResult->addListItem(CronTaskLogRowDto::fromEntityRow($row));
         }
         $pageResult->setTotal($total);
@@ -1182,9 +1184,12 @@ class CronTaskManagerService
         $this->assertTaskVisible((int) ($attrs['cron_id'] ?? 0));
         $cronId = (int) ($attrs['cron_id'] ?? 0);
         if ($cronId > 0) {
-            $names = $this->mapTaskNamesByCronIds([$cronId]);
+            $meta = $this->mapTaskMetaByCronIds([$cronId]);
             if (trim((string) ($attrs['task_name'] ?? '')) === '') {
-                $attrs['task_name'] = (string) ($names[$cronId] ?? '');
+                $attrs['task_name'] = (string) ($meta[$cronId]['task_name'] ?? '');
+            }
+            if ((int) ($attrs['exec_type'] ?? 0) <= 0) {
+                $attrs['exec_type'] = (int) ($meta[$cronId]['exec_type'] ?? 0);
             }
         }
 
@@ -2550,16 +2555,16 @@ class CronTaskManagerService
 
     /**
      * @param list<int> $cronIds
-     * @return array<int, string> key=cron_id value=cron_name
+     * @return array<int, array{task_name:string,exec_type:int}>
      */
-    private function mapTaskNamesByCronIds(array $cronIds): array
+    private function mapTaskMetaByCronIds(array $cronIds): array
     {
         if ($cronIds === []) {
             return [];
         }
         $rows = CronTaskEntity::queryNotDeleted()
             ->whereIn('id', $cronIds)
-            ->field(['id', 'cron_name'])
+            ->field(['id', 'cron_name', 'exec_type'])
             ->select()
             ->toArray();
         $map = [];
@@ -2568,7 +2573,10 @@ class CronTaskManagerService
             if ($id <= 0) {
                 continue;
             }
-            $map[$id] = (string) ($row['cron_name'] ?? '');
+            $map[$id] = [
+                'task_name' => (string) ($row['cron_name'] ?? ''),
+                'exec_type' => (int) ($row['exec_type'] ?? 0),
+            ];
         }
 
         return $map;

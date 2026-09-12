@@ -31,6 +31,9 @@ class ExecutionDetailDto extends AbstractDto
     #[ApiProperty(description: '触发类型：1-scheduler 2-run_once')]
     protected int $triggerType = 0;
 
+    #[ApiProperty(description: '执行类型：1=shell, 2=http, 3=kubernetes')]
+    protected int $execType = 0;
+
     #[ApiProperty(description: '手动执行请求 ID')]
     protected ?int $requestId = null;
 
@@ -132,6 +135,7 @@ class ExecutionDetailDto extends AbstractDto
         $dto->taskItem = self::normalizeTaskItem(self::pick($row, 'task_item', 'taskItem'));
         $dto->command = self::commandFromTaskItem($dto->taskItem);
         $dto->taskName = self::taskNameFromRow($row, $dto->taskItem);
+        $dto->execType = self::execTypeFromRow($row, $dto->taskItem);
 
         return $dto;
     }
@@ -171,6 +175,20 @@ class ExecutionDetailDto extends AbstractDto
         }
 
         return '';
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $item
+     */
+    private static function execTypeFromRow(array $row, array $item): int
+    {
+        $execType = (int) (self::pick($row, 'exec_type', 'execType') ?? 0);
+        if ($execType > 0) {
+            return $execType;
+        }
+
+        return (int) ($item['exec_type'] ?? $item['execType'] ?? 0);
     }
 
     /**

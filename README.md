@@ -23,17 +23,17 @@ Schedule Job 由两个独立部署、协同工作的子系统组成：**schedule
 
 ### cron agent（节点执行端）
 
-Cron Agent 部署在**实际需要跑定时脚本的机器**上，负责本机拉取任务并执行 Shell/HTTP 调度。
+Cron Agent 部署在**实际需要跑定时任务的机器**上，负责本机拉取任务并执行 Shell / HTTP / Kubernetes 调度。
 
 | 项目 | 说明 |
 |------|------|
-| **职责** | 按 `CRON_NODE_ID` 拉取绑定任务、fork 执行脚本或发起 HTTP 请求、上报心跳与执行日志 |
+| **职责** | 按 `CRON_NODE_ID` 拉取绑定任务：本机 fork 脚本、发起 HTTP，或向 Kubernetes 提交一次性 Job；上报心跳与执行日志 |
 | **部署位置** | 每台执行机各部署 1 套；多台机器 = 多个 Agent 节点 |
 | **启动命令** | `php cron.php start App` |
 | **必需 `.env` 配置** | `CRON_NODE_ID`、`CRON_NODE_API_KEY`、以及与管理端相同的 **DB 连接**（`DB_HOST_*` 等） |
 | **可选配置** | `CRON_POLL_INTERVAL`（拉取间隔）、`CRON_HEARTBEAT_INTERVAL`（节点心跳）、`EXECUTION_LEASE_*`（执行租约，见下表） |
 
-**Agent 机器还需部署目标业务代码。** 管理台里任务的 `command` / `exec_script` 指向本机路径（如 `/home/wwwroot/your-project/script.sh`），Agent 只负责按 Cron 表达式触发执行，**不会**把代码分发到节点；脚本依赖的运行时（PHP、Python、Shell 等）也需在 Agent 机器上预先安装。
+**Shell 任务还需要在 Agent 机器部署目标业务代码。** 管理台里任务的 `command` / `exec_script` 指向本机路径（如 `/home/wwwroot/your-project/script.sh`），Agent 只负责按 Cron 表达式触发执行，**不会**把代码分发到节点；脚本依赖的运行时（PHP、Python、Shell 等）也需在 Agent 机器上预先安装。Kubernetes 任务则跑在集群 Pod 里，Agent 机器本身不必放业务代码，但必须能访问 Kubernetes API。
 
 ### 二者如何协作
 
@@ -43,7 +43,7 @@ Cron Agent 部署在**实际需要跑定时脚本的机器**上，负责本机�
      │  创建/编辑任务 ──────────────► │ ◄──── 轮询拉取本节点任务 ─────── │
      │  查看日志 / Dashboard ◄─────── │ ────► 写入执行日志 / 心跳 ────── │
      │                                │                                │
-     │                                │         在本机 fork 执行脚本      │
+     │                                │         本机 fork / HTTP / 提交 K8s Job │
 ```
 
 1. 在管理端 **Cron Nodes** 创建节点，获得 `node_id` 与 `api_key`（`api_key` 仅展示一次）。
@@ -69,6 +69,7 @@ Cron Agent 部署在**实际需要跑定时脚本的机器**上，负责本机�
 - [Web 管理台](#web-管理台)
 - [界面截图](#界面截图)
 - [Agent 节点部署](#agent-节点部署)
+- [Kubernetes 任务部署](#kubernetes-任务部署)
 - [权限与数据范围](#权限与数据范围)
 - [API 概览](#api-概览)
 - [数据库表说明](#数据库表说明)
@@ -85,6 +86,7 @@ Cron Agent 部署在**实际需要跑定时脚本的机器**上，负责本机�
 
 - **Shell / Fork 任务**（`exec_type = 1`）：在 Agent 节点上 fork 子进程执行脚本或命令
 - **HTTP 任务**（`exec_type = 2`）：按 Cron 表达式定时发起 HTTP 请求
+- **Kubernetes 任务**（`exec_type = 3`）：绑定到具备集群凭证的 Agent，到点后按 Deployment 模板派生一次性 Job（**不使用** Kubernetes CronJob）
 - 支持 Cron 表达式、允许/跳过时间段（`cron_between` / `cron_skip`）
 - 支持阻塞重叠执行（`with_block_lapping`）、失败重试（`retry`）
 - 支持**手动执行一次**（Run Once），跨进程入队后由 Worker 消费
@@ -137,10 +139,14 @@ flowchart TB
     subgraph AgentNode["cron agent · 执行机 A<br/>cron.php · Worker :9506"]
         Fork["CronForkProcess<br/>Shell 任务"]
         URL["CronUrlProcess<br/>HTTP 任务"]
+        K8s["CronK8sProcess<br/>Kubernetes Job"]
         Script["本机目标项目<br/>script.sh / php …"]
+        Cluster["Kubernetes API<br/>一次性 Job"]
         Fork --> Script
         Fork --> DB
         URL --> DB
+        K8s --> Cluster
+        K8s --> DB
     end
 
     Admin -.->|"任务配置写入 DB"| DB
@@ -150,7 +156,7 @@ flowchart TB
 | 子系统 | 入口 | 启动命令 | 默认端口 | 职责 |
 |--------|------|----------|----------|------|
 | **schedule-job-admin-manager** | `cli.php` | `php cli.php start App` | `9502` | Web UI、管理 API、JWT 鉴权、日志清理 |
-| **cron agent** | `cron.php` | `php cron.php start App` | `9506` | 拉取本节点任务、本机执行脚本/HTTP、心跳上报 |
+| **cron agent** | `cron.php` | `php cron.php start App` | `9506` | 拉取本节点任务、本机执行脚本/HTTP 或提交 K8s Job、心跳上报 |
 
 > 端口在各自入口文件的 `APP_META_ARR` 中配置，可按环境修改。应用名 `App` 需与 `cli.php` / `cron.php` 中定义一致（区分大小写）。
 
@@ -301,6 +307,8 @@ php cron.php start App
 | `CRON_DEBUG` | Cron 调试开关 |
 | `CRON_TASK_LOG_DELETE_DAY` | 执行日志保留天数，默认 `7`；≤0 表示不自动清理 |
 
+Kubernetes Agent 环境变量见 [Kubernetes 任务部署](#kubernetes-任务部署)。Admin（`cli.php`）不读这些变量。
+
 #### Execution Lease（Agent）
 
 续租间隔不单独配置，由代码计算：`(EXECUTION_LEASE_DURATION / 2) - 5`。
@@ -362,6 +370,7 @@ Agent Worker 进程配置位于：
 - `App/WorkerCron/worker_cron_conf.php` — 总入口
 - `App/WorkerCron/conf/schedule_fork_conf.php` — Shell 任务
 - `App/WorkerCron/conf/schedule_url_conf.php` — HTTP 任务
+- `App/WorkerCron/conf/schedule_k8s_conf.php` — Kubernetes 任务（`schedule-k8s-task-cron`，`worker_num=1`）
 
 ### 健康检查
 
@@ -408,7 +417,7 @@ HTTP 服务默认暴露（可在 `App/Config/health.php` 调整）：
 
 ### 创建 / 编辑任务
 
-配置 Cron 表达式、执行方式（Shell / HTTP）、节点、重试与阻塞策略等。
+配置 Cron 表达式、执行方式（Shell / HTTP / Kubernetes）、节点、重试与阻塞策略等。
 
 ![编辑计划任务](docs/images/edittask.png)
 
@@ -497,6 +506,8 @@ php cron.php start App          # 前台
 php cron.php start App --daemon=1   # 守护进程
 ```
 
+Kubernetes 任务（`exec_type=3`）必须绑到**具备集群凭证**的 Agent，步骤见下一节。
+
 ### 任务拉取方式
 
 Worker 通过 `CronTaskService::fetchCronTask()` 从 DB 拉取本节点、未软删的任务（含禁用任务，由 Runtime Diff 处理启停）。也可通过 HTTP 调试：
@@ -509,7 +520,145 @@ curl 'http://127.0.0.1:9502/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&exec
 |------|------|
 | `nodeId` | 节点 ID |
 | `apiKey` | 节点密钥 |
-| `execType` | 可选：`1`=Shell，`2`=HTTP；省略则返回两类 |
+| `execType` | 可选：`1`=Shell，`2`=HTTP，`3`=Kubernetes；省略则返回三类 |
+
+---
+
+## Kubernetes 任务部署
+
+schedule-job 继续负责**何时执行**；Kubernetes 负责这次 Execution 的**一次性 Pod**。不使用 Kubernetes CronJob，也不走 `kubectl`。
+
+```text
+Admin（cli.php :9502）     只做 CRUD / UI / 入队 RunOnce / Cancel
+        │
+        ▼ 写 cron_task（含 node_id、k8s_spec）
+      MySQL
+        ▲
+        │ 按 CRON_NODE_ID + exec_type=3 拉取
+Agent（cron.php :9506）    CronManager：时间窗 → 重叠保护 → Slot 抢占 → RUNNING
+        │
+        ▼ 只有抢到该调度点的那一台 Agent
+GET Deployment.spec.template（执行当下，不缓存镜像）
+        │
+        ▼ 消毒模板（去掉 probe / sidecar 注入 / hostPort / Service selector）
+Create Job  sj-{execBatchId}-a{attempt}
+        │
+        ▼ 协程同步等到 Complete / Failed / 超时 / 取消
+写回 cron_task_log
+```
+
+和 GLUE / HTTP 一样：任务绑一个 `node_id`，多套 Agent 各自只拉自己的节点。同一调度点靠 `cron_scheduled_task_record` 的 `UNIQUE(cron_id, scheduled_at)` 去重，**只有一个赢家会 Create Job**。Admin 多副本不影响执行。
+
+设计细节见 [`docs/schedule-job-k8s-deployment.md`](docs/schedule-job-k8s-deployment.md)。
+
+### 1. 数据库
+
+新库直接执行 `migrations/cron.sql`（已含 `exec_type=3` 与 `k8s_spec`）。已有库补跑：
+
+```bash
+mysql -h <host> -u <user> -p <database> < migrations/upgrade_kubernetes_exec_type.sql
+```
+
+### 2. 准备 K8s Agent 节点
+
+生产建议单独建一个「K8s Agent」节点，所有 `exec_type=3` 任务绑这个 `node_id`。该 Agent 必须能访问 Kubernetes API。
+
+**集群内跑 Agent**（推荐）：把 Agent 部署进集群，凭证自动读 `KUBERNETES_SERVICE_HOST/PORT` 与 ServiceAccount。按目标 Namespace 改 `deploy/kubernetes/schedule-job-agent-rbac.yaml` 后应用：
+
+```bash
+kubectl apply -f deploy/kubernetes/schedule-job-agent-rbac.yaml
+```
+
+权限是按 Namespace 的 Role，不是 ClusterRole：
+
+| 资源 | 动词 | 用途 |
+|------|------|------|
+| `deployments` | `get` | 读取 `spec.template`，**不改** Deployment |
+| `jobs` | `create/get/list/watch/delete` | 提交、等待、超时/取消时删除 |
+| `pods` / `pods/log` | `get/list/watch` | 定位 Pod、写日志摘要 |
+
+目标 Namespace 有几个就复制几份 Role，并与 `K8S_ALLOWED_NAMESPACES` 对齐。不给 `secrets`、不给 Deployment 的 update/patch。
+
+**集群外跑 Agent**：在 `.env` 配 API Server 与 token。
+
+```env
+# 集群外必填。Docker Desktop 只监听 127.0.0.1:6443，不要填局域网 IP
+K8S_API_SERVER=https://127.0.0.1:6443
+K8S_TOKEN=<kubectl create token schedule-job-agent -n <ns> --duration=8760h>
+# K8S_CA_CERT_FILE=/path/to/ca.crt
+K8S_VERIFY_TLS=0
+K8S_ALLOWED_NAMESPACES=production
+```
+
+`K8S_VERIFY_TLS=0` 只用于本机调试。生产必须校验证书，并填写 `K8S_ALLOWED_NAMESPACES`（为空时写错的 namespace 也能建 Pod）。
+
+### 3. Agent 环境变量
+
+Admin 不读这些变量。集群内跑 Agent 时，凭证相关项可全部留空。
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `K8S_API_SERVER` + `K8S_TOKEN` | — | 集群外访问 API Server |
+| `K8S_CA_CERT_FILE` | — | API Server CA；集群内不设则用 ServiceAccount 的 `ca.crt` |
+| `K8S_VERIFY_TLS` | `1` | `0` 仅本机调试 |
+| `K8S_ALLOWED_NAMESPACES` | 空（不限制） | **生产必填**，逗号分隔；任务的 `k8s_spec.namespace` 必须在名单内 |
+| `K8S_MAX_WAIT_SECONDS` | `3600` | 单个 Job 等待硬上限。实际等待 = `min(任务 Job 超时, 该值)` |
+| `K8S_POLL_INTERVAL` | `3` | 轮询 Job 状态间隔（秒） |
+| `K8S_JOB_TTL_SECONDS` | `120` | Job 结束后由 K8s 回收的 TTL |
+| `K8S_DEADLINE_PADDING` | `100` | `activeDeadlineSeconds = 等待秒数 + 该值`，让 schedule-job 先判超时 |
+| `K8S_LOG_TAIL_LINES` | `50` | 写入执行记录的 Pod 日志尾部行数；完整日志留在集群 |
+| `K8S_REQUIRE_TIMEOUT` | `1` | `1` 时拒绝 `timeout=0` 的 K8s 任务 |
+| `K8S_API_TIMEOUT` | `15` | 单次 Kubernetes HTTP 调用超时 |
+| `CRON_K8S_WORKER_LIFE_TIME` | `86400` | K8s Worker 进程寿命（秒）；到期 reboot 会等在跑的协程结束 |
+| `CRON_K8S_MAX_CONCURRENCY` | `1000` | 本节点同时等待中的 Job 数上限（≈ 占用协程数） |
+
+完整注释见 `App/.env.example`。
+
+### 4. 在管理台创建任务
+
+1. **Cron Nodes** 建好 K8s Agent 节点，Agent `.env` 写入对应 `CRON_NODE_ID` / `CRON_NODE_API_KEY`。
+2. 启动 Agent：`php cron.php start App`。`schedule-k8s-task-cron` 会和 fork / url Worker 一起拉起。
+3. **计划任务** 里新建任务，执行类型选 **Kubernetes**，节点必须指向第 1 步那台 Agent。绑错节点会「保存成功但永远不执行」。
+4. 填写 `k8s_spec`：
+
+| 字段 | 说明 |
+|------|------|
+| `namespace` | 目标 Namespace，必须在 `K8S_ALLOWED_NAMESPACES` 内 |
+| `deployment` | 用作模板的 Deployment 名 |
+| `container` | `spec.template.spec.containers[].name`，多容器时必填 |
+| `command` / `args` | argv 数组，覆盖目标容器；**禁止**写成带空格的一行或 `sh -c "..."` |
+
+镜像、环境变量、卷**不保存在任务里**。到点即时 GET Deployment 模板再派生 Job，发布系统只更新 Deployment 即可。
+
+5. **Job 超时（秒）必填**。Agent 用一个协程等 Job 结束，没有上限会一直占着。到期会删除该 Job（连带 Pod）并记为 TIMEOUT。需要按自身业务评估这个时间，长时间任务必须设够大。
+6. 先用较小超时点「立即执行」验证：执行记录的 `task_item` 里应出现 `k8s_job_name` / `k8s_pod_name`，再放开 Cron 表达式。
+
+`command` 列对 type 3 只是展示摘要，不是执行来源。
+
+### 5. 行为约定
+
+- Job 名：`sj-{execBatchId}-a{attempt}`；`backoffLimit: 0`，业务重试由 schedule-job 自己做（最多再试一次）。
+- Job **不复制** Deployment 的 Service selector（避免把流量打到 Cron Pod），并剥离 probe / lifecycle / Istio 注入 / hostPort。
+- 取消：Admin 只 CAS `CANCEL_REQUESTED`，Agent 先 DELETE Job 再收尾。
+- Agent 崩溃且 Job 还在跑：不删 Job、不改执行记录，下一轮扫到 Complete/Failed 再落库；Agent 再也没起来则跑到 `activeDeadlineSeconds` 后由 K8s 停掉。
+- 完整 Pod 日志留在集群；`cron_task_log.message` 只写尾部摘要。
+
+### 6. 本机 Docker Desktop 联调
+
+```bash
+kubectl apply -f deploy/kubernetes/local/docker-desktop.yaml
+kubectl -n swoolefy get pods,svc,sa
+kubectl create token schedule-job-agent -n swoolefy --duration=8760h
+```
+
+清单使用 Namespace `swoolefy`（不要用 `kube-public`），本机镜像 `swoolefy-php85-swoole62:v1`（`imagePullPolicy: Never`）。Agent `.env` 示例：
+
+```env
+K8S_API_SERVER=https://127.0.0.1:6443
+K8S_VERIFY_TLS=0
+K8S_ALLOWED_NAMESPACES=swoolefy
+K8S_TOKEN=<上一步 token>
+```
 
 ---
 
@@ -610,12 +759,14 @@ curl 'http://127.0.0.1:9502/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&exec
 |------|------|
 | `name` | 任务名称（唯一） |
 | `expression` | Cron 表达式 |
-| `command` | Shell 命令或 HTTP URL |
-| `exec_type` | `1`=Shell，`2`=HTTP |
-| `node_id` | 绑定 Agent 节点 |
+| `command` | Shell 命令、HTTP URL，或 type 3 的展示摘要（不是执行来源） |
+| `exec_type` | `1`=Shell，`2`=HTTP，`3`=Kubernetes |
+| `k8s_spec` | type 3：`namespace` / `deployment` / `container` / `command[]` / `args[]`；不存 image |
+| `node_id` | 绑定 Agent 节点（type 3 必须是具备集群凭证的那台） |
 | `status` | `0` 禁用，`1` 启用 |
 | `with_block_lapping` | `1` 时阻塞重叠执行 |
-| `retry` | 失败后额外重试次数 |
+| `retry` | 失败后额外重试次数（K8s 硬上限：最多再试一次） |
+| `timeout` | type 3 必填且 `>0`，按业务评估；长任务要设够大 |
 | `http_method` / `http_body` / `http_headers` | HTTP 任务专用 |
 
 更完整的请求示例见 `App/Module/Cron/Controller/CronTaskManagerController.php` 中各方法的 curl 注释。
@@ -633,6 +784,7 @@ curl 'http://127.0.0.1:9502/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&exec
 | `cron_robot_alert_log` | 告警投递记录（每条 Execution 最多一行） |
 | `cron_task_run_request` | 手动执行请求队列 |
 | `cron_task_log` | 执行记录 |
+| `cron_scheduled_task_record` | 调度点抢占（同一 cron_id + 时间点只有一个赢家） |
 | `cron_task_operation_log` | 操作审计 |
 | `staff_user` | 用户 |
 | `staff_roles` | 角色 |
@@ -641,7 +793,7 @@ curl 'http://127.0.0.1:9502/api/v1/agent/tasks?nodeId=1&apiKey=YOUR_API_KEY&exec
 | `staff_user_role` | 用户-角色 |
 | `staff_user_relate_node_group` | 用户-节点组 |
 
-迁移脚本：`migrations/cron.sql`（新库）、`migrations/robot_alert.sql`（已有库升级）。
+迁移脚本：`migrations/cron.sql`（新库）、`migrations/upgrade_kubernetes_exec_type.sql`（已有库补 `exec_type=3` / `k8s_spec`）、`migrations/robot_alert.sql`（已有库升级告警）。
 
 ---
 
@@ -672,6 +824,7 @@ schedule-job/
 │   ├── Event.php               # 应用生命周期钩子
 │   └── .env                    # 环境变量（不提交 Git）
 ├── migrations/                 # SQL 迁移
+├── deploy/kubernetes/          # Agent RBAC 与本机 Docker Desktop 清单
 ├── cli.php                     # HTTP 管理服务入口
 ├── cron.php                    # Cron Worker 入口
 ├── composer.json
@@ -706,6 +859,7 @@ Swoolefy 默认 PID / 控制日志目录：
 - 为 `cron_task_log.created_at` 保留合理天数，避免表过大
 - 使用 `--daemon=1` + 进程监控（systemd / supervisord / K8s）
 - 配置 `/health`、`/ready` 探针
+- 跑 Kubernetes 任务的 Agent：填写 `K8S_ALLOWED_NAMESPACES`，按 Namespace 应用 `deploy/kubernetes/schedule-job-agent-rbac.yaml`，任务绑到该节点
 
 ---
 
@@ -725,6 +879,12 @@ A: 在用户管理中为用户授权对应 **节点组**，且任务所属节点
 
 **Q: 静态资源 404？**  
 A: 新增前端 JS/CSS 需加入 `CronAdminController` 的白名单 `$allowed`。
+
+**Q: Kubernetes 任务保存成功但不执行？**  
+A: 任务 `node_id` 必须指向正在跑、且 `.env` 配了集群凭证的那台 Agent。Agent 按 `node_id + exec_type` 拉任务，绑到普通 Shell 节点永远不会 Create Job。
+
+**Q: Kubernetes 任务到点后集群里没有 Job？**  
+A: 确认 `schedule-k8s-task-cron` 已随 `php cron.php start App` 拉起；`K8S_ALLOWED_NAMESPACES` 包含任务 namespace；Deployment / container 名称与集群一致。执行记录失败原因常见为 `KUBERNETES_DEPLOYMENT_NOT_FOUND`。
 
 ---
 

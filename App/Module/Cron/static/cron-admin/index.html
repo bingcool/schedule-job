@@ -590,6 +590,7 @@
             <div class="help-stack">
               <div class="help">Kubernetes 任务必须填写：Agent 用一个协程等 Job 结束，没有上限就会被永久占用。</div>
               <div class="help">到期后 schedule-job 会删除该 Job（连带删 Pod），并记为 TIMEOUT。</div>
+              <div class="help">需要评估自身业务来设置这个时间，长时间任务需要设置足够大。</div>
             </div>
           </div>
         </section>
@@ -801,6 +802,11 @@
       <el-table class="exec-list-table" :data="items" v-loading="loading" style="width: 100%">
         <el-table-column prop="cronId" label="任务ID" width="80"></el-table-column>
         <el-table-column prop="taskName" label="任务名称" min-width="150"></el-table-column>
+        <el-table-column label="执行类型" width="120">
+          <template slot-scope="s">
+            <el-tag size="mini" :type="s.row.execType===2?'warning':(s.row.execType===3?'success':'primary')">{{ execTypeText(s.row) }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="execBatchId" label="批次" min-width="160"></el-table-column>
         <el-table-column label="触发类型" width="100">
           <template slot-scope="s">{{ triggerTypeText(s.row) }}</template>
@@ -1511,7 +1517,7 @@
 <script defer src="/cron-admin/assets/js/editor.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
-<script defer src="/cron-admin/assets/js/executions.js?v=exec-log-task-name-1"></script>
+<script defer src="/cron-admin/assets/js/executions.js?v=exec-type-col-1"></script>
 <script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-2"></script>
 <script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
