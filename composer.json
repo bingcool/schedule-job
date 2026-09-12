@@ -19,6 +19,7 @@
   ],
   "prefer-stable": true,
   "require": {
+    "php": "^8.4",
     "bingcool/swoolefy": "^6.3.5",
     "bingcool/library": "^6.0.1"
   },

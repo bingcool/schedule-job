@@ -21,9 +21,16 @@
     return 'default';
   }
 
+  function registerTaskStatusSuffix(row) {
+    var taskStatus = row && row.taskStatus;
+    if (taskStatus === 1 || taskStatus === '1') return '（启用）';
+    if (taskStatus === 0 || taskStatus === '0') return '（禁用）';
+    return '';
+  }
+
   function execStatusText(row) {
     var raw = execStatusRaw(row);
-    if (raw === 'register' || raw === 'pending' || raw === '0') return '注册定时任务';
+    if (raw === 'register' || raw === 'pending' || raw === '0') return '注册定时任务' + registerTaskStatusSuffix(row);
     if (raw === 'unregister' || raw === '7') return '解除定时任务';
     var key = normalizeExecStatus(row);
     var map = {

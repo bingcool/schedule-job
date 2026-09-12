@@ -1017,6 +1017,10 @@
   color: #c0c4cc;
 }
 
+.exec-batch-input .el-input__inner::placeholder {
+  color: #c0c4cc;
+}
+
 .execution-range-picker .el-range-separator {
   color: #909399;
   line-height: 28px;

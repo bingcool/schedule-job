@@ -88,6 +88,9 @@ spec:
       containers:
         - name: swoolefy-test
           image: swoolefy-php85-swoole62:v1
+          # Never 只适合本机联调：镜像只在本机 Docker，没有推仓库。
+          # 生产多节点 / 自动扩缩容不要用 Never，应改成仓库镜像 + IfNotPresent（或可变 tag 用 Always），
+          # 并配 imagePullSecrets。schedule-job 创建 Job 时会原样继承 Deployment 的这两项，不在这里改。
           imagePullPolicy: Never
           workingDir: /home/wwwroot/swoolefy
           command: ["php", "cli.php", "start", "Test"]

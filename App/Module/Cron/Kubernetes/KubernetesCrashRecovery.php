@@ -19,13 +19,13 @@ use Swoolefy\Support\Kubernetes\JobTemplateBuilder;
  * Lease 过期后按集群 Job 真实状态收尾（方案 §11.3）。
  *
  * 不能走 Shell 语义「过期 = WORKER_CRASH」：Job 可能已经 Complete，
- * 也可能还在跑。仍 Active 时不删 Job、不改执行记录（{@see self::KEY_DEFER}），
- * 等下一轮扫到终态再落库。Admin 已取消的除外：Active 仍要 DELETE。
+ * 也可能还在跑。仍 Active、或集群 API 暂时不可达时，不删 Job、不改执行记录
+ * （{@see self::KEY_DEFER}），等下一轮再看。Admin 已取消且 Job 仍 Active：DELETE。
  * 不补 Create。
  */
 final class KubernetesCrashRecovery
 {
-    /** resolve() 返回此键为 true 时：Job 仍在跑，本轮不收尾。 */
+    /** resolve() 返回此键为 true 时：本轮不收尾（Job 仍在跑，或集群暂时不可达）。 */
     public const KEY_DEFER = 'defer';
 
     public function __construct(private readonly ?ClientInterface $client = null)
@@ -35,7 +35,7 @@ final class KubernetesCrashRecovery
     /**
      * @param array<string, mixed> $row cron_task_log 行
      * @return array{status:int,failure_reason:string,message:string,defer?:bool}|null
-     *         null=不是 K8s 执行或无法访问集群，走默认 Recovery
+     *         null=不是 K8s 执行，走默认 Recovery
      */
     public function resolve(array $row): ?array
     {
@@ -59,8 +59,11 @@ final class KubernetesCrashRecovery
 
         try {
             $client = $this->client ?? Client::fromEnv();
-        } catch (\Throwable) {
-            return null;
+        } catch (\Throwable $e) {
+            return $this->defer(sprintf(
+                'Lease 过期后无法初始化 Kubernetes 客户端（%s），保留 Job 与执行记录，下一轮再收割',
+                $e->getMessage(),
+            ));
         }
 
         try {
@@ -75,9 +78,19 @@ final class KubernetesCrashRecovery
                 );
             }
 
-            return null;
-        } catch (\Throwable) {
-            return null;
+            return $this->defer(sprintf(
+                'Lease 过期后读取 Job %s/%s 失败（%s），保留 Job 与执行记录，下一轮再收割',
+                $namespace,
+                $jobName,
+                $e->getMessage(),
+            ));
+        } catch (\Throwable $e) {
+            return $this->defer(sprintf(
+                'Lease 过期后读取 Job %s/%s 异常（%s），保留 Job 与执行记录，下一轮再收割',
+                $namespace,
+                $jobName,
+                $e->getMessage(),
+            ));
         }
 
         $outcome = JobStatus::classify($job);
@@ -116,10 +129,22 @@ final class KubernetesCrashRecovery
             );
         }
 
+        return $this->defer(sprintf(
+            'Lease 过期时 Job %s/%s 仍在运行，保留 Job 与执行记录，下一轮再收割',
+            $namespace,
+            $jobName,
+        ));
+    }
+
+    /**
+     * @return array{status:int,failure_reason:string,message:string,defer:bool}
+     */
+    private function defer(string $message): array
+    {
         return [
             'status' => ExecutionStatus::RUNNING,
             'failure_reason' => '',
-            'message' => sprintf('Lease 过期时 Job %s/%s 仍在运行，保留 Job 与执行记录，下一轮再收割', $namespace, $jobName),
+            'message' => $message,
             self::KEY_DEFER => true,
         ];
     }

@@ -56,6 +56,9 @@ class CronTaskLogRowDto extends AbstractDto
     #[ApiProperty(description: '执行类型：1=shell, 2=http, 3=kubernetes')]
     protected int $execType = 0;
 
+    #[ApiProperty(description: '注册/解除当时的任务状态：1=启用，0=禁用；无法判定时为 null')]
+    protected ?int $taskStatus = null;
+
     #[ApiProperty(description: '手动执行请求 ID')]
     protected ?int $requestId = null;
 
@@ -135,6 +138,7 @@ class CronTaskLogRowDto extends AbstractDto
         $dto->setStatusName(ExecutionStatus::name($status));
         $dto->setTriggerType((int)($row['trigger_type'] ?? 0));
         $dto->setExecType(self::resolveExecType($row));
+        $dto->setTaskStatus(self::resolveTaskStatus($row));
         $rid = $row['request_id'] ?? null;
         $dto->requestId = $rid !== null && $rid !== '' ? (int) $rid : null;
         $dto->nodeId = (int) ($row['node_id'] ?? 0);
@@ -190,6 +194,28 @@ class CronTaskLogRowDto extends AbstractDto
         }
 
         return (int) ($item['exec_type'] ?? $item['execType'] ?? 0);
+    }
+
+    /**
+     * 配置变更当时的任务启停。优先读 task_item.status，旧日志回落到 message 文案。
+     *
+     * @param array<string, mixed> $row
+     */
+    private static function resolveTaskStatus(array $row): ?int
+    {
+        $item = self::normalizeTaskItem(self::pick($row, 'task_item', 'taskItem'));
+        if (is_array($item) && array_key_exists('status', $item) && $item['status'] !== '' && $item['status'] !== null) {
+            return (int) $item['status'] === 1 ? 1 : 0;
+        }
+        $message = (string) ($row['message'] ?? '');
+        if (str_contains($message, '【启用】') || str_contains($message, 'ENABLE')) {
+            return 1;
+        }
+        if (str_contains($message, '【禁用】') || str_contains($message, 'DISABLE')) {
+            return 0;
+        }
+
+        return null;
     }
 
     /**
@@ -327,6 +353,18 @@ class CronTaskLogRowDto extends AbstractDto
     public function setExecType(int $execType): static
     {
         $this->execType = $execType;
+
+        return $this;
+    }
+
+    public function getTaskStatus(): ?int
+    {
+        return $this->taskStatus;
+    }
+
+    public function setTaskStatus(?int $taskStatus): static
+    {
+        $this->taskStatus = $taskStatus;
 
         return $this;
     }

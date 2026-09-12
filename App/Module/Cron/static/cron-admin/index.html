@@ -6,7 +6,7 @@
   <title>Schedule Job Admin</title>
   <link rel="stylesheet" href="/cron-admin/assets/vendor/element-ui/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css?v=app-header-4">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=editor-sticky-actions-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-batch-placeholder-1">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=app-header-2">
 </head>
 <body>
@@ -758,7 +758,15 @@
       <el-form :inline="true" size="small" @submit.native.prevent="search">
         <el-form-item label="任务ID"><el-input v-model="query.taskId" clearable placeholder="可选，留空查全部"></el-input></el-form-item>
         <el-form-item label="任务名称"><el-input v-model="query.taskName" clearable placeholder="支持模糊搜索"></el-input></el-form-item>
-        <el-form-item label="批次"><el-input v-model="query.execBatchId" clearable></el-input></el-form-item>
+        <el-form-item label="批次">
+          <el-input
+            class="exec-batch-input"
+            v-model="query.execBatchId"
+            clearable
+            :placeholder="'请输入批次'"
+            style="width:200px">
+          </el-input>
+        </el-form-item>
         <el-form-item label="流水状态">
           <el-select v-model="query.status" clearable style="width:140px" popper-class="exec-status-select-dropdown">
             <el-option value="register" label="注册定时任务"></el-option>
@@ -814,7 +822,7 @@
         <el-table-column label="触发类型" width="100">
           <template slot-scope="s">{{ triggerTypeText(s.row) }}</template>
         </el-table-column>
-        <el-table-column label="流水状态" width="130">
+        <el-table-column label="流水状态" width="180">
           <template slot-scope="s">
             <span class="status-pill" :class="statusClass(s.row)">{{ statusText(s.row) }}</span>
           </template>
@@ -1520,7 +1528,7 @@
 <script defer src="/cron-admin/assets/js/editor.js?v=k8s-command-argv-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=avg-duration-sec-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
-<script defer src="/cron-admin/assets/js/executions.js?v=exec-type-col-1"></script>
+<script defer src="/cron-admin/assets/js/executions.js?v=register-task-status-1"></script>
 <script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-2"></script>
 <script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>

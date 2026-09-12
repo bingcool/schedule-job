@@ -360,7 +360,7 @@ class ExecutionService
     }
 
     /**
-     * 收尾一条过期租约。返回 false 表示本轮不改记录（K8s Job 仍在跑，或 CAS 失败）。
+     * 收尾一条过期租约。返回 false 表示本轮不改记录（K8s Job 仍在跑、集群不可达，或 CAS 失败）。
      *
      * @param array<string, mixed> $row
      */

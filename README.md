@@ -640,7 +640,7 @@ Admin 不读这些变量。集群内跑 Agent 时，凭证相关项可全部留�
 - Job 名：`sj-{execBatchId}-a{attempt}`；`backoffLimit: 0`，业务重试由 schedule-job 自己做（最多再试一次）。
 - Job **不复制** Deployment 的 Service selector（避免把流量打到 Cron Pod），并剥离 probe / lifecycle / Istio 注入 / hostPort。
 - 取消：Admin 只 CAS `CANCEL_REQUESTED`，Agent 先 DELETE Job 再收尾。
-- Agent 崩溃且 Job 还在跑：不删 Job、不改执行记录，下一轮扫到 Complete/Failed 再落库；Agent 再也没起来则跑到 `activeDeadlineSeconds` 后由 K8s 停掉。
+- Agent 崩溃且 Job 还在跑，或集群 API 暂时不可达：不删 Job、不改执行记录，下一轮再收割；Agent 再也没起来则跑到 `activeDeadlineSeconds` 后由 K8s 停掉。
 - 完整 Pod 日志留在集群；`cron_task_log.message` 只写尾部摘要。
 
 ### 6. 本机 Docker Desktop 联调
