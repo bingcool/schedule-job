@@ -325,7 +325,7 @@ public readonly int $plannedAt;
 ```text
 sj-{execBatchId}-a{attempt}
 例：sj-3f9a1c8e2b7d0456-a1        （3 + 16 + 3 = 22 字符，上限 63）
-attempt 从 1 起，与 runWithRetry 的 for 循环一致；retry=2 时为 a1 / a2 / a3
+attempt 从 1 起，与 runWithRetry 的 for 循环一致；retry≥1 时最多 a1 / a2（只再试一次）
 ```
 
 反查：`cron_task_log` 有 `exec_batch_id` 列和 `idx_cron_exec_batch` 索引，Recovery 可由 Execution 行反推 Job 名。
@@ -484,8 +484,8 @@ CronManager.runExecutionPipeline
         │
         ▼
 KubernetesExecutor          implements CronExecutorInterface
-        ├── Swoolefy\Worker\Kubernetes\ClientInterface
-        └── Swoolefy\Worker\Kubernetes\JobTemplateBuilder
+        ├── Swoolefy\Support\Kubernetes\ClientInterface
+        └── Swoolefy\Support\Kubernetes\JobTemplateBuilder
 ```
 
 不要：
@@ -596,8 +596,8 @@ Secret/ConfigMap：只继承 Template 里的 **引用名**，Cron 配置不存 S
 |---|---|---|
 | P0-1 | `exec_type=3` + `k8s_spec` JSON + PayloadBuilder / fetchCronTask | `migrations/upgrade_kubernetes_exec_type.sql`、`CronTaskPayloadBuilder`、`CronTaskService::fetchK8sCronTask` |
 | P0-2 | Worker `schedule-k8s-task-cron`（`worker_num=1`，独立 life_time / 协程上限） | `App/WorkerCron/conf/schedule_k8s_conf.php`、`ScheduleK8sCronProcess` |
-| P0-3 | `KubernetesExecutor` + Kubernetes HTTP Client（禁止 kubectl） | `Swoolefy\Worker\Cron\KubernetesExecutor` / `Swoolefy\Worker\Kubernetes\Client` |
-| P0-4 | Template Deep Copy + 只留目标容器 + §7.1 消毒 | `Swoolefy\Worker\Kubernetes\JobTemplateBuilder` |
+| P0-3 | `KubernetesExecutor` + Kubernetes HTTP Client（禁止 kubectl） | `Swoolefy\Worker\Cron\KubernetesExecutor` / `Swoolefy\Support\Kubernetes\Client` |
+| P0-4 | Template Deep Copy + 只留目标容器 + §7.1 消毒 | `Swoolefy\Support\Kubernetes\JobTemplateBuilder` |
 | P0-5 | command/args 数组覆盖（三态语义） | `KubernetesJobSpec` + `JobTemplateBuilder::applyArgv` |
 | P0-6 | `ExecutionSnapshot::withAttempt()`；Job 名 `sj-{execBatchId}-a{attempt}`；409 幂等 | `ExecutionSnapshot`、`CronManager::runWithRetry`、`KubernetesExecutor::createJobIdempotent` |
 | P0-7 | `backoffLimit=0`；Retry 走 CronManager 同批次 | `JobTemplateBuilder::build` |
@@ -684,7 +684,7 @@ kubectl apply -f deploy/kubernetes/schedule-job-agent-rbac.yaml   # 按目标 Na
 | `K8S_ALLOWED_NAMESPACES` | 空（不限制） | **生产必填**，逗号分隔。为空时任何写错的 namespace 都能塞 Pod |
 | `K8S_MAX_WAIT_SECONDS` | 3600 | Executor 等待单个 Job 的硬上限，夹住 `cron_task.timeout` |
 | `K8S_POLL_INTERVAL` | 3 | 轮询 Job 状态的间隔秒 |
-| `K8S_JOB_TTL_SECONDS` | 3600 | Job 完成后由 K8s 回收的 TTL |
+| `K8S_JOB_TTL_SECONDS` | 120 | Job 完成后由 K8s 回收的 TTL |
 | `K8S_DEADLINE_PADDING` | 100 | `activeDeadlineSeconds = timeout + 该值`，保证 schedule-job 先判超时 |
 | `K8S_LOG_TAIL_LINES` | 50 | 写进 message 的 Pod 日志行数 |
 | `K8S_REQUIRE_TIMEOUT` | 1 | 是否拒绝 `timeout=0` 的 K8s 任务 |
@@ -698,7 +698,7 @@ Worker 规格：
 | `CRON_K8S_MAX_CONCURRENCY` | 50 | ≈ 本节点允许同时在跑的 Job 数 |
 
 ### 22.3 上线顺序
-
+P1
 1. 迁移 DB 与 RBAC。
 2. 在**具备集群凭证**的机器上配好上表环境变量，启动 Agent：`php cron.php start App`。
    `schedule-k8s-task-cron` 会随另外两个 Worker 一起拉起。

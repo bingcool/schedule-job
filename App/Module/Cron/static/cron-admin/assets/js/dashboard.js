@@ -21,6 +21,14 @@
     computed: {
       showNoGroupAssigned: function () {
         return !this.scopeLoading && !common.isViewerSuper() && !this.scopeGroups.length;
+      },
+      todayDate: function () {
+        var d = new Date();
+        var m = String(d.getMonth() + 1);
+        var day = String(d.getDate());
+        if (m.length < 2) m = '0' + m;
+        if (day.length < 2) day = '0' + day;
+        return d.getFullYear() + '-' + m + '-' + day;
       }
     },
     created: function () {

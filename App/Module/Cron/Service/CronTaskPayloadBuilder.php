@@ -142,7 +142,7 @@ class CronTaskPayloadBuilder
             $dto->putWithBlockLapping($withBlockLapping);
         }
         if ($retry !== null) {
-            $dto->putRetry(max(0, $retry));
+            $dto->putRetry(min(1, max(0, $retry)));
         } elseif ($isCreate) {
             $dto->putRetry(0);
         }

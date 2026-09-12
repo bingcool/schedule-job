@@ -179,8 +179,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             $arr = $cronK8sTask->toArray();
             $arr['exec_type'] = CronProcess::EXEC_K8S_TYPE;
             $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
-            $k8sSpec = $item['k8s_spec'] ?? [];
-            $arr['k8s_spec'] = is_array($k8sSpec) ? $k8sSpec : [];
+            $arr['k8s_spec'] = self::normalizeK8sSpec($item['k8s_spec'] ?? []);
             $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
             $arr['run_once_request_ids'] = $pendingIds;
             $arr['run_once_request_id'] = $pendingIds[0] ?? null;
@@ -383,5 +382,23 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             'last_heartbeat_at' => $now,
             'heartbeat_interval' => $interval,
         ]);
+    }
+
+    /**
+     * select()->toArray() 可能把 json 列原样带回字符串 / stdClass，不能直接当空数组丢掉。
+     *
+     * @return array<string, mixed>
+     */
+    private static function normalizeK8sSpec(mixed $k8sSpec): array
+    {
+        if ($k8sSpec instanceof \stdClass) {
+            $k8sSpec = get_object_vars($k8sSpec);
+        }
+        if (is_string($k8sSpec) && $k8sSpec !== '') {
+            $decoded = json_decode($k8sSpec, true);
+            $k8sSpec = is_array($decoded) ? $decoded : [];
+        }
+
+        return is_array($k8sSpec) ? $k8sSpec : [];
     }
 }

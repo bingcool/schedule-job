@@ -1,0 +1,116 @@
+# 这时一个swoolefy的http基于k8s的部署demo。schedule-job调用k8s的job能力执行任务
+
+# Docker Desktop 本机联调：swoolefy Test Deployment + Agent RBAC
+#
+# 不要部署到 kube-public。本清单使用独立 Namespace swoolefy。
+#
+#   kubectl apply -f deploy/kubernetes/local/docker-desktop.yaml
+#   kubectl -n swoolefy get pods,svc,sa
+#   kubectl create token schedule-job-agent -n swoolefy --duration=8760h
+#
+# 运行时用本机镜像 swoolefy-php85-swoole62:v1（PHP 8.5 + Swoole 6.2）。
+# 代码用 hostPath 挂进来：Docker Desktop VM 上的
+#   /host_mnt/Users/macbook/Documents/wwwphp  →  /home/wwwroot
+# 容器工作目录是 /home/wwwroot/swoolefy，启动 php cli.php start Test。
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: swoolefy
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: schedule-job-agent
+  namespace: swoolefy
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: schedule-job-agent
+  namespace: swoolefy
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: schedule-job-agent
+  namespace: swoolefy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: schedule-job-agent
+subjects:
+  - kind: ServiceAccount
+    name: schedule-job-agent
+    namespace: swoolefy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swoolefy-test
+  namespace: swoolefy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: swoolefy-test
+  template:
+    metadata:
+      labels:
+        app: swoolefy-test
+    spec:
+      containers:
+        - name: swoolefy-test
+          image: swoolefy-php85-swoole62:v1
+          imagePullPolicy: Never
+          workingDir: /home/wwwroot/swoolefy
+          command: ["php", "cli.php", "start", "Test"]
+          env:
+            - name: PWD
+              value: /home/wwwroot/swoolefy
+            - name: SKIP_NACOS_FETCH
+              value: "1"
+            - name: PHP_BIN_FILE
+              value: /usr/bin/php
+            - name: DB_HOST_NAME
+              value: host.docker.internal
+            - name: REDIS_HOST
+              value: host.docker.internal
+          ports:
+            - name: http
+              containerPort: 9501
+          volumeMounts:
+            - name: wwwphp
+              mountPath: /home/wwwroot
+      volumes:
+        - name: wwwphp
+          hostPath:
+            path: /host_mnt/Users/macbook/Documents/wwwphp
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swoolefy-test
+  namespace: swoolefy
+spec:
+  type: NodePort
+  selector:
+    app: swoolefy-test
+  ports:
+    - name: http
+      port: 9501
+      targetPort: 9501
+      nodePort: 30501

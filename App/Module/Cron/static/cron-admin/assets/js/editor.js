@@ -311,6 +311,12 @@
             this.$message.warning('请填写 Kubernetes Namespace 与 Deployment');
             return;
           }
+          var fatArgv = this.splitArgv(this.k8sCommandText).concat(this.splitArgv(this.k8sArgsText))
+            .filter(function (item) { return /\s/.test(item); });
+          if (fatArgv.length) {
+            this.$message.warning('Command/Args 每一行只能是一个参数，空格隔开的请拆成多行');
+            return;
+          }
           if (!this.form.timeout || this.form.timeout <= 0) {
             this.$message.warning('Kubernetes 任务必须设置 Job 超时（秒）');
             return;

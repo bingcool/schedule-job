@@ -9,11 +9,11 @@ use App\Module\Cron\FailureReason;
 use Swoolefy\Worker\Cron\CronProcess;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 use Swoolefy\Worker\Cron\KubernetesExecutor;
-use Swoolefy\Worker\Kubernetes\ApiException;
-use Swoolefy\Worker\Kubernetes\Client;
-use Swoolefy\Worker\Kubernetes\ClientInterface;
-use Swoolefy\Worker\Kubernetes\JobStatus;
-use Swoolefy\Worker\Kubernetes\JobTemplateBuilder;
+use Swoolefy\Support\Kubernetes\ApiException;
+use Swoolefy\Support\Kubernetes\Client;
+use Swoolefy\Support\Kubernetes\ClientInterface;
+use Swoolefy\Support\Kubernetes\JobStatus;
+use Swoolefy\Support\Kubernetes\JobTemplateBuilder;
 
 /**
  * Lease 过期后按集群 Job 真实状态收尾（方案 §11.3）。

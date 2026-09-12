@@ -189,7 +189,14 @@ class CronTaskRowDto extends AbstractDto
         $hh = $row['http_headers'] ?? null;
         $dto->setHttpHeaders(self::maskSensitiveHeaders(is_array($hh) ? $hh : null));
         $dto->setHttpRequestTimeOut((int)($row['http_request_time_out'] ?? 30));
-        $ks = $row['k8s_spec'] ?? null;
+        $ks = $row['k8s_spec'] ?? $row['k8sSpec'] ?? null;
+        if ($ks instanceof \stdClass) {
+            $ks = get_object_vars($ks);
+        }
+        if (is_string($ks) && $ks !== '') {
+            $decoded = json_decode($ks, true);
+            $ks = is_array($decoded) ? $decoded : null;
+        }
         $dto->setK8sSpec(is_array($ks) ? $ks : null);
         $dto->setCreatedBy((int) self::pick($row, 'created_by', 'createdBy', 0));
         $dto->setCreatedByName((string) self::pick($row, 'created_by_name', 'createdByName', ''));
@@ -461,7 +468,7 @@ class CronTaskRowDto extends AbstractDto
     /** 设置失败后重试次数 */
     public function setRetry(int $retry): static
     {
-        $this->retry = max(0, $retry);
+        $this->retry = min(1, max(0, $retry));
 
         return $this;
     }

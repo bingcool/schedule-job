@@ -115,8 +115,8 @@
     </div>
     <div class="stat-row">
       <div class="panel stat-card"><div>任务总数</div><h2>{{ overview.tasks.total }}</h2><div class="meta"><span class="status-mark status-enabled">启用 {{ overview.tasks.enabled }}</span> / <span class="status-mark status-disabled">禁用 {{ overview.tasks.disabled }}</span></div></div>
-      <div class="panel stat-card"><div>今日执行</div><h2>{{ overview.executions.today }}</h2><div class="meta"><span class="status-mark status-success">成功 {{ overview.executions.success }}</span> / <span class="status-mark status-failed">失败 {{ overview.executions.failed }}</span> / <span class="status-mark status-timeout">超时 {{ overview.executions.timeout || 0 }}</span></div></div>
-      <div class="panel stat-card"><div>跳过</div><h2>{{ overview.executions.skipped }}</h2><div class="meta"><span class="status-mark status-skipped">今日 SKIP</span></div></div>
+      <div class="panel stat-card"><div>今日执行({{ todayDate }})</div><h2>{{ overview.executions.today }}</h2><div class="meta"><span class="status-mark status-success">成功 {{ overview.executions.success }}</span> / <span class="status-mark status-failed">失败 {{ overview.executions.failed }}</span> / <span class="status-mark status-timeout">超时 {{ overview.executions.timeout || 0 }}</span></div></div>
+      <div class="panel stat-card"><div>今日跳过({{ todayDate }})</div><h2>{{ overview.executions.skipped }}</h2><div class="meta"><span class="status-mark status-skipped">今日 SKIP</span></div></div>
       <div class="panel stat-card"><div>节点</div><h2>{{ overview.nodes.total }}</h2><div class="meta"><span class="status-mark status-online">在线 {{ overview.nodes.online }}</span> / <span class="status-mark status-offline">离线 {{ overview.nodes.offline }}</span></div></div>
     </div>
     <div class="panel">
@@ -477,13 +477,13 @@
               </div>
               <div class="field">
                 <label>Command（每行一个参数）</label>
-                <textarea class="form-textarea mono" v-model="k8sCommandText" placeholder="/app/bin/task"></textarea>
-                <div class="help">留空则沿用镜像 ENTRYPOINT。不要写 <span class="mono">sh -c "..."</span>，参数不过 Shell。</div>
+                <textarea class="form-textarea mono" v-model="k8sCommandText" placeholder="php"></textarea>
+                <div class="help">每行一个参数，不是一行 shell。例如第一行只写 <span class="mono">php</span>。留空则沿用镜像 ENTRYPOINT。</div>
               </div>
               <div class="field">
                 <label>Args（每行一个参数）</label>
-                <textarea class="form-textarea mono" v-model="k8sArgsText" placeholder="reconcile"></textarea>
-                <div class="help">填写后整体替换镜像 CMD，不是追加。</div>
+                <textarea class="form-textarea mono" v-model="k8sArgsText" placeholder="script.php&#10;start&#10;Test&#10;--c=test:script"></textarea>
+                <div class="help">每行一个参数。本机 Test 脚本应写成四行：<span class="mono">script.php</span> / <span class="mono">start</span> / <span class="mono">Test</span> / <span class="mono">--c=test:script</span>。</div>
               </div>
               <div class="field full">
                 <label>执行摘要 command</label>
@@ -573,8 +573,8 @@
           </div>
           <div class="field field-gap-top">
             <label>失败重试</label>
-            <input class="form-control" type="number" min="0" v-model.number="form.retry">
-            <div class="help">不含首次；0=不重试。</div>
+            <input class="form-control" type="number" min="0" max="1" v-model.number="form.retry">
+            <div class="help">不含首次；0=不重试，1=失败后再试一次。</div>
           </div>
           <div class="field field-gap-top" v-if="form.execType===1">
             <label>Shell 超时（秒）</label>
@@ -1506,7 +1506,7 @@
 <script defer src="/cron-admin/assets/vendor/vue-router.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/element-ui/index.js"></script>
 <script defer src="/cron-admin/assets/js/common.js?v=task-manage-auth-1"></script>
-<script defer src="/cron-admin/assets/js/dashboard.js?v=dashboard-scope-1"></script>
+<script defer src="/cron-admin/assets/js/dashboard.js?v=dashboard-today-date-1"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=task-manage-auth-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=task-manage-auth-1"></script>

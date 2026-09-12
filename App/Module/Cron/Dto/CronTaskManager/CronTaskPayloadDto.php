@@ -206,11 +206,11 @@ class CronTaskPayloadDto extends AbstractDto
     /**
      * 标记并设置失败后重试次数（不含首次）。
      *
-     * @param int $retry 0=不重试，N=最多再试 N 次
+     * @param int $retry 0=不重试，1=最多再试 1 次
      */
     public function putRetry(int $retry): static
     {
-        $this->retry = $retry;
+        $this->retry = min(1, max(0, $retry));
         $this->presentFields['retry'] = true;
 
         return $this;

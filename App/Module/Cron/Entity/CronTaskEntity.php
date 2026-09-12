@@ -15,7 +15,7 @@ use App\Model\ClientModel;
  * @property int exec_type 执行类型 1-shell，2-http，3-kubernetes
  * @property int status 状态 0-禁用，1-启用
  * @property int with_block_lapping 是否阻塞执行 0-否，1->是
- * @property int retry 失败后重试次数（不含首次；0=不重试）
+ * @property int retry 失败后重试次数（不含首次；0=不重试，最多 1）
  * @property int timeout Shell执行超时秒数，0=不限制
  * @property string description 描述
  * @property string cron_between json类型-允许执行时间段
