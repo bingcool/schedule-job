@@ -1297,8 +1297,8 @@
       <p>定时任务调度管理平台</p>
     </div>
     <el-form class="auth-form" label-position="top" @submit.native.prevent="submit">
-      <el-form-item label="账号">
-        <el-input v-model="form.account" placeholder="请输入邮箱或账号" prefix-icon="el-icon-user"></el-input>
+      <el-form-item label="账号 / 邮箱">
+        <el-input v-model="form.account" placeholder="账号，或含 @ 的邮箱" prefix-icon="el-icon-user"></el-input>
       </el-form-item>
       <el-form-item label="密码">
         <el-input v-model="form.password" type="password" placeholder="请输入密码" prefix-icon="el-icon-lock" show-password @keyup.enter.native="submit"></el-input>
@@ -1698,7 +1698,7 @@
 <script defer src="/cron-admin/assets/vendor/vue.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/vue-router.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/element-ui/index.js"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=task-manage-auth-1"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=no-menu-login-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js?v=dash-trend-view-1"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=k8s-command-argv-1"></script>
@@ -1708,13 +1708,13 @@
 <script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-2"></script>
 <script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
-<script defer src="/cron-admin/assets/js/login.js?v=login-menu-1"></script>
+<script defer src="/cron-admin/assets/js/login.js?v=login-email-1"></script>
 <script defer src="/cron-admin/assets/js/users.js?v=admin-no-delete-1"></script>
 <script defer src="/cron-admin/assets/js/user-editor.js?v=admin-account-lock-1"></script>
 <script defer src="/cron-admin/assets/js/roles.js?v=pages-dlg-2"></script>
 <script defer src="/cron-admin/assets/js/role-editor.js?v=basic-only-3"></script>
 <script defer src="/cron-admin/assets/vendor/sortable.min.js"></script>
 <script defer src="/cron-admin/assets/js/menus.js?v=menu-sort-1"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=cancel-op-1"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=no-menu-login-1"></script>
 </body>
 </html>

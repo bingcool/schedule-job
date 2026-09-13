@@ -505,7 +505,7 @@ class StaffUserService
     {
         $account = trim($account);
         if ($account !== '' && filter_var($account, FILTER_VALIDATE_EMAIL) !== false) {
-            return $account;
+            return strtolower($account);
         }
 
         return null;
@@ -520,7 +520,7 @@ class StaffUserService
         if ($fromAccount !== null) {
             return $fromAccount;
         }
-        $submittedEmail = trim($submittedEmail);
+        $submittedEmail = strtolower(trim($submittedEmail));
         if ($submittedEmail === '') {
             return null;
         }
@@ -533,21 +533,22 @@ class StaffUserService
 
     private function assertAccountAvailable(string $account, ?string $email, ?int $exceptId): void
     {
-        $existAccount = StaffUserEntity::query()->where('account', $account);
+        $existAccount = StaffUserEntity::queryActive()->where('account', $account);
         if ($exceptId !== null && $exceptId > 0) {
             $existAccount->where('id', '<>', $exceptId);
         }
         if ($existAccount->find()) {
             throw StaffException::throw('账号已存在', -1);
         }
+        $this->assertEmailAvailable($email, $exceptId);
+    }
+
+    private function assertEmailAvailable(?string $email, ?int $exceptId): void
+    {
         if ($email === null || $email === '') {
             return;
         }
-        $existEmail = StaffUserEntity::query()->where('email', $email);
-        if ($exceptId !== null && $exceptId > 0) {
-            $existEmail->where('id', '<>', $exceptId);
-        }
-        if ($existEmail->find()) {
+        if (StaffUserEntity::findIdUsingEmail($email, $exceptId) !== null) {
             throw StaffException::throw('邮箱已被使用', -1);
         }
     }

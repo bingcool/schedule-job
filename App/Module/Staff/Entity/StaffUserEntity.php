@@ -43,7 +43,7 @@ class StaffUserEntity extends ClientModel
 
     public function loadByEmail(string $email): ?static
     {
-        $email = trim($email);
+        $email = strtolower(trim($email));
         if ($email === '') {
             return null;
         }
@@ -52,7 +52,34 @@ class StaffUserEntity extends ClientModel
     }
 
     /**
-     * 登录标识：合法邮箱查 email，否则查 account。
+     * 邮箱是否已被其他用户占用（email 或 account）。
+     */
+    public static function findIdUsingEmail(string $email, ?int $exceptId = null): ?int
+    {
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return null;
+        }
+        $emailQb = static::queryActive()->where('email', $email);
+        $accountQb = static::queryActive()->where('account', $email);
+        if ($exceptId !== null && $exceptId > 0) {
+            $emailQb->where('id', '<>', $exceptId);
+            $accountQb->where('id', '<>', $exceptId);
+        }
+        $row = $emailQb->field(['id'])->find();
+        if ($row) {
+            return (int) ($row['id'] ?? 0) ?: null;
+        }
+        $row = $accountQb->field(['id'])->find();
+        if ($row) {
+            return (int) ($row['id'] ?? 0) ?: null;
+        }
+
+        return null;
+    }
+
+    /**
+     * 登录标识：含 @ 按邮箱查（email，兼容账号本身是该邮箱）；否则按 account 查。
      */
     public function loadByLoginIdentity(string $identity): ?static
     {
@@ -60,8 +87,13 @@ class StaffUserEntity extends ClientModel
         if ($identity === '') {
             return null;
         }
-        if (filter_var($identity, FILTER_VALIDATE_EMAIL) !== false) {
-            return $this->loadByEmail($identity);
+        if (str_contains($identity, '@')) {
+            $user = $this->loadByEmail($identity);
+            if ($user !== null) {
+                return $user;
+            }
+
+            return $this->loadByAccount($identity);
         }
 
         return $this->loadByAccount($identity);

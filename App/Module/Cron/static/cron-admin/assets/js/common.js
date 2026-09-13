@@ -4,7 +4,9 @@
   var API = '/api/v1';
   var TOKEN_KEY = 'schedule_job_token';
   var USER_KEY = 'schedule_job_user';
+  var AUTH_HINT_KEY = 'schedule_job_auth_hint';
   var AUTH_PUBLIC_PATHS = ['/login'];
+  var NO_MENU_ACCESS_HINT = '您无菜单权限，暂无法进入系统，请联系管理员分配角色';
 
   function getToken() {
     return localStorage.getItem(TOKEN_KEY) || '';
@@ -380,6 +382,28 @@
     });
   }
 
+  function hasAccessibleMenus(user) {
+    if (!user) return false;
+    if (user.isSuper) return true;
+    return collectMenuPaths(user.menus || []).length > 0;
+  }
+
+  function rememberAuthHint(message) {
+    try {
+      sessionStorage.setItem(AUTH_HINT_KEY, String(message || ''));
+    } catch (e) {}
+  }
+
+  function consumeAuthHint() {
+    try {
+      var hint = sessionStorage.getItem(AUTH_HINT_KEY) || '';
+      sessionStorage.removeItem(AUTH_HINT_KEY);
+      return hint;
+    } catch (e) {
+      return '';
+    }
+  }
+
   function firstAllowedRoute(user) {
     var menus = (user && user.menus) || [];
     for (var i = 0; i < menus.length; i++) {
@@ -440,7 +464,11 @@
     normalizeMenuPath: normalizeMenuPath,
     collectMenuPaths: collectMenuPaths,
     canAccessRoute: canAccessRoute,
+    hasAccessibleMenus: hasAccessibleMenus,
+    rememberAuthHint: rememberAuthHint,
+    consumeAuthHint: consumeAuthHint,
     firstAllowedRoute: firstAllowedRoute,
-    sidebarMenus: sidebarMenus
+    sidebarMenus: sidebarMenus,
+    NO_MENU_ACCESS_HINT: NO_MENU_ACCESS_HINT
   };
 })(window);

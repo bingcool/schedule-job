@@ -35,7 +35,11 @@
     if (isPublic) {
       if (token && to.path === '/login') {
         var loggedIn = common.getUser();
-        return next(loggedIn ? common.firstAllowedRoute(loggedIn) : '/dashboard');
+        if (!common.hasAccessibleMenus(loggedIn)) {
+          common.clearAuth();
+          return next();
+        }
+        return next(common.firstAllowedRoute(loggedIn));
       }
       return next();
     }
@@ -43,10 +47,16 @@
       return next('/login');
     }
     var user = common.getUser();
+    if (user && !common.hasAccessibleMenus(user)) {
+      common.clearAuth();
+      common.rememberAuthHint(common.NO_MENU_ACCESS_HINT);
+      return next('/login');
+    }
     if (user && Array.isArray(user.menus) && !common.canAccessRoute(to.path, user)) {
       var fallback = common.firstAllowedRoute(user);
       if (to.path === fallback || !common.canAccessRoute(fallback, user)) {
         common.clearAuth();
+        common.rememberAuthHint(common.NO_MENU_ACCESS_HINT);
         return next('/login');
       }
       return next(fallback);
@@ -140,6 +150,13 @@
           var user = await common.api('/auth/me');
           common.setUser(user);
           this.currentUser = user;
+          if (!this.isAuthPage && user && !common.hasAccessibleMenus(user)) {
+            common.clearAuth();
+            this.currentUser = null;
+            this.$message.warning(common.NO_MENU_ACCESS_HINT);
+            this.$router.replace('/login');
+            return;
+          }
           if (!this.isAuthPage && user && !common.canAccessRoute(this.$route.path, user)) {
             this.$router.replace(common.firstAllowedRoute(user));
           }

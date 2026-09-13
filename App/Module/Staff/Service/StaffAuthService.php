@@ -51,6 +51,9 @@ class StaffAuthService
         if ($account === '' || $dto->getPassword() === '') {
             throw StaffException::throw('账号和密码不能为空', -1);
         }
+        if (str_contains($account, '@') && filter_var($account, FILTER_VALIDATE_EMAIL) === false) {
+            throw StaffException::throw('邮箱格式不对', -1);
+        }
 
         $user = (new StaffUserEntity())->loadByLoginIdentity($account);
         if (!$user || $user->isDeleted() || !password_verify($dto->getPassword(), (string) $user->password)) {
@@ -127,6 +130,7 @@ class StaffAuthService
     private function issueSession(StaffUserEntity $user): AuthSessionDto
     {
         $profile = $this->profileOf($user);
+        $this->assertHasMenuAccess($profile);
         $roleCodes = array_values(array_filter(array_map(
             static fn (array $role): string => (string) ($role['code'] ?? ''),
             $profile['roles'] ?? []
@@ -173,5 +177,27 @@ class StaffAuthService
             'nodeGroupIds' => $this->staffUserService->nodeGroupIdsOfUser((int) $user->id),
             'menus' => $this->staffRoleService->menusForUser((int) $user->id, $isSuper),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $profile
+     */
+    private function assertHasMenuAccess(array $profile): void
+    {
+        if (!empty($profile['isSuper'])) {
+            return;
+        }
+        foreach ($profile['menus'] ?? [] as $group) {
+            if (!is_array($group)) {
+                continue;
+            }
+            foreach ($group['children'] ?? [] as $item) {
+                if (is_array($item) && trim((string) ($item['uri'] ?? '')) !== '') {
+                    return;
+                }
+            }
+        }
+
+        throw StaffException::throw('您无菜单权限，暂无法进入系统，请联系管理员分配角色', -1);
     }
 }
