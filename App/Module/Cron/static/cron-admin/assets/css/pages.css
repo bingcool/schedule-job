@@ -1021,6 +1021,18 @@
   color: #c0c4cc;
 }
 
+.dash-trend-head {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.dash-trend-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .exec-toolbar {
   align-items: center;
   margin-bottom: 12px;

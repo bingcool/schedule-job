@@ -15,6 +15,9 @@ class StaffUserRowDto extends AbstractDto
     #[ApiProperty(description: '账号')]
     protected string $account = '';
 
+    #[ApiProperty(description: '邮箱，账号非邮箱时为空')]
+    protected string $email = '';
+
     #[ApiProperty(description: '用户名称')]
     protected string $userName = '';
 
@@ -62,6 +65,7 @@ class StaffUserRowDto extends AbstractDto
         $dto = new self();
         $dto->id = (int) ($row['id'] ?? 0);
         $dto->account = (string) ($row['account'] ?? '');
+        $dto->email = (string) ($row['email'] ?? '');
         $dto->userName = (string) ($row['user_name'] ?? $row['userName'] ?? '');
         $dto->status = (int) ($row['status'] ?? 1) === 0 ? 0 : 1;
         $dto->roles = is_array($row['roles'] ?? null) ? $row['roles'] : [];
@@ -85,6 +89,11 @@ class StaffUserRowDto extends AbstractDto
     public function getAccount(): string
     {
         return $this->account;
+    }
+
+    public function getEmail(): string
+    {
+        return $this->email;
     }
 
     public function getUserName(): string

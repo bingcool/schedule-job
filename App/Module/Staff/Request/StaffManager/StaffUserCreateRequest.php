@@ -10,9 +10,12 @@ use Swoolefy\Http\BaseRequest;
 
 class StaffUserCreateRequest extends BaseRequest
 {
-    #[ApiProperty(description: '账号（建议邮箱）')]
+    #[ApiProperty(description: '账号：合法邮箱将同时写入 email；含 @ 但格式不对则拒绝')]
     #[ValidationRule(rule: 'required|string', message: 'account 不能为空')]
     protected string $account = '';
+
+    #[ApiProperty(description: '邮箱，可选；账号为邮箱时以后端同步值为准')]
+    protected ?string $email = null;
 
     #[ApiProperty(description: '用户名称')]
     #[ValidationRule(rule: 'required|string', message: 'userName 不能为空')]
@@ -42,6 +45,18 @@ class StaffUserCreateRequest extends BaseRequest
     public function setAccount(string $account): static
     {
         $this->account = $account;
+
+        return $this;
+    }
+
+    public function getEmail(): string
+    {
+        return trim((string) $this->email);
+    }
+
+    public function setEmail(?string $email): static
+    {
+        $this->email = $email;
 
         return $this;
     }

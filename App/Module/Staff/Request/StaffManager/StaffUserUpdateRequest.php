@@ -20,6 +20,9 @@ class StaffUserUpdateRequest extends BaseRequest
     #[ValidationRule(rule: 'required|string', message: 'account 不能为空')]
     protected string $account = '';
 
+    #[ApiProperty(description: '邮箱，可选；账号为邮箱时以后端同步值为准')]
+    protected ?string $email = null;
+
     #[ApiProperty(description: '用户名称')]
     #[ValidationRule(rule: 'required|string', message: 'userName 不能为空')]
     protected string $userName = '';
@@ -59,6 +62,18 @@ class StaffUserUpdateRequest extends BaseRequest
     public function setAccount(string $account): static
     {
         $this->account = $account;
+
+        return $this;
+    }
+
+    public function getEmail(): string
+    {
+        return trim((string) $this->email);
+    }
+
+    public function setEmail(?string $email): static
+    {
+        $this->email = $email;
 
         return $this;
     }

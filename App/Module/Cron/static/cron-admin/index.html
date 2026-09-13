@@ -6,7 +6,7 @@
   <title>Schedule Job Admin</title>
   <link rel="stylesheet" href="/cron-admin/assets/vendor/element-ui/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css?v=app-header-4">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-trend-chart-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=dash-trend-view-1">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=app-header-2">
 </head>
 <body>
@@ -120,15 +120,21 @@
       <div class="panel stat-card"><div>节点</div><h2>{{ overview.nodes.total }}</h2><div class="meta"><span class="status-mark status-online">在线 {{ overview.nodes.online }}</span> / <span class="status-mark status-offline">离线 {{ overview.nodes.offline }}</span></div></div>
     </div>
     <div class="panel">
-      <div class="page-head" style="margin-bottom:12px">
-        <b>执行趋势</b>
-        <el-radio-group v-model="range" size="mini" @change="loadTrend">
-          <el-radio-button label="24h">24h</el-radio-button>
-          <el-radio-button label="7d">7d</el-radio-button>
-          <el-radio-button label="15d">15d</el-radio-button>
+      <div class="page-head dash-trend-head">
+        <div class="dash-trend-left">
+          <b>执行趋势</b>
+          <el-radio-group v-model="range" size="mini" @change="loadTrend">
+            <el-radio-button label="24h">24h</el-radio-button>
+            <el-radio-button label="7d">7d</el-radio-button>
+            <el-radio-button label="15d">15d</el-radio-button>
+          </el-radio-group>
+        </div>
+        <el-radio-group class="exec-view-switch" v-model="viewMode" size="mini" @change="onViewModeChange">
+          <el-radio-button label="list"><i class="el-icon-s-operation"></i> 列表</el-radio-button>
+          <el-radio-button label="chart"><i class="el-icon-data-line"></i> 折线图</el-radio-button>
         </el-radio-group>
       </div>
-      <el-table :data="trend" size="small">
+      <el-table v-show="viewMode==='list'" :data="trend" size="small">
         <el-table-column prop="time" label="时间"></el-table-column>
         <el-table-column prop="total" label="总计"></el-table-column>
         <el-table-column prop="success" label="成功">
@@ -147,6 +153,82 @@
           <template slot-scope="s"><span class="status-mark status-skipped">{{ s.row.skipped }}</span></template>
         </el-table-column>
       </el-table>
+      <div v-show="viewMode==='chart'" class="exec-chart-wrap" v-loading="trendLoading">
+        <div class="exec-chart-legend">
+          <span v-for="s in chartSeries" :key="s.key" class="exec-chart-legend-item">
+            <i class="exec-chart-swatch" :style="{ background: s.color }"></i>
+            {{ s.label }} {{ chartTotals[s.key] || 0 }}
+          </span>
+        </div>
+        <div v-if="!trend.length" class="exec-chart-empty">暂无成功 / 失败 / 超时 / 取消数据</div>
+        <div v-else ref="dashChartBox" class="exec-chart" @mousemove="onChartMove" @mouseleave="onChartLeave">
+          <svg :width="chartModel.width" :height="chartModel.height">
+            <line
+              v-for="g in chartModel.gridY"
+              :key="'gy-'+g.y"
+              class="exec-chart-grid"
+              :x1="chartModel.pad.l"
+              :x2="chartModel.width - chartModel.pad.r"
+              :y1="g.y"
+              :y2="g.y"
+            ></line>
+            <text
+              v-for="g in chartModel.gridY"
+              :key="'yl-'+g.y"
+              class="exec-chart-axis"
+              :x="chartModel.pad.l - 8"
+              :y="g.y + 4"
+              text-anchor="end"
+            >{{ g.label }}</text>
+            <text
+              v-for="t in chartModel.xLabels"
+              :key="'xl-'+t.i"
+              class="exec-chart-axis"
+              :x="t.x"
+              :y="chartModel.height - 12"
+              text-anchor="middle"
+            >{{ t.label }}</text>
+            <polyline
+              v-for="s in chartModel.lines"
+              :key="'line-'+s.key"
+              class="exec-chart-line"
+              fill="none"
+              :stroke="s.color"
+              stroke-width="2"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              :points="s.points"
+            ></polyline>
+            <circle
+              v-for="d in chartModel.dots"
+              :key="'dot-'+d.key"
+              :cx="d.x"
+              :cy="d.y"
+              r="3"
+              :fill="d.color"
+            ></circle>
+            <line
+              v-if="hoverIndex>=0 && chartModel.hoverX!=null"
+              class="exec-chart-guide"
+              :x1="chartModel.hoverX"
+              :x2="chartModel.hoverX"
+              :y1="chartModel.pad.t"
+              :y2="chartModel.height - chartModel.pad.b"
+            ></line>
+          </svg>
+          <div
+            v-if="hoverIndex>=0 && hoverTip"
+            class="exec-chart-tooltip"
+            :style="{ left: hoverTip.left + 'px', top: hoverTip.top + 'px' }"
+          >
+            <div class="exec-chart-tip-time">{{ hoverTip.time }}</div>
+            <div v-for="s in chartSeries" :key="'tip-'+s.key">
+              <i class="exec-chart-swatch" :style="{ background: s.color }"></i>
+              {{ s.label }} {{ hoverTip.values[s.key] }}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </script>
@@ -1291,7 +1373,7 @@
               type="text"
               size="small"
               @click="openResetPassword(s.row)">重置密码</el-button>
-            <el-button type="text" size="small" style="color:#f56c6c" @click="remove(s.row)">删除</el-button>
+            <el-button type="text" size="small" style="color:#f56c6c" :disabled="isProtectedAdmin(s.row)" @click="remove(s.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -1380,8 +1462,9 @@
         <div class="section">
           <h3 class="section-title">基本信息</h3>
           <div class="grid">
-            <div class="field"><label>账号 <span class="req">*</span></label><input class="form-control" v-model="form.account" placeholder="邮箱或字母数字账号"><p class="auth-field-hint">可使用邮箱；不含 @ 时仅支持大小写字母与数字</p></div>
+            <div class="field"><label>账号 <span class="req">*</span></label><input class="form-control" v-model="form.account" :disabled="isBuiltInAdmin" placeholder="邮箱或字母数字账号"><p class="auth-field-hint" v-if="isBuiltInAdmin">系统内置账号 admin 不可修改</p><p class="auth-field-hint" v-else-if="accountIsEmail">账号是邮箱格式，将会同步更新email</p><p class="auth-field-hint" v-else>含 @ 时必须是合法邮箱；不含 @ 时仅支持大小写字母与数字</p></div>
             <div class="field"><label>用户名称 <span class="req">*</span></label><input class="form-control" v-model="form.userName" placeholder="显示名称"></div>
+            <div class="field" v-if="isEdit"><label>邮箱</label><input class="form-control" v-model="form.email" placeholder="可选，合法邮箱"></div>
             <div class="field" v-if="!isEdit"><label>密码 <span class="req">*</span></label><input class="form-control" type="password" v-model="form.password" placeholder="至少 8 位"></div>
             <div class="field" v-if="!isEdit"><label>确认密码</label><input class="form-control" type="password" v-model="form.passwordConfirm" placeholder="再次输入密码"></div>
           </div>
@@ -1616,7 +1699,7 @@
 <script defer src="/cron-admin/assets/vendor/vue-router.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/element-ui/index.js"></script>
 <script defer src="/cron-admin/assets/js/common.js?v=task-manage-auth-1"></script>
-<script defer src="/cron-admin/assets/js/dashboard.js?v=dashboard-today-date-1"></script>
+<script defer src="/cron-admin/assets/js/dashboard.js?v=dash-trend-view-1"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=k8s-command-argv-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=avg-duration-sec-1"></script>
@@ -1626,8 +1709,8 @@
 <script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js?v=login-menu-1"></script>
-<script defer src="/cron-admin/assets/js/users.js?v=roles-2"></script>
-<script defer src="/cron-admin/assets/js/user-editor.js?v=roles-1"></script>
+<script defer src="/cron-admin/assets/js/users.js?v=admin-no-delete-1"></script>
+<script defer src="/cron-admin/assets/js/user-editor.js?v=admin-account-lock-1"></script>
 <script defer src="/cron-admin/assets/js/roles.js?v=pages-dlg-2"></script>
 <script defer src="/cron-admin/assets/js/role-editor.js?v=basic-only-3"></script>
 <script defer src="/cron-admin/assets/vendor/sortable.min.js"></script>

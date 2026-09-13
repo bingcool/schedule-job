@@ -76,6 +76,7 @@ class StaffUserController extends BController
     {
         $dto = (new CreateUserDto())
             ->setAccount($request->getAccount())
+            ->setEmail($request->getEmail())
             ->setUserName($request->getUserName())
             ->setPassword($request->getPassword());
 
@@ -91,6 +92,7 @@ class StaffUserController extends BController
         $dto = (new UpdateUserDto())
             ->setId($request->getId())
             ->setAccount($request->getAccount())
+            ->setEmail($request->getEmail())
             ->setUserName($request->getUserName());
 
         return new StaffUserRowResponse($this->staffUserService->updateUser($dto));

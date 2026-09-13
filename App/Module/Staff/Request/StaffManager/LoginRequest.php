@@ -10,7 +10,7 @@ use Swoolefy\Http\BaseRequest;
 
 class LoginRequest extends BaseRequest
 {
-    #[ApiProperty(description: '账号（建议邮箱）')]
+    #[ApiProperty(description: '登录标识：合法邮箱按 email 查，否则按 account 查')]
     #[ValidationRule(rule: 'required|string', message: 'account 不能为空')]
     protected string $account = '';
 

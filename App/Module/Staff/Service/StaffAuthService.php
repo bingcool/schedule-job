@@ -52,7 +52,7 @@ class StaffAuthService
             throw StaffException::throw('账号和密码不能为空', -1);
         }
 
-        $user = (new StaffUserEntity())->loadByAccount($account);
+        $user = (new StaffUserEntity())->loadByLoginIdentity($account);
         if (!$user || $user->isDeleted() || !password_verify($dto->getPassword(), (string) $user->password)) {
             throw StaffException::throw('账号或密码错误', -1);
         }
@@ -165,6 +165,7 @@ class StaffAuthService
         return [
             'id' => (int) $user->id,
             'account' => (string) $user->account,
+            'email' => (string) ($user->email ?? ''),
             'userName' => (string) $user->user_name,
             'isSuper' => $isSuper,
             'isEditorTaskGroup' => $this->staffUserService->isEditorTaskGroupUser((int) $user->id),

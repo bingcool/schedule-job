@@ -12,6 +12,9 @@ class CreateUserDto extends AbstractDto
     #[ApiProperty(description: '账号')]
     protected string $account = '';
 
+    #[ApiProperty(description: '邮箱，账号非邮箱时可单独填写')]
+    protected string $email = '';
+
     #[ApiProperty(description: '用户名称')]
     protected string $userName = '';
 
@@ -38,6 +41,18 @@ class CreateUserDto extends AbstractDto
     public function setAccount(string $account): static
     {
         $this->account = $account;
+
+        return $this;
+    }
+
+    public function getEmail(): string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(string $email): static
+    {
+        $this->email = $email;
 
         return $this;
     }

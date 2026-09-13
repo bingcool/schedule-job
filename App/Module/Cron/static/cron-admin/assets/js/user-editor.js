@@ -4,7 +4,13 @@
   var common = window.CronAdminCommon;
 
   function emptyForm() {
-    return { account: '', userName: '', password: '', passwordConfirm: '' };
+    return { account: '', email: '', userName: '', password: '', passwordConfirm: '' };
+  }
+
+  function isEmailFormat(value) {
+    var text = String(value || '').trim();
+    if (!text) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
   }
 
   window.CronAdminUserEditor = {
@@ -12,6 +18,7 @@
     data: function () {
       return {
         form: emptyForm(),
+        loadedEmail: '',
         saving: false,
         userId: 0
       };
@@ -19,23 +26,44 @@
     computed: {
       isEdit: function () {
         return !!this.$route.params.id;
+      },
+      accountIsEmail: function () {
+        return isEmailFormat(this.form.account);
+      },
+      isBuiltInAdmin: function () {
+        return this.isEdit && String(this.form.account || '').trim().toLowerCase() === 'admin';
+      }
+    },
+    watch: {
+      'form.account': function (val) {
+        this.syncEmailWithAccount(val);
       }
     },
     created: function () {
       this.init();
     },
     methods: {
+      syncEmailWithAccount: function (account) {
+        if (isEmailFormat(account)) {
+          this.form.email = String(account || '').trim();
+          return;
+        }
+        this.form.email = this.loadedEmail;
+      },
       init: async function () {
         try {
           if (!this.isEdit) return;
           var d = await common.api('/users/detail?id=' + this.$route.params.id);
           this.userId = d.id;
+          this.loadedEmail = String(d.email || '').trim();
           this.form = {
             account: d.account || '',
+            email: this.loadedEmail,
             userName: d.userName || '',
             password: '',
             passwordConfirm: ''
           };
+          this.syncEmailWithAccount(this.form.account);
         } catch (e) {
           common.toastErr(this, e);
         }
@@ -53,10 +81,15 @@
           this.$message.warning('两次输入的密码不一致');
           return;
         }
+        if (this.form.email && !isEmailFormat(this.form.email)) {
+          this.$message.warning('邮箱格式不对');
+          return;
+        }
         this.saving = true;
         try {
           var body = {
             account: this.form.account,
+            email: this.form.email || '',
             userName: this.form.userName,
             password: this.form.password || ''
           };

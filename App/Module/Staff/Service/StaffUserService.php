@@ -93,12 +93,13 @@ class StaffUserService
     {
         $this->assertAccountAndName($dto->getAccount(), $dto->getUserName());
         $this->assertPassword($dto->getPassword());
-        if ((new StaffUserEntity())->loadByAccount($dto->getAccount())) {
-            throw StaffException::throw('账号已存在', -1);
-        }
+        $account = $dto->getAccount();
+        $email = $this->resolveStoredEmail($account, $dto->getEmail());
+        $this->assertAccountAvailable($account, $email, null);
         $user = new StaffUserEntity();
         $user->setData([
-            'account' => $dto->getAccount(),
+            'account' => $account,
+            'email' => $email,
             'user_name' => $dto->getUserName(),
             'password' => self::hashPassword($dto->getPassword()),
             'status' => 1,
@@ -115,14 +116,21 @@ class StaffUserService
     public function updateUser(UpdateUserDto $dto): array
     {
         $user = $this->requireUser($dto->getId());
-        $this->assertAccountAndName($dto->getAccount(), $dto->getUserName());
-        $exist = StaffUserEntity::query()->where('account', $dto->getAccount())->where('id', '<>', $dto->getId())->find();
-        if ($exist) {
-            throw StaffException::throw('账号已存在', -1);
+        $currentAccount = (string) ($user->account ?? '');
+        $account = $dto->getAccount();
+        if (self::isBuiltInAdminAccount($currentAccount)) {
+            if ($account !== '' && !self::isBuiltInAdminAccount($account)) {
+                throw StaffException::throw('系统内置账号 admin 不可修改', -1);
+            }
+            $account = $currentAccount;
         }
+        $this->assertAccountAndName($account, $dto->getUserName());
+        $email = $this->resolveStoredEmail($account, $dto->getEmail());
+        $this->assertAccountAvailable($account, $email, $dto->getId());
 
         $data = [
-            'account' => $dto->getAccount(),
+            'account' => $account,
+            'email' => $email,
             'user_name' => $dto->getUserName(),
         ];
         $user->setData($data);
@@ -332,6 +340,9 @@ class StaffUserService
     public function deleteUser(UserIdDto $dto): int
     {
         $user = $this->requireUser($dto->getId());
+        if (self::isBuiltInAdminAccount((string) ($user->account ?? '')) || $this->isSuperUser((int) $user->id)) {
+            throw StaffException::throw('超级管理员账号不能删除', -1);
+        }
         $this->assertNotSelf((int) $user->id, '不能删除当前登录账号');
 
         $userId = (int) $user->id;
@@ -424,7 +435,7 @@ class StaffUserService
         }
         if (str_contains($account, '@')) {
             if (filter_var($account, FILTER_VALIDATE_EMAIL) === false) {
-                throw StaffException::throw('请输入有效的邮箱地址', -1);
+                throw StaffException::throw('邮箱格式不对', -1);
             }
 
             return;
@@ -484,6 +495,60 @@ class StaffUserService
                 'node_group_id' => $groupId,
             ]);
             $rel->save();
+        }
+    }
+
+    /**
+     * 账号是合法邮箱时返回该邮箱，否则返回 null。须先经过 {@see assertAccount()}。
+     */
+    public static function emailFromAccount(string $account): ?string
+    {
+        $account = trim($account);
+        if ($account !== '' && filter_var($account, FILTER_VALIDATE_EMAIL) !== false) {
+            return $account;
+        }
+
+        return null;
+    }
+
+    /**
+     * 账号为邮箱时同步写入 email；否则使用提交的邮箱（空则清空）。
+     */
+    private function resolveStoredEmail(string $account, string $submittedEmail): ?string
+    {
+        $fromAccount = self::emailFromAccount($account);
+        if ($fromAccount !== null) {
+            return $fromAccount;
+        }
+        $submittedEmail = trim($submittedEmail);
+        if ($submittedEmail === '') {
+            return null;
+        }
+        if (filter_var($submittedEmail, FILTER_VALIDATE_EMAIL) === false) {
+            throw StaffException::throw('邮箱格式不对', -1);
+        }
+
+        return $submittedEmail;
+    }
+
+    private function assertAccountAvailable(string $account, ?string $email, ?int $exceptId): void
+    {
+        $existAccount = StaffUserEntity::query()->where('account', $account);
+        if ($exceptId !== null && $exceptId > 0) {
+            $existAccount->where('id', '<>', $exceptId);
+        }
+        if ($existAccount->find()) {
+            throw StaffException::throw('账号已存在', -1);
+        }
+        if ($email === null || $email === '') {
+            return;
+        }
+        $existEmail = StaffUserEntity::query()->where('email', $email);
+        if ($exceptId !== null && $exceptId > 0) {
+            $existEmail->where('id', '<>', $exceptId);
+        }
+        if ($existEmail->find()) {
+            throw StaffException::throw('邮箱已被使用', -1);
         }
     }
 
@@ -582,6 +647,11 @@ class StaffUserService
         }
 
         return false;
+    }
+
+    public static function isBuiltInAdminAccount(string $account): bool
+    {
+        return strcasecmp(trim($account), 'admin') === 0;
     }
 
     private function assertNotSelf(int $userId, string $message): void

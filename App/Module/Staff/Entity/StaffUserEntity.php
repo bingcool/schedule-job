@@ -10,6 +10,7 @@ use Swoolefy\Library\Db\Query;
 /**
  * @property int $id
  * @property string $account
+ * @property string|null $email
  * @property string $password
  * @property string $user_name
  * @property int $status
@@ -38,6 +39,32 @@ class StaffUserEntity extends ClientModel
     public function loadByAccount(string $account): ?static
     {
         return $this->loadOne(['account' => $account]);
+    }
+
+    public function loadByEmail(string $email): ?static
+    {
+        $email = trim($email);
+        if ($email === '') {
+            return null;
+        }
+
+        return $this->loadOne(['email' => $email]);
+    }
+
+    /**
+     * 登录标识：合法邮箱查 email，否则查 account。
+     */
+    public function loadByLoginIdentity(string $identity): ?static
+    {
+        $identity = trim($identity);
+        if ($identity === '') {
+            return null;
+        }
+        if (filter_var($identity, FILTER_VALIDATE_EMAIL) !== false) {
+            return $this->loadByEmail($identity);
+        }
+
+        return $this->loadByAccount($identity);
     }
 
     public function isDeleted(): bool

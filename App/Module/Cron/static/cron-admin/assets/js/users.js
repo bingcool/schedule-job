@@ -160,7 +160,16 @@
           if (e !== 'cancel') common.toastErr(this, e);
         }
       },
+      isProtectedAdmin: function (row) {
+        if (!row) return false;
+        if (row.isSuper) return true;
+        return String(row.account || '').trim().toLowerCase() === 'admin';
+      },
       remove: async function (row) {
+        if (this.isProtectedAdmin(row)) {
+          this.$message.warning('超级管理员账号不能删除');
+          return;
+        }
         try {
           await common.confirmUserDelete(this, row.userName || row.account);
           await common.api('/users?id=' + encodeURIComponent(row.id), {
