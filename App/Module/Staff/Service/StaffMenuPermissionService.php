@@ -35,6 +35,7 @@ class StaffMenuPermissionService
     private const API_PATH_MENU_RULES = [
         '/api/v1/dashboard/overview' => '/dashboard',
         '/api/v1/dashboard/execution-trend' => '/dashboard',
+        '/api/v1/tasks/logs/trend' => '/executions',
         '/api/v1/tasks/logs' => '/executions',
         '/api/v1/tasks/operation-logs/operators' => '/tasks',
         '/api/v1/tasks/operation-logs' => '/tasks',

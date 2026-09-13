@@ -128,6 +128,9 @@ Route::group([
     ]);
 
     // 日志监控
+    Route::get('/tasks/logs/trend', [
+        'dispatch_route' => [CronTaskManagerController::class, 'taskLogsTrend'],
+    ]);
     Route::get('/tasks/logs', [
         'dispatch_route' => [CronTaskManagerController::class, 'taskLogs'],
     ]);

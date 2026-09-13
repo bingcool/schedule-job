@@ -118,6 +118,10 @@
   color: #d97706;
 }
 
+.status-mark.status-cancelled {
+  color: #4b5563;
+}
+
 .status-mark.status-skipped {
   color: #64748b;
 }
@@ -1015,6 +1019,101 @@
 
 .execution-range-picker .el-range-input::placeholder {
   color: #c0c4cc;
+}
+
+.exec-toolbar {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.exec-view-switch {
+  flex-shrink: 0;
+}
+
+.exec-chart-wrap {
+  min-height: 280px;
+}
+
+.exec-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 4px 0 12px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.exec-chart-legend-item,
+.exec-chart-tooltip div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exec-chart-hint {
+  margin-left: auto;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.exec-chart-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.exec-chart-empty {
+  padding: 64px 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.exec-chart {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.exec-chart svg {
+  display: block;
+}
+
+.exec-chart-grid {
+  stroke: #e5e9f0;
+  stroke-width: 1;
+}
+
+.exec-chart-axis {
+  fill: #94a3b8;
+  font-size: 11px;
+}
+
+.exec-chart-guide {
+  stroke: #94a3b8;
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.exec-chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  min-width: 128px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #e5e9f0;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.7;
+  pointer-events: none;
+}
+
+.exec-chart-tip-time {
+  margin-bottom: 4px;
+  color: #64748b;
+  font-weight: 600;
 }
 
 .exec-batch-input .el-input__inner::placeholder {

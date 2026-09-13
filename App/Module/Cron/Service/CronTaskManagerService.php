@@ -569,20 +569,106 @@ class CronTaskManagerService
      */
     public function taskLogs(TaskLogsQueryDto $query): TaskLogsPageResult
     {
+        $qb = $this->newTaskLogsFilteredQuery($query, true);
+        if ($qb === null) {
+            $pageResult = new TaskLogsPageResult();
+            $pageResult->setTotal(0);
+
+            return $pageResult;
+        }
+        $total = $qb->clone()->count();
+        $list = $qb->order('id', 'desc')->limit($query->getOffset(), $query->getPageSize())->select()->toArray();
+        $taskMetaMap = $this->mapTaskMetaByCronIds($this->collectCronIds($list));
+
+        $pageResult = new TaskLogsPageResult();
+        foreach ($list as $row) {
+            $meta = $taskMetaMap[(int) ($row['cron_id'] ?? 0)] ?? [];
+            $row['task_name'] = (string) ($meta['task_name'] ?? '');
+            $row['exec_type'] = (int) ($meta['exec_type'] ?? 0);
+            $pageResult->addListItem(CronTaskLogRowDto::fromEntityRow($row));
+        }
+        $pageResult->setTotal($total);
+
+        return $pageResult;
+    }
+
+    /**
+     * 执行记录折线：成功 / 失败 / 超时 / 取消按时间桶 COUNT(DISTINCT exec_batch_id)。
+     * 不套用流水状态筛选（四条线本身就是状态拆分）。无时间窗时按近 15 个自然日。
+     * ≤72 小时按小时，否则按天。
+     *
+     * @return list<ExecutionTrendBucketDto>
+     */
+    public function taskLogsTrend(TaskLogsQueryDto $query): array
+    {
+        $window = $this->resolveTaskLogsTrendWindow($query);
+        $start = date('Y-m-d H:i:s', $window['startTs']);
+        $end = date('Y-m-d H:i:s', $window['endTs']);
+        $hourly = $window['hourly'];
+        $fmt = $hourly ? '%Y-%m-%d %H' : '%Y-%m-%d';
+        $buckets = $this->emptyTaskLogsTrendBuckets($window);
+
+        $trendQuery = (new TaskLogsQueryDto())
+            ->setTaskId($query->getTaskId())
+            ->setExecBatchId($query->getExecBatchId())
+            ->setExecType($query->getExecType())
+            ->setTriggerType($query->getTriggerType())
+            ->setTaskName($query->getTaskName())
+            ->setStartTime($start)
+            ->setEndTime($end);
+        $qb = $this->newTaskLogsFilteredQuery($trendQuery, false);
+        if ($qb === null) {
+            return array_values($buckets);
+        }
+
+        $rows = $qb->whereNotNull('exec_batch_id')
+            ->where('exec_batch_id', '<>', '')
+            ->whereIn('status', [
+                ExecutionStatus::SUCCESS,
+                ExecutionStatus::FAILED,
+                ExecutionStatus::TIMEOUT,
+                ExecutionStatus::CANCELLED,
+            ])
+            ->field([
+                new Raw("DATE_FORMAT(created_at, '{$fmt}') AS bucket"),
+                new Raw('status'),
+                new Raw('COUNT(DISTINCT exec_batch_id) AS total'),
+            ])
+            ->group('bucket,status')
+            ->select()
+            ->toArray();
+
+        foreach ($rows as $row) {
+            $key = (string) ($row['bucket'] ?? '');
+            if (!isset($buckets[$key])) {
+                continue;
+            }
+            $buckets[$key] = $this->applyTrendStatusCount(
+                $buckets[$key],
+                (int) ($row['status'] ?? -1),
+                (int) ($row['total'] ?? 0),
+            );
+        }
+
+        return array_values($buckets);
+    }
+
+    /**
+     * 执行记录列表 / 折线共用过滤。applyStatus=false 时不套流水状态（折线自行限定四类终态）。
+     */
+    protected function newTaskLogsFilteredQuery(TaskLogsQueryDto $query, bool $applyStatus): ?Query
+    {
         $taskId = $query->getTaskId();
         $execType = $query->getExecType();
         $triggerType = $query->getTriggerType();
         $taskName = $query->getTaskName();
-        $statusFilter = $query->getStatus();
+        $statusFilter = $applyStatus ? $query->getStatus() : null;
 
         $qb = CronTaskLogEntity::queryNotDeleted();
         $allowedTaskIds = $this->scopedTaskIds();
         if ($allowedTaskIds !== null) {
             if ($allowedTaskIds === [] || ($taskId !== null && $taskId > 0 && !isset($allowedTaskIds[$taskId]))) {
-                $pageResult = new TaskLogsPageResult();
-                $pageResult->setTotal(0);
-
-                return $pageResult;
+                return null;
             }
             if ($taskId === null || $taskId <= 0) {
                 $qb->whereIn('cron_id', array_values($allowedTaskIds));
@@ -598,17 +684,11 @@ class CronTaskManagerService
         if ($execType !== null || ($taskName !== null && $taskName !== '')) {
             $taskIds = $this->queryTaskIdsByExecTypeAndName($execType, $taskName);
             if ($taskIds === []) {
-                $pageResult = new TaskLogsPageResult();
-                $pageResult->setTotal(0);
-
-                return $pageResult;
+                return null;
             }
             if ($taskId !== null && $taskId > 0) {
                 if (!isset($taskIds[$taskId])) {
-                    $pageResult = new TaskLogsPageResult();
-                    $pageResult->setTotal(0);
-
-                    return $pageResult;
+                    return null;
                 }
             } else {
                 $qb->whereIn('cron_id', array_values($taskIds));
@@ -632,20 +712,66 @@ class CronTaskManagerService
                 $qb->where('status', $statusCode);
             }
         }
-        $total = $qb->clone()->count();
-        $list = $qb->order('id', 'desc')->limit($query->getOffset(), $query->getPageSize())->select()->toArray();
-        $taskMetaMap = $this->mapTaskMetaByCronIds($this->collectCronIds($list));
 
-        $pageResult = new TaskLogsPageResult();
-        foreach ($list as $row) {
-            $meta = $taskMetaMap[(int) ($row['cron_id'] ?? 0)] ?? [];
-            $row['task_name'] = (string) ($meta['task_name'] ?? '');
-            $row['exec_type'] = (int) ($meta['exec_type'] ?? 0);
-            $pageResult->addListItem(CronTaskLogRowDto::fromEntityRow($row));
+        return $qb;
+    }
+
+    /**
+     * @return array{startTs:int,endTs:int,hourly:bool}
+     */
+    protected function resolveTaskLogsTrendWindow(TaskLogsQueryDto $query): array
+    {
+        $startRaw = $query->getStartTime();
+        $endRaw = $query->getEndTime();
+        $endTs = ($endRaw !== null && $endRaw !== '') ? (int) strtotime($endRaw) : (int) strtotime(date('Y-m-d 23:59:59'));
+        $startTs = ($startRaw !== null && $startRaw !== '')
+            ? (int) strtotime($startRaw)
+            : (int) strtotime('-14 days 00:00:00');
+        if ($startTs <= 0) {
+            $startTs = (int) strtotime('-14 days 00:00:00');
         }
-        $pageResult->setTotal($total);
+        if ($endTs <= 0 || $endTs < $startTs) {
+            $endTs = (int) strtotime(date('Y-m-d 23:59:59'));
+        }
+        $hours = max(1, (int) ceil(($endTs - $startTs) / 3600));
 
-        return $pageResult;
+        return [
+            'startTs' => $startTs,
+            'endTs' => $endTs,
+            'hourly' => $hours <= 72,
+        ];
+    }
+
+    /**
+     * @param array{startTs:int,endTs:int,hourly:bool} $window
+     * @return array<string, ExecutionTrendBucketDto>
+     */
+    protected function emptyTaskLogsTrendBuckets(array $window): array
+    {
+        $hourly = $window['hourly'];
+        $startTs = $window['startTs'];
+        $endTs = $window['endTs'];
+        $sameDay = date('Y-m-d', $startTs) === date('Y-m-d', $endTs);
+        $buckets = [];
+        if ($hourly) {
+            $cursor = (int) strtotime(date('Y-m-d H:00:00', $startTs));
+            $last = (int) strtotime(date('Y-m-d H:00:00', $endTs));
+            for ($ts = $cursor; $ts <= $last; $ts += 3600) {
+                $key = date('Y-m-d H', $ts);
+                $label = $sameDay ? date('H:00', $ts) : date('m-d H:00', $ts);
+                $buckets[$key] = ExecutionTrendBucketDto::of($label, 0, 0, 0);
+            }
+
+            return $buckets;
+        }
+        $cursor = (int) strtotime(date('Y-m-d 00:00:00', $startTs));
+        $last = (int) strtotime(date('Y-m-d 00:00:00', $endTs));
+        for ($ts = $cursor; $ts <= $last; $ts = (int) strtotime('+1 day', $ts)) {
+            $key = date('Y-m-d', $ts);
+            $buckets[$key] = ExecutionTrendBucketDto::of($key, 0, 0, 0);
+        }
+
+        return $buckets;
     }
 
     /**
@@ -998,7 +1124,7 @@ class CronTaskManagerService
     }
 
     /**
-     * Dashboard 趋势与今日概览共用：终态 SUCCESS/FAILED/TIMEOUT/SKIPPED，按 DISTINCT exec_batch_id 计数。
+     * Dashboard 趋势与今日概览共用：终态 SUCCESS/FAILED/TIMEOUT/SKIPPED/CANCELLED，按 DISTINCT exec_batch_id 计数。
      *
      * @return list<array{status:int|string,total:int|string}>
      */
@@ -1010,6 +1136,7 @@ class CronTaskManagerService
                 ExecutionStatus::FAILED,
                 ExecutionStatus::TIMEOUT,
                 ExecutionStatus::SKIPPED,
+                ExecutionStatus::CANCELLED,
             ])
             ->field([
                 new Raw('status'),
@@ -1024,7 +1151,7 @@ class CronTaskManagerService
 
     /**
      * 将 DISTINCT exec_batch_id 分组行折叠为 Dashboard executions 字段。
-     * today = success+failed+timeout（与趋势 total 同源，但不含 SKIPPED）。
+     * today = success+failed+timeout+cancelled（与趋势同源，但不含 SKIPPED）。
      *
      * @param list<array{status:int|string,total:int|string}> $rows
      * @return array{today:int,success:int,failed:int,skipped:int,timeout:int,cancelled:int}
@@ -1035,6 +1162,7 @@ class CronTaskManagerService
         $failed = 0;
         $timeout = 0;
         $skipped = 0;
+        $cancelled = 0;
         foreach ($rows as $row) {
             $status = (int) ($row['status'] ?? -1);
             $count = (int) ($row['total'] ?? 0);
@@ -1046,16 +1174,18 @@ class CronTaskManagerService
                 $timeout = $count;
             } elseif ($status === ExecutionStatus::SKIPPED) {
                 $skipped = $count;
+            } elseif ($status === ExecutionStatus::CANCELLED) {
+                $cancelled = $count;
             }
         }
 
         return [
-            'today' => $success + $failed + $timeout,
+            'today' => $success + $failed + $timeout + $cancelled,
             'success' => $success,
             'failed' => $failed,
             'skipped' => $skipped,
             'timeout' => $timeout,
-            'cancelled' => 0,
+            'cancelled' => $cancelled,
         ];
     }
 
@@ -1281,6 +1411,7 @@ class CronTaskManagerService
                 ExecutionStatus::FAILED,
                 ExecutionStatus::TIMEOUT,
                 ExecutionStatus::SKIPPED,
+                ExecutionStatus::CANCELLED,
             ])
             ->field([
                 new Raw("DATE_FORMAT(created_at, '{$fmt}') AS bucket"),
@@ -1305,7 +1436,7 @@ class CronTaskManagerService
     }
 
     /**
-     * 将单条分组统计折叠到时间桶，只累加四类终态。
+     * 将单条分组统计折叠到时间桶。取消单独计数，不并入失败。
      */
     protected function applyTrendStatusCount(ExecutionTrendBucketDto $bucket, int $status, int $count): ExecutionTrendBucketDto
     {
@@ -1317,6 +1448,7 @@ class CronTaskManagerService
         $failed = (int) ($cur['failed'] ?? 0);
         $timeout = (int) ($cur['timeout'] ?? 0);
         $skipped = (int) ($cur['skipped'] ?? 0);
+        $cancelled = (int) ($cur['cancelled'] ?? 0);
         if ($status === ExecutionStatus::SUCCESS) {
             $success += $count;
         } elseif ($status === ExecutionStatus::FAILED) {
@@ -1325,17 +1457,20 @@ class CronTaskManagerService
             $timeout += $count;
         } elseif ($status === ExecutionStatus::SKIPPED) {
             $skipped += $count;
+        } elseif ($status === ExecutionStatus::CANCELLED) {
+            $cancelled += $count;
         } else {
             return $bucket;
         }
 
         return ExecutionTrendBucketDto::of(
             (string) ($cur['time'] ?? ''),
-            $success + $failed + $timeout + $skipped,
+            $success + $failed + $timeout + $skipped + $cancelled,
             $success,
             $failed,
             $timeout,
             $skipped,
+            $cancelled,
         );
     }
 

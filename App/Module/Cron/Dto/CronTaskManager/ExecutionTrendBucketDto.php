@@ -30,8 +30,18 @@ class ExecutionTrendBucketDto extends AbstractDto
     #[ApiProperty(description: '跳过次数')]
     protected int $skipped = 0;
 
-    public static function of(string $time, int $total, int $success, int $failed, int $timeout = 0, int $skipped = 0): self
-    {
+    #[ApiProperty(description: '取消次数')]
+    protected int $cancelled = 0;
+
+    public static function of(
+        string $time,
+        int $total,
+        int $success,
+        int $failed,
+        int $timeout = 0,
+        int $skipped = 0,
+        int $cancelled = 0,
+    ): self {
         $dto = new self();
         $dto->time = $time;
         $dto->total = $total;
@@ -39,6 +49,7 @@ class ExecutionTrendBucketDto extends AbstractDto
         $dto->failed = $failed;
         $dto->timeout = $timeout;
         $dto->skipped = $skipped;
+        $dto->cancelled = $cancelled;
 
         return $dto;
     }

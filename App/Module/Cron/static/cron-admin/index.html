@@ -6,7 +6,7 @@
   <title>Schedule Job Admin</title>
   <link rel="stylesheet" href="/cron-admin/assets/vendor/element-ui/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css?v=app-header-4">
-  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-batch-placeholder-1">
+  <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=exec-trend-chart-1">
   <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=app-header-2">
 </head>
 <body>
@@ -115,7 +115,7 @@
     </div>
     <div class="stat-row">
       <div class="panel stat-card"><div>任务总数</div><h2>{{ overview.tasks.total }}</h2><div class="meta"><span class="status-mark status-enabled">启用 {{ overview.tasks.enabled }}</span> / <span class="status-mark status-disabled">禁用 {{ overview.tasks.disabled }}</span></div></div>
-      <div class="panel stat-card"><div>今日执行({{ todayDate }})</div><h2>{{ overview.executions.today }}</h2><div class="meta"><span class="status-mark status-success">成功 {{ overview.executions.success }}</span> / <span class="status-mark status-failed">失败 {{ overview.executions.failed }}</span> / <span class="status-mark status-timeout">超时 {{ overview.executions.timeout || 0 }}</span></div></div>
+      <div class="panel stat-card"><div>今日执行({{ todayDate }})</div><h2>{{ overview.executions.today }}</h2><div class="meta"><span class="status-mark status-success">成功 {{ overview.executions.success }}</span> / <span class="status-mark status-failed">失败 {{ overview.executions.failed }}</span> / <span class="status-mark status-timeout">超时 {{ overview.executions.timeout || 0 }}</span> / <span class="status-mark status-cancelled">取消 {{ overview.executions.cancelled || 0 }}</span></div></div>
       <div class="panel stat-card"><div>今日跳过({{ todayDate }})</div><h2>{{ overview.executions.skipped }}</h2><div class="meta"><span class="status-mark status-skipped">今日 SKIP</span></div></div>
       <div class="panel stat-card"><div>节点</div><h2>{{ overview.nodes.total }}</h2><div class="meta"><span class="status-mark status-online">在线 {{ overview.nodes.online }}</span> / <span class="status-mark status-offline">离线 {{ overview.nodes.offline }}</span></div></div>
     </div>
@@ -139,6 +139,9 @@
         </el-table-column>
         <el-table-column prop="timeout" label="超时">
           <template slot-scope="s"><span class="status-mark status-timeout">{{ s.row.timeout }}</span></template>
+        </el-table-column>
+        <el-table-column prop="cancelled" label="取消">
+          <template slot-scope="s"><span class="status-mark status-cancelled">{{ s.row.cancelled || 0 }}</span></template>
         </el-table-column>
         <el-table-column prop="skipped" label="跳过">
           <template slot-scope="s"><span class="status-mark status-skipped">{{ s.row.skipped }}</span></template>
@@ -754,6 +757,19 @@
 
 <script type="text/x-template" id="tpl-executions">
   <div>
+    <div class="page-head exec-toolbar">
+      <el-radio-group v-model="timePreset" size="small" @change="onTimePresetChange">
+        <el-radio-button label="all">全部</el-radio-button>
+        <el-radio-button label="today">今日</el-radio-button>
+        <el-radio-button label="3d">3天</el-radio-button>
+        <el-radio-button label="7d">7天</el-radio-button>
+        <el-radio-button label="15d">15天</el-radio-button>
+      </el-radio-group>
+      <el-radio-group class="exec-view-switch" v-model="viewMode" size="small" @change="onViewModeChange">
+        <el-radio-button label="list"><i class="el-icon-s-operation"></i> 列表</el-radio-button>
+        <el-radio-button label="chart"><i class="el-icon-data-line"></i> 折线图</el-radio-button>
+      </el-radio-group>
+    </div>
     <div class="panel">
       <el-form :inline="true" size="small" @submit.native.prevent="search">
         <el-form-item label="任务ID"><el-input v-model="query.taskId" clearable placeholder="可选，留空查全部"></el-input></el-form-item>
@@ -810,7 +826,84 @@
         </el-form-item>
         <el-form-item><el-button type="primary" @click="search">查询</el-button></el-form-item>
       </el-form>
-      <el-table class="exec-list-table" :data="items" v-loading="loading" style="width: 100%">
+      <div v-show="viewMode==='chart'" class="exec-chart-wrap" v-loading="chartLoading">
+        <div class="exec-chart-legend">
+          <span v-for="s in chartSeries" :key="s.key" class="exec-chart-legend-item">
+            <i class="exec-chart-swatch" :style="{ background: s.color }"></i>
+            {{ s.label }} {{ chartTotals[s.key] || 0 }}
+          </span>
+          <span v-if="timePreset==='all'" class="exec-chart-hint">未选时间范围时，折线按近 15 天聚合</span>
+        </div>
+        <div v-if="!trend.length" class="exec-chart-empty">暂无成功 / 失败 / 超时 / 取消数据</div>
+        <div v-else ref="execChartBox" class="exec-chart" @mousemove="onChartMove" @mouseleave="onChartLeave">
+          <svg :width="chartModel.width" :height="chartModel.height">
+            <line
+              v-for="g in chartModel.gridY"
+              :key="'gy-'+g.y"
+              class="exec-chart-grid"
+              :x1="chartModel.pad.l"
+              :x2="chartModel.width - chartModel.pad.r"
+              :y1="g.y"
+              :y2="g.y"
+            ></line>
+            <text
+              v-for="g in chartModel.gridY"
+              :key="'yl-'+g.y"
+              class="exec-chart-axis"
+              :x="chartModel.pad.l - 8"
+              :y="g.y + 4"
+              text-anchor="end"
+            >{{ g.label }}</text>
+            <text
+              v-for="t in chartModel.xLabels"
+              :key="'xl-'+t.i"
+              class="exec-chart-axis"
+              :x="t.x"
+              :y="chartModel.height - 12"
+              text-anchor="middle"
+            >{{ t.label }}</text>
+            <polyline
+              v-for="s in chartModel.lines"
+              :key="'line-'+s.key"
+              class="exec-chart-line"
+              fill="none"
+              :stroke="s.color"
+              stroke-width="2"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              :points="s.points"
+            ></polyline>
+            <circle
+              v-for="d in chartModel.dots"
+              :key="'dot-'+d.key"
+              :cx="d.x"
+              :cy="d.y"
+              r="3"
+              :fill="d.color"
+            ></circle>
+            <line
+              v-if="hoverIndex>=0 && chartModel.hoverX!=null"
+              class="exec-chart-guide"
+              :x1="chartModel.hoverX"
+              :x2="chartModel.hoverX"
+              :y1="chartModel.pad.t"
+              :y2="chartModel.height - chartModel.pad.b"
+            ></line>
+          </svg>
+          <div
+            v-if="hoverIndex>=0 && hoverTip"
+            class="exec-chart-tooltip"
+            :style="{ left: hoverTip.left + 'px', top: hoverTip.top + 'px' }"
+          >
+            <div class="exec-chart-tip-time">{{ hoverTip.time }}</div>
+            <div v-for="s in chartSeries" :key="'tip-'+s.key">
+              <i class="exec-chart-swatch" :style="{ background: s.color }"></i>
+              {{ s.label }} {{ hoverTip.values[s.key] }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <el-table v-show="viewMode==='list'" class="exec-list-table" :data="items" v-loading="loading" style="width: 100%">
         <el-table-column prop="cronId" label="任务ID" width="80"></el-table-column>
         <el-table-column prop="taskName" label="任务名称" min-width="150"></el-table-column>
         <el-table-column label="执行类型" width="120">
@@ -849,7 +942,7 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-pagination style="margin-top:12px" background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
+      <el-pagination v-show="viewMode==='list'" style="margin-top:12px" background layout="total, prev, pager, next" :total="total" :page-size="query.pageSize" :current-page.sync="query.page" @current-change="load"></el-pagination>
     </div>
     <el-dialog title="执行详情" :visible.sync="dlg" width="720px">
       <div v-if="execDetail" class="meta-grid" style="margin-bottom:12px">
@@ -1528,7 +1621,7 @@
 <script defer src="/cron-admin/assets/js/editor.js?v=k8s-command-argv-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=avg-duration-sec-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
-<script defer src="/cron-admin/assets/js/executions.js?v=register-task-status-1"></script>
+<script defer src="/cron-admin/assets/js/executions.js?v=exec-trend-pagesize-1"></script>
 <script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-2"></script>
 <script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>

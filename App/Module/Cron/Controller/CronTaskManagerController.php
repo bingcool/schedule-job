@@ -48,6 +48,7 @@ use App\Module\Cron\Request\CronTaskManager\ExpressionPreviewRequest;
 use App\Module\Cron\Request\CronTaskManager\ListTasksRequest;
 use App\Module\Cron\Request\CronTaskManager\TaskOperationLogsQueryRequest;
 use App\Module\Cron\Request\CronTaskManager\TaskLogsQueryRequest;
+use App\Module\Cron\Request\CronTaskManager\TaskLogsTrendRequest;
 use App\Module\Cron\Request\CronTaskManager\TaskTransferOwnerRequest;
 use App\Module\Cron\Response\CronTaskManager\BatchStatusResponse;
 use App\Module\Cron\Response\CronTaskManager\CronAgentHeartbeatResponse;
@@ -356,6 +357,26 @@ class CronTaskManagerController extends BController
             ->setEndTime($request->getEndTime());
 
         return new TaskLogsResponse($this->cronTaskManagerService->taskLogs($query));
+    }
+
+    /**
+     * 执行记录折线：成功 / 失败 / 超时 / 取消。
+     *
+     * Route: GET /api/v1/tasks/logs/trend
+     */
+    #[ApiOperation("执行记录趋势折线")]
+    public function taskLogsTrend(TaskLogsTrendRequest $request): ExecutionTrendResponse
+    {
+        $query = (new TaskLogsQueryDto())
+            ->setTaskId($request->getTaskId())
+            ->setExecBatchId($request->getExecBatchId())
+            ->setExecType($request->getExecType())
+            ->setTriggerType($request->getTriggerType())
+            ->setTaskName($request->getTaskName())
+            ->setStartTime($request->getStartTime())
+            ->setEndTime($request->getEndTime());
+
+        return new ExecutionTrendResponse($this->cronTaskManagerService->taskLogsTrend($query));
     }
 
     /**
