@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Service;
 
+use App\Module\Cron\CronTaskLogMessageConfig;
 use App\Module\Cron\Dto\CronTaskManager\ExecutionCancelResultDto;
 use App\Module\Cron\Entity\CronTaskLogEntity;
 use App\Module\Cron\ExecutionLeaseConfig;
@@ -19,14 +20,12 @@ use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
  */
 class ExecutionService
 {
-    /** cron_task_log.message 追加上限（字节），超出保留最新尾部 */
-    private const MESSAGE_MAX_BYTES = 60000;
-
     /**
      * Agent Worker 启动：生成 boot_id，回收过期 RUNNING，启动看护 Tick。
      */
     public function bootAgent(): void
     {
+        CronTaskLogMessageConfig::maxBytes();
         ExecutionWorkerIdentity::bootId();
         ExecutionRuntimeGuard::boot();
     }
@@ -706,11 +705,13 @@ class ExecutionService
 
     private function capMessage(string $message): string
     {
-        if (strlen($message) <= self::MESSAGE_MAX_BYTES) {
+        $maxBytes = CronTaskLogMessageConfig::maxBytes();
+        if (strlen($message) <= $maxBytes) {
             return $message;
         }
+        $keep = max(1, $maxBytes - 20);
 
-        return "...[truncated]...\n" . substr($message, -(self::MESSAGE_MAX_BYTES - 20));
+        return "...[truncated]...\n" . substr($message, -$keep);
     }
 
     private function leaseDuration(): int

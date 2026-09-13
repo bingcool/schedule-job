@@ -11,6 +11,7 @@
 
 namespace App;
 
+use App\Module\Cron\CronTaskLogMessageConfig;
 use Swoolefy\Core\EventHandler;
 use Swoolefy\Core\Process\ProcessManager;
 use Swoolefy\Core\SystemEnv;
@@ -21,6 +22,7 @@ class Event extends EventHandler
      * onInit
      */
     public function onInit() {
+        CronTaskLogMessageConfig::maxBytes();
 
         if (!SystemEnv::isWorkerService()) {
             // 创建一个定时器处理进程清理执行日志
