@@ -8,7 +8,8 @@
     { value: 2, label: '禁用任务' },
     { value: 3, label: '删除任务' },
     { value: 4, label: '执行任务' },
-    { value: 5, label: '编辑任务' }
+    { value: 5, label: '编辑任务' },
+    { value: 6, label: '取消执行' }
   ];
 
   window.CronAdminTaskOperationLogs = {
@@ -100,6 +101,7 @@
         if (type === 3) return 'status-failed';
         if (type === 4) return 'status-enabled';
         if (type === 5) return 'status-timeout';
+        if (type === 6) return 'status-cancelled';
         return 'default';
       },
       showDetail: function (row) {

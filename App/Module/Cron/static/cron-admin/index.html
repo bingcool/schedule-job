@@ -706,7 +706,7 @@
         <el-form-item label="任务名称"><el-input v-model="query.taskName" clearable placeholder="支持模糊搜索"></el-input></el-form-item>
         <el-form-item label="操作类型">
           <el-select v-model="query.actionType" clearable placeholder="全部" style="width:130px">
-            <el-option v-for="opt in [{value:1,label:'启用任务'},{value:2,label:'禁用任务'},{value:3,label:'删除任务'},{value:4,label:'执行任务'},{value:5,label:'编辑任务'}]" :key="opt.value" :value="opt.value" :label="opt.label"></el-option>
+            <el-option v-for="opt in [{value:1,label:'启用任务'},{value:2,label:'禁用任务'},{value:3,label:'删除任务'},{value:4,label:'执行任务'},{value:5,label:'编辑任务'},{value:6,label:'取消执行'}]" :key="opt.value" :value="opt.value" :label="opt.label"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="操作人">
@@ -1620,7 +1620,7 @@
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=k8s-command-argv-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=avg-duration-sec-1"></script>
-<script defer src="/cron-admin/assets/js/task-operation-logs.js?v=1"></script>
+<script defer src="/cron-admin/assets/js/task-operation-logs.js?v=cancel-op-1"></script>
 <script defer src="/cron-admin/assets/js/executions.js?v=exec-trend-pagesize-1"></script>
 <script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-2"></script>
 <script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
@@ -1632,6 +1632,6 @@
 <script defer src="/cron-admin/assets/js/role-editor.js?v=basic-only-3"></script>
 <script defer src="/cron-admin/assets/vendor/sortable.min.js"></script>
 <script defer src="/cron-admin/assets/js/menus.js?v=menu-sort-1"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=breadcrumb-cron-1"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=cancel-op-1"></script>
 </body>
 </html>

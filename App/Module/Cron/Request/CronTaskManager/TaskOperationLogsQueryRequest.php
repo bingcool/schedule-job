@@ -14,7 +14,7 @@ class TaskOperationLogsQueryRequest extends BasePageRequest
     #[ApiProperty(description: '任务名称（模糊搜索）')]
     protected ?string $taskName = null;
 
-    #[ApiProperty(description: '操作类型：1=启用 2=禁用 3=删除 4=执行 5=编辑')]
+    #[ApiProperty(description: '操作类型：1=启用 2=禁用 3=删除 4=执行 5=编辑 6=取消执行')]
     #[ValidationRule(rule: 'nullable|int', message: 'actionType 必须是整数')]
     #[StringToInt]
     protected ?int $actionType = null;

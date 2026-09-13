@@ -1339,9 +1339,29 @@ class CronTaskManagerService
             throw CronTaskException::throw('执行记录不存在', -1);
         }
         $attrs = is_array($row) ? $row : $row->toArray();
-        $this->assertTaskManageAllowed($this->requireTask((int) ($attrs['cron_id'] ?? 0)));
+        $task = $this->requireTask((int) ($attrs['cron_id'] ?? 0));
+        $this->assertTaskManageAllowed($task);
 
-        return (new ExecutionService())->requestCancel($logId);
+        $result = (new ExecutionService())->requestCancel($logId);
+        if (!$result->isAlreadyFinished()) {
+            $afterAttrs = $attrs;
+            $afterAttrs['status'] = ExecutionStatus::CANCEL_REQUESTED;
+            $afterAttrs['cancelled_at'] = date('Y-m-d H:i:s');
+            $this->recordTaskOperationLog(
+                $task,
+                CronTaskOperationType::CANCEL,
+                [
+                    'task' => $this->snapshotTaskForOperationLog($task),
+                    'execution' => $this->snapshotExecutionForOperationLog($attrs),
+                ],
+                [
+                    'task' => $this->snapshotTaskForOperationLog($task),
+                    'execution' => $this->snapshotExecutionForOperationLog($afterAttrs),
+                ],
+            );
+        }
+
+        return $result;
     }
 
     /**
@@ -2128,6 +2148,27 @@ class CronTaskManagerService
     protected function snapshotTaskForOperationLog(CronTaskEntity $task): array
     {
         return $this->snapshotTaskAttributes($task->getAttributes());
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    protected function snapshotExecutionForOperationLog(array $row): array
+    {
+        $status = (int) ($row['status'] ?? 0);
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'cron_id' => (int) ($row['cron_id'] ?? 0),
+            'exec_batch_id' => (string) ($row['exec_batch_id'] ?? ''),
+            'status' => $status,
+            'status_name' => ExecutionStatus::name($status),
+            'pid' => (int) ($row['pid'] ?? 0),
+            'trigger_type' => (int) ($row['trigger_type'] ?? 0),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'cancelled_at' => (string) ($row['cancelled_at'] ?? ''),
+        ];
     }
 
     /**

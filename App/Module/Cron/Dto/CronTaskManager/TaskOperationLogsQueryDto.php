@@ -18,7 +18,7 @@ class TaskOperationLogsQueryDto extends AbstractDto
     #[ApiProperty(description: '任务名称关键词（模糊匹配）')]
     protected ?string $taskName = null;
 
-    #[ApiProperty(description: '操作类型：1=启用 2=禁用 3=删除 4=执行 5=编辑')]
+    #[ApiProperty(description: '操作类型：1=启用 2=禁用 3=删除 4=执行 5=编辑 6=取消执行')]
     protected ?int $actionType = null;
 
     #[ApiProperty(description: '操作人 staff_user.id')]

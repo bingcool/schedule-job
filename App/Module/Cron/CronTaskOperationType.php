@@ -19,6 +19,8 @@ final class CronTaskOperationType
 
     public const EDIT = 5;
 
+    public const CANCEL = 6;
+
     public static function label(int $type): string
     {
         return match ($type) {
@@ -27,13 +29,14 @@ final class CronTaskOperationType
             self::DELETE => '删除任务',
             self::RUN => '执行任务',
             self::EDIT => '编辑任务',
+            self::CANCEL => '取消执行',
             default => '未知操作',
         };
     }
 
     public static function isValid(?int $type): bool
     {
-        return in_array($type, [self::ENABLE, self::DISABLE, self::DELETE, self::RUN, self::EDIT], true);
+        return in_array($type, [self::ENABLE, self::DISABLE, self::DELETE, self::RUN, self::EDIT, self::CANCEL], true);
     }
 
     /**
@@ -41,6 +44,6 @@ final class CronTaskOperationType
      */
     public static function all(): array
     {
-        return [self::ENABLE, self::DISABLE, self::DELETE, self::RUN, self::EDIT];
+        return [self::ENABLE, self::DISABLE, self::DELETE, self::RUN, self::EDIT, self::CANCEL];
     }
 }

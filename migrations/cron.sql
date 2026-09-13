@@ -150,7 +150,7 @@ CREATE TABLE `cron_task_operation_log` (
     `cron_id` bigint unsigned NOT NULL DEFAULT '0' COMMENT 'cron_task.id',
     `node_id` int unsigned NOT NULL DEFAULT '0' COMMENT '操作时的节点ID快照',
     `task_name` varchar(128) NOT NULL DEFAULT '' COMMENT '操作时的任务名称快照',
-    `action_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1=启用 2=禁用 3=删除 4=执行 5=编辑',
+    `action_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1=启用 2=禁用 3=删除 4=执行 5=编辑 6=取消执行',
     `operator_id` int unsigned NOT NULL DEFAULT '0' COMMENT '操作人 staff_user.id',
     `operator_name` varchar(128) NOT NULL DEFAULT '' COMMENT '操作人展示名快照',
     `content_before` json DEFAULT NULL COMMENT '变更前任务内容（编辑/删除）',
