@@ -195,7 +195,7 @@ CREATE TABLE `cron_robot_alert_log` (
 CREATE TABLE IF NOT EXISTS `staff_user` (
     `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '自增用户ID',
     `account` varchar(128) NOT NULL DEFAULT '' COMMENT '用户账号(建议邮箱)',
-    `email` varchar(128) DEFAULT NULL COMMENT '登录邮箱',
+    `email` varchar(128) NOT NULL DEFAULT '' COMMENT '登录邮箱',
     `password` varchar(128) NOT NULL DEFAULT '' COMMENT '密码哈希',
     `user_name` varchar(128) NOT NULL DEFAULT '' COMMENT '用户名称',
     `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1-启用,0-禁用',
