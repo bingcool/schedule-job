@@ -10,6 +10,11 @@ class Factory
      */
     public static function getDb()
     {
-        return Application::getApp()->get('db');
+        $app = Application::getApp();
+        if ($app === null) {
+            throw new \RuntimeException('Application context is not ready');
+        }
+
+        return $app->get('db');
     }
 }

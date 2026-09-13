@@ -7,6 +7,8 @@ namespace App\Module\Cron\Service;
 use App\Module\Cron\ExecutionLeaseConfig;
 use App\Module\Cron\ExecutionWorkerIdentity;
 use App\Module\Cron\FailureReason;
+use Swoole\Coroutine\Channel;
+use Swoolefy\Core\BaseServer;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 
 /**
@@ -29,7 +31,8 @@ final class ExecutionRuntimeGuard
     /** @var array<int, array{pid:int,timeoutAt:?string,termSentAt:int,killSentAt:int,terminator:?callable}> */
     private static array $watched = [];
 
-    private static int $timerId = 0;
+    /** @var Channel|int|null */
+    private static Channel|int|null $timerHandle = null;
 
     private static int $lastRecoveryAt = 0;
 
@@ -136,18 +139,29 @@ final class ExecutionRuntimeGuard
 
     private static function ensureTimer(): void
     {
-        if (self::$timerId > 0) {
+        if (self::$timerHandle !== null) {
             return;
         }
-        if (!class_exists(\Swoole\Timer::class)) {
+        if (!function_exists('goTick')) {
             return;
         }
         try {
-            self::$timerId = (int) \Swoole\Timer::tick(5000, static function (): void {
-                self::onTick();
-            });
+            // goTick 会走 EventApp，Timer 回调才能拿到 db 容器。
+            // 阻塞不重叠：心跳 / 回收 / 杀进程不能并发跑两轮。
+            $handle = goTick(5000, static function (): void {
+                try {
+                    self::onTick();
+                } catch (\Throwable $e) {
+                    BaseServer::catchException($e);
+                }
+            }, true);
+            if ($handle === false || $handle === 0) {
+                self::$timerHandle = null;
+                return;
+            }
+            self::$timerHandle = $handle;
         } catch (\Throwable) {
-            self::$timerId = 0;
+            self::$timerHandle = null;
         }
     }
 
