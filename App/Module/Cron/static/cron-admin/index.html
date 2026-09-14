@@ -493,13 +493,13 @@
           <h2 class="section-title">调度配置</h2>
           <div class="section-desc">Swoolefy Cron 支持秒级 Interval 与 Linux Cron 两种表达式。</div>
           <div class="expr-types">
-            <div class="expr-type" :class="{active: exprType==='interval'}" @click="setExprType('interval')">
-              <div class="radio"><i class="radio-dot"></i>每 N 秒</div>
-              <small>适合 5s、15s、30s 等高频任务</small>
-            </div>
             <div class="expr-type" :class="{active: exprType==='cron'}" @click="setExprType('cron')">
               <div class="radio"><i class="radio-dot"></i>Linux Cron</div>
               <small>分钟级标准 Cron 表达式</small>
+            </div>
+            <div class="expr-type" :class="{active: exprType==='interval'}" @click="setExprType('interval')">
+              <div class="radio"><i class="radio-dot"></i>每 N 秒</div>
+              <small>适合 5s、15s、30s 等高频任务</small>
             </div>
           </div>
           <div v-if="exprType==='interval'">
@@ -547,8 +547,8 @@
             <div class="grid">
               <div class="field">
                 <label>Namespace <span class="required-mark">*</span></label>
-                <input class="form-control mono" v-model="k8s.namespace" placeholder="production">
-                <div class="help">必须在该 Agent 节点的 K8S_ALLOWED_NAMESPACES 白名单内。</div>
+                <input class="form-control mono" v-model="k8s.namespace" placeholder="请输入 k8s 部署 yaml 的 Namespace">
+                <div class="help">请输入 k8s 部署 yaml 的 Namespace（须在该 Agent 节点的 K8S_ALLOWED_NAMESPACES 白名单内）。</div>
               </div>
               <div class="field">
                 <label>Deployment <span class="required-mark">*</span></label>
@@ -561,19 +561,36 @@
                 <div class="help">多容器 Deployment 必填；单容器可留空自动选中。Sidecar 不会被复制。</div>
               </div>
               <div class="field">
-                <label>Command（每行一个参数）</label>
-                <textarea class="form-textarea mono" v-model="k8sCommandText" placeholder="php"></textarea>
-                <div class="help">每行一个参数，不是一行 shell。例如第一行只写 <span class="mono">php</span>。留空则沿用镜像 ENTRYPOINT。</div>
+                <label>Command（每行一个参数） <span class="required-mark">*</span></label>
+                <textarea class="form-textarea mono" v-model="k8sCommandText"></textarea>
+                <div class="help-stack">
+                  <div class="help">每行一个参数，不是一行 shell。</div>
+                  <div class="help">eg：<span class="mono">/usr/bin/php</span></div>
+                </div>
               </div>
               <div class="field">
-                <label>Args（每行一个参数）</label>
-                <textarea class="form-textarea mono" v-model="k8sArgsText" placeholder="script.php&#10;start&#10;Test&#10;--c=test:script"></textarea>
-                <div class="help">每行一个参数。本机 Test 脚本应写成四行：<span class="mono">script.php</span> / <span class="mono">start</span> / <span class="mono">Test</span> / <span class="mono">--c=test:script</span>。</div>
+                <label>Args（每行一个参数） <span class="required-mark">*</span></label>
+                <textarea class="form-textarea mono" v-model="k8sArgsText"></textarea>
+                <div class="help-stack">
+                  <div class="help">每行一个参数。</div>
+                  <div class="help">eg：<br><span class="mono">script.php</span><br><span class="mono">start</span><br><span class="mono">Test</span><br><span class="mono">--c=test:script</span></div>
+                </div>
               </div>
               <div class="field full">
-                <label>执行摘要 command</label>
-                <input class="form-control mono" v-model="form.command" placeholder="留空则自动生成">
-                <div class="help">仅用于列表展示，不参与执行；留空保存时会按上面的配置自动生成。</div>
+                <label>完整执行脚本</label>
+                <input class="form-control mono" :value="k8sScriptPreview" readonly>
+                <div class="help">由上面 Command 与 Args 动态拼接，仅用于展示。</div>
+              </div>
+              <div class="field full">
+                <label>Job 超时（秒） <span class="required-mark">*</span></label>
+                <input class="form-control" type="number" min="1" v-model.number="form.timeout" @input="timeoutUserEdited = true">
+                <div class="help-stack">
+                  <div class="help" v-if="k8sTimeoutHoursHint">{{ k8sTimeoutHoursHint }}</div>
+                  <div class="help">默认超时时间随表达式变化不同：分钟级默认600s，小时级默认3600s，按天默认21600s(6个小时)，其他默认7200s(2个小时)</div>
+                  <div class="help">Kubernetes 任务必须填写：Agent 用一个协程等 Job 结束，没有上限就会被永久占用。</div>
+                  <div class="help">到期后 schedule-job 会删除该 Job（连带删 Pod），并记为 TIMEOUT。</div>
+                  <div class="help">需要评估自身业务来设置这个时间，长时间任务需要设置足够大。</div>
+                </div>
               </div>
             </div>
           </div>
@@ -668,15 +685,6 @@
             <div class="help-stack">
               <div class="help">仅 GLUE/Shell；0=不限制。到期 SIGTERM，grace 后 SIGKILL。</div>
               <div class="help">除非很明确任务可能跑很长时间的，否则不建议设置这个超时，容易误杀正在运行的脚本。</div>
-            </div>
-          </div>
-          <div class="field field-gap-top" v-if="form.execType===3">
-            <label>Job 超时（秒） <span class="required-mark">*</span></label>
-            <input class="form-control" type="number" min="1" v-model.number="form.timeout">
-            <div class="help-stack">
-              <div class="help">Kubernetes 任务必须填写：Agent 用一个协程等 Job 结束，没有上限就会被永久占用。</div>
-              <div class="help">到期后 schedule-job 会删除该 Job（连带删 Pod），并记为 TIMEOUT。</div>
-              <div class="help">需要评估自身业务来设置这个时间，长时间任务需要设置足够大。</div>
             </div>
           </div>
         </section>
@@ -1698,10 +1706,10 @@
 <script defer src="/cron-admin/assets/vendor/vue.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/vue-router.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/element-ui/index.js"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=no-menu-login-1"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=auth-401-once-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js?v=dash-trend-view-1"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
-<script defer src="/cron-admin/assets/js/editor.js?v=k8s-command-argv-1"></script>
+<script defer src="/cron-admin/assets/js/editor.js?v=k8s-timeout-hours-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=avg-duration-sec-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=cancel-op-1"></script>
 <script defer src="/cron-admin/assets/js/executions.js?v=exec-trend-pagesize-1"></script>

@@ -61,6 +61,9 @@ class CronTaskPayloadBuilder
             } catch (\Throwable $e) {
                 return CronTaskPayloadBuildResultDto::fail($e->getMessage());
             }
+            if ($parsed->command === [] || $parsed->args === []) {
+                return CronTaskPayloadBuildResultDto::fail('exec_type=3时k8s_spec.command与args为必填');
+            }
             $k8sSpec = $this->canonicalK8sSpec($parsed);
             $command = $this->k8sCommandLine($parsed);
         }

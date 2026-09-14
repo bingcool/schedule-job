@@ -7,14 +7,19 @@
   var AUTH_HINT_KEY = 'schedule_job_auth_hint';
   var AUTH_PUBLIC_PATHS = ['/login'];
   var NO_MENU_ACCESS_HINT = '您无菜单权限，暂无法进入系统，请联系管理员分配角色';
+  var authExpiredNotified = false;
 
   function getToken() {
     return localStorage.getItem(TOKEN_KEY) || '';
   }
 
   function setToken(token) {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      authExpiredNotified = false;
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
   }
 
   function getUser() {
@@ -70,10 +75,16 @@
       json = {};
     }
     if (res.status === 401 && path.indexOf('/auth/login') === -1 && path.indexOf('/auth/register') === -1) {
+      var expiredMsg = json.msg || json.message || '登录已过期';
+      notifyAuthExpiredOnce(expiredMsg);
       clearAuth();
       if (window.location.hash.indexOf('#/login') === -1) {
         window.location.hash = '#/login';
       }
+      var expiredErr = new Error(expiredMsg);
+      expiredErr.code = 'AUTH_EXPIRED';
+      expiredErr.silent = true;
+      throw expiredErr;
     }
     if (!res.ok || (json.code !== undefined && json.code !== 0)) {
       throw new Error(json.msg || json.message || ('HTTP ' + res.status));
@@ -81,7 +92,18 @@
     return json.data;
   }
 
+  function notifyAuthExpiredOnce(message) {
+    if (authExpiredNotified) return;
+    authExpiredNotified = true;
+    try {
+      if (window.Vue && Vue.prototype && Vue.prototype.$message) {
+        Vue.prototype.$message.error(message);
+      }
+    } catch (e) {}
+  }
+
   function toastErr(vm, err) {
+    if (err && err.silent) return;
     vm.$message.error((err && err.message) || String(err));
   }
 

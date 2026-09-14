@@ -22,6 +22,7 @@
         k8s: { namespace: '', deployment: '', container: '' },
         k8sCommandText: '',
         k8sArgsText: '',
+        timeoutUserEdited: false,
         betweenItems: [],
         skipItems: [],
         preview: { valid: true, description: '', nextRuns: [] },
@@ -74,6 +75,14 @@
         var dep = this.k8s.deployment || '?';
         var argv = this.splitArgv(this.k8sCommandText).concat(this.splitArgv(this.k8sArgsText));
         return ns + '/' + dep + (argv.length ? ' ' + argv.join(' ') : '');
+      },
+      k8sScriptPreview: function () {
+        return this.splitArgv(this.k8sCommandText).concat(this.splitArgv(this.k8sArgsText)).join(' ');
+      },
+      k8sTimeoutHoursHint: function () {
+        var sec = Number(this.form.timeout) || 0;
+        if (sec <= 3600) return '';
+        return sec + 's约等于' + (sec / 3600).toFixed(1) + '小时';
       }
     },
     watch: {
@@ -148,6 +157,7 @@
               'cron_skip'
             );
             this.applySelectedGroup(this.form.nodeId);
+            this.timeoutUserEdited = true;
             if (!common.canManageTask(row)) {
               this.readOnly = true;
               this.$message.warning('无权限操作，仅可查看');
@@ -166,7 +176,7 @@
         if (type === 'http') this.form.execType = 2;
         else if (type === 'k8s') {
           this.form.execType = 3;
-          if (!this.form.timeout || this.form.timeout <= 0) this.form.timeout = 600;
+          this.applyK8sTimeoutDefault();
         } else this.form.execType = 1;
       },
       // 多行文本 → argv 数组。空行丢弃，每行原样作为一个参数（不做 Shell 分词）
@@ -293,6 +303,55 @@
         } catch (e) {
           this.preview = { valid: false, description: e.message, nextRuns: [] };
         }
+        this.applyK8sTimeoutDefault();
+      },
+      timeoutDefaultFromSchedule: function () {
+        var runs = (this.preview && this.preview.nextRuns) || [];
+        if (this.preview && this.preview.valid && runs.length >= 2) {
+          var a = Date.parse(String(runs[0]).replace(/-/g, '/'));
+          var b = Date.parse(String(runs[1]).replace(/-/g, '/'));
+          if (!isNaN(a) && !isNaN(b) && b > a) {
+            return this.timeoutDefaultFromIntervalSec(Math.round((b - a) / 1000));
+          }
+        }
+        if (this.exprType === 'interval') {
+          return this.timeoutDefaultFromIntervalSec(this.intervalSec);
+        }
+        return this.timeoutDefaultFromCron(this.cronExpr);
+      },
+      timeoutDefaultFromIntervalSec: function (sec) {
+        sec = Number(sec) || 0;
+        if (sec > 0 && sec < 3600) return 600;
+        if (sec >= 3600 && sec < 86400) return 3600;
+        if (sec >= 86400 && sec < 86400 * 2) return 21600;
+        return 7200;
+      },
+      timeoutDefaultFromCron: function (expr) {
+        var parts = String(expr || '').trim().split(/\s+/);
+        if (parts.length < 5) return 7200;
+        var minute = parts[0];
+        var hour = parts[1];
+        var day = parts[2];
+        var month = parts[3];
+        var dow = parts[4];
+        var wild = function (f) { return f === '*' || f === '?'; };
+        var stepped = function (f) {
+          return f === '*' || f.indexOf('/') >= 0 || f.indexOf(',') >= 0 || f.indexOf('-') >= 0;
+        };
+        if (wild(hour) && (minute === '*' || minute.indexOf('/') >= 0 || minute.indexOf(',') >= 0 || minute.indexOf('-') >= 0)) {
+          return 600;
+        }
+        if (wild(day) && wild(month) && wild(dow) && (wild(hour) || hour.indexOf('/') >= 0 || hour.indexOf(',') >= 0 || hour.indexOf('-') >= 0)) {
+          return 3600;
+        }
+        if (wild(day) && wild(month) && wild(dow)) {
+          return 21600;
+        }
+        return 7200;
+      },
+      applyK8sTimeoutDefault: function () {
+        if (this.form.execType !== 3 || this.timeoutUserEdited) return;
+        this.form.timeout = this.timeoutDefaultFromSchedule();
       },
       save: async function () {
         if (this.readOnly || (this.isEdit && !common.canManageTask(this.form))) {
@@ -309,6 +368,10 @@
         if (isK8s) {
           if (!this.k8s.namespace || !this.k8s.deployment) {
             this.$message.warning('请填写 Kubernetes Namespace 与 Deployment');
+            return;
+          }
+          if (!this.splitArgv(this.k8sCommandText).length || !this.splitArgv(this.k8sArgsText).length) {
+            this.$message.warning('请填写 Kubernetes Command 与 Args');
             return;
           }
           var fatArgv = this.splitArgv(this.k8sCommandText).concat(this.splitArgv(this.k8sArgsText))
