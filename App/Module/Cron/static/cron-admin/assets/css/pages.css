@@ -434,6 +434,10 @@
   line-height: 1.5;
 }
 
+.expr-switch {
+  margin-top: 4px;
+}
+
 .expr-types {
   display: flex;
   gap: 10px;
@@ -447,11 +451,20 @@
   padding: 13px;
   cursor: pointer;
   background: #fff;
+  color: var(--muted);
 }
 
 .expr-type.active {
   border-color: #8db1f7;
   background: var(--primary-soft);
+  color: inherit;
+}
+
+.expr-panel {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 9px;
+  padding: 16px 16px 14px;
 }
 
 .expr-type .radio {
@@ -493,7 +506,7 @@
 
 .expr-preview {
   border: 1px solid #cfe0ff;
-  background: #f8fbff;
+  background: #fff;
   border-radius: 9px;
   padding: 13px 14px;
   margin-top: 12px;
