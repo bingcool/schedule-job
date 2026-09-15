@@ -17,12 +17,14 @@ use App\Module\Staff\Request\StaffManager\StaffUserByNodeGroupRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserCreateRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserIdRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserNodeGroupsRequest;
+use App\Module\Staff\Request\StaffManager\StaffUserGenerateResetPasswordRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserResetPasswordRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserRolesRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserStatusRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserUpdateRequest;
-use App\Module\Staff\Response\StaffManager\ChangePasswordAckResponse;
+use App\Module\Staff\Response\StaffManager\GenerateResetPasswordResponse;
 use App\Module\Staff\Response\StaffManager\ListUsersResponse;
+use App\Module\Staff\Response\StaffManager\ResetPasswordAckResponse;
 use App\Module\Staff\Response\StaffManager\RoleOptionsResponse;
 use App\Module\Staff\Response\StaffManager\StaffDeleteAckResponse;
 use App\Module\Staff\Response\StaffManager\StaffUserRowResponse;
@@ -141,7 +143,27 @@ class StaffUserController extends BController
     }
 
     /**
-     * 超级管理员重置其他用户密码。
+     * 超级管理员生成 3 天有效的 32 位临时重置密码。
+     *
+     * Route: POST /api/v1/users/generate-reset-password
+     *
+     ```bash
+     curl -X POST 'http://127.0.0.1:9502/api/v1/users/generate-reset-password' \
+       -H 'Authorization: Bearer <jwt>' \
+       -H 'Content-Type: application/json' \
+       -d '{"userId":2}'
+     ```
+     */
+    #[ApiOperation('生成临时重置密码')]
+    public function generateResetPassword(StaffUserGenerateResetPasswordRequest $request): GenerateResetPasswordResponse
+    {
+        return new GenerateResetPasswordResponse(
+            $this->staffUserService->generateResetPassword($request->getUserId())
+        );
+    }
+
+    /**
+     * 超级管理员确认写入已生成的临时重置密码。
      *
      * Route: PUT /api/v1/users/reset-password
      *
@@ -149,21 +171,17 @@ class StaffUserController extends BController
      curl -X PUT 'http://127.0.0.1:9502/api/v1/users/reset-password' \
        -H 'Authorization: Bearer <jwt>' \
        -H 'Content-Type: application/json' \
-       -d '{"id":2,"newPassword":"123456789","newPasswordConfirm":"123456789"}'
+       -d '{"id":2,"password":"<32-char-password>"}'
      ```
      */
     #[ApiOperation('超级管理员重置用户密码')]
-    public function resetPassword(StaffUserResetPasswordRequest $request): ChangePasswordAckResponse
+    public function resetPassword(StaffUserResetPasswordRequest $request): ResetPasswordAckResponse
     {
-        $id = $this->staffUserService->resetPasswordBySuperAdmin(
-            ResetUserPasswordDto::of(
-                $request->getId(),
-                $request->getNewPassword(),
-                $request->getNewPasswordConfirm(),
+        return new ResetPasswordAckResponse(
+            $this->staffUserService->resetPasswordBySuperAdmin(
+                ResetUserPasswordDto::of($request->getId(), $request->getPassword())
             )
         );
-
-        return new ChangePasswordAckResponse($id);
     }
 
     /**

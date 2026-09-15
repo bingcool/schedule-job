@@ -124,6 +124,31 @@
   color: var(--primary);
 }
 
+.temp-password-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+  font-size: 14px;
+  line-height: 1;
+  cursor: help;
+}
+
+.reset-pwd-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.reset-pwd-mail-hint {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
 .reset-password-form .el-form-item__label {
   white-space: nowrap;
 }

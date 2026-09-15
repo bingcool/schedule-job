@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/cron-admin/assets/vendor/element-ui/theme-chalk/index.css">
   <link rel="stylesheet" href="/cron-admin/assets/css/common.css?v=app-header-4">
   <link rel="stylesheet" href="/cron-admin/assets/css/pages.css?v=expr-switch-gap-1">
-  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=app-header-2">
+  <link rel="stylesheet" href="/cron-admin/assets/css/auth.css?v=temp-pwd-mark-1">
 </head>
 <body>
 <div id="app" v-cloak>
@@ -40,6 +40,9 @@
               <el-dropdown-item command="profile"><i class="el-icon-user"></i> 个人设置</el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
+          <el-tooltip v-if="tempPasswordHint" :content="tempPasswordHint" placement="bottom">
+            <span class="temp-password-mark">❗</span>
+          </el-tooltip>
           <el-button size="mini" plain @click="logout">退出</el-button>
         </div>
         <el-dialog title="重置密码" :visible.sync="settingsDlg" width="440px" append-to-body @closed="resetPasswordForm">
@@ -1442,16 +1445,25 @@
         <el-button type="primary" :loading="grantSaving" @click="saveGrant">保存</el-button>
       </div>
     </el-dialog>
-    <el-dialog title="重置密码" :visible.sync="resetPwdDlg" width="480px" append-to-body>
+    <el-dialog title="重置密码" :visible.sync="resetPwdDlg" width="520px" append-to-body>
       <p style="margin:0 0 12px;color:var(--muted);font-size:13px">为「{{ resetPwdUser.userName || resetPwdUser.account }}」设置新密码，重置后立即生效。</p>
       <el-form label-position="top" @submit.native.prevent="saveResetPassword">
-        <el-form-item label="新密码">
-          <el-input v-model="resetPwdForm.newPassword" type="password" placeholder="至少 8 位" show-password></el-input>
-        </el-form-item>
-        <el-form-item label="确认新密码">
-          <el-input v-model="resetPwdForm.newPasswordConfirm" type="password" placeholder="请再次输入新密码" show-password @keyup.enter.native="saveResetPassword"></el-input>
+        <el-form-item>
+          <div slot="label" class="reset-pwd-field-label">
+            <span>重置的密码</span>
+            <el-button type="primary" size="mini" native-type="button" :loading="resetPwdGenerating" @click="generateResetPassword">生成密码</el-button>
+          </div>
+          <el-input
+            v-model="resetPwdForm.password"
+            readonly
+            placeholder="点击「生成密码」自动填入，不可手动输入">
+          </el-input>
         </el-form-item>
       </el-form>
+      <p class="reset-pwd-mail-hint">
+        <template v-if="resetPwdUser.email">重置密码将通过其邮箱「{{ resetPwdUser.email }}」发给用户</template>
+        <template v-else>用户没绑定邮箱，无法通过邮件发送重置密码，需人为通知</template>
+      </p>
       <div slot="footer">
         <el-button @click="resetPwdDlg = false">取消</el-button>
         <el-button type="primary" :loading="resetPwdSaving" @click="saveResetPassword">确认重置</el-button>
@@ -1710,7 +1722,7 @@
 <script defer src="/cron-admin/assets/vendor/vue.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/vue-router.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/element-ui/index.js"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=auth-401-once-1"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=temp-login-hint-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js?v=dash-trend-view-1"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=k8s-timeout-hours-1"></script>
@@ -1721,12 +1733,12 @@
 <script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js?v=login-email-1"></script>
-<script defer src="/cron-admin/assets/js/users.js?v=admin-no-delete-1"></script>
+<script defer src="/cron-admin/assets/js/users.js?v=reset-pwd-gen-1"></script>
 <script defer src="/cron-admin/assets/js/user-editor.js?v=admin-account-lock-1"></script>
 <script defer src="/cron-admin/assets/js/roles.js?v=pages-dlg-2"></script>
 <script defer src="/cron-admin/assets/js/role-editor.js?v=basic-only-3"></script>
 <script defer src="/cron-admin/assets/vendor/sortable.min.js"></script>
 <script defer src="/cron-admin/assets/js/menus.js?v=menu-sort-1"></script>
-<script defer src="/cron-admin/assets/js/app.js?v=no-menu-login-1"></script>
+<script defer src="/cron-admin/assets/js/app.js?v=temp-login-hint-1"></script>
 </body>
 </html>

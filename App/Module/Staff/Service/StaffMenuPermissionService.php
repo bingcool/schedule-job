@@ -60,6 +60,8 @@ class StaffMenuPermissionService
         '/api/v1/robots/test' => '/robots',
         '/api/v1/robots' => '/robots',
         '/api/v1/runtime/overview' => '/runtime',
+        '/api/v1/users/generate-reset-password' => '/users',
+        '/api/v1/users/reset-password' => '/users',
         '/api/v1/users/status' => '/users',
         '/api/v1/users/roles' => '/users',
         '/api/v1/users/node-groups' => '/users',

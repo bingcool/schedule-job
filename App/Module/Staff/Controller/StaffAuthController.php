@@ -47,6 +47,8 @@ class StaffAuthController extends BController
     }
 
     /**
+     * 登录：密码能解析为临时重置令牌则先校验 3 天有效期，否则走普通密码。
+     *
      * Route: POST /api/v1/auth/login
      *
      ```bash

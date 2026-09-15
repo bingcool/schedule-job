@@ -88,11 +88,11 @@ return [
 
     // support_log模块日志
     'support_log' => function($name) {
-    $logger = new \Swoolefy\Util\Log($name);
-    $logger->setChannel('application');
-    $logFilePath = LOG_PATH.'/support/support.log';
-    $logger->setLogFilePath($logFilePath);
-    $logger->setRotateDay(2);
-    return $logger;
-}
+        $logger = new \Swoolefy\Util\Log($name);
+        $logger->setChannel('application');
+        $logFilePath = LOG_PATH.'/support/support.log';
+        $logger->setLogFilePath($logFilePath);
+        $logger->setRotateDay(2);
+        return $logger;
+    }
 ];

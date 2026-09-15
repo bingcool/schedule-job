@@ -5,6 +5,8 @@
   var TOKEN_KEY = 'schedule_job_token';
   var USER_KEY = 'schedule_job_user';
   var AUTH_HINT_KEY = 'schedule_job_auth_hint';
+  // 按 user_id 记录本次是临时密码登录还是普通登录，以及临时密码到期时间
+  var LOGIN_MODE_KEY = 'schedule_job_login_modes';
   var AUTH_PUBLIC_PATHS = ['/login'];
   var NO_MENU_ACCESS_HINT = '您无菜单权限，暂无法进入系统，请联系管理员分配角色';
   var authExpiredNotified = false;
@@ -44,10 +46,80 @@
     return AUTH_PUBLIC_PATHS.indexOf(path) !== -1;
   }
 
+  /** 读取 localStorage 里以 user_id 为键的登录方式表。 */
+  function readLoginModes() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(LOGIN_MODE_KEY) || '{}');
+      return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /** 登录成功后写入：mode=temp|normal，temp 时带 expiresAt。 */
+  function setLoginModeByUserId(userId, mode, expiresAt) {
+    var id = String(userId || '');
+    if (!id) return;
+    var all = readLoginModes();
+    all[id] = {
+      mode: mode === 'temp' ? 'temp' : 'normal',
+      expiresAt: expiresAt || ''
+    };
+    localStorage.setItem(LOGIN_MODE_KEY, JSON.stringify(all));
+  }
+
+  /** 取当前用户的登录方式，供顶部 ❗ 判断是否展示。 */
+  function getLoginModeByUserId(userId) {
+    return readLoginModes()[String(userId || '')] || null;
+  }
+
+  /** 用户自己改完密码后清掉临时登录提示。 */
+  function markNormalLogin(userId) {
+    setLoginModeByUserId(userId, 'normal', '');
+  }
+
+  function parseLocalDateTime(value) {
+    var m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+  }
+
+  /** 悬停 ❗ 时展示的剩余时间文案。 */
+  function formatTempPasswordHint(expiresAt) {
+    var end = parseLocalDateTime(expiresAt);
+    if (!end) return '';
+    var ms = end.getTime() - Date.now();
+    if (ms <= 0) return '临时密码已过期，请马上更改密码';
+    var totalMin = Math.floor(ms / 60000);
+    var days = Math.floor(totalMin / (60 * 24));
+    var hours = Math.floor((totalMin % (60 * 24)) / 60);
+    var mins = totalMin % 60;
+    var parts = [];
+    if (days > 0) parts.push(days + '天');
+    if (hours > 0) parts.push(hours + '小时');
+    if (days === 0 && (mins > 0 || hours === 0)) parts.push(Math.max(mins, 1) + '分钟');
+    return '临时密码剩余 ' + parts.join('') + '，请马上更改密码';
+  }
+
+  /** 重置弹窗提示用的邮箱：优先 email，其次账号本身是邮箱。 */
+  function resolveUserEmail(row) {
+    var email = String((row && row.email) || '').trim();
+    if (email) return email;
+    var account = String((row && row.account) || '').trim();
+    if (account.indexOf('@') !== -1 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account)) {
+      return account;
+    }
+    return '';
+  }
+
+  /** 登录成功落 token / 用户，并按 user_id 记下本次登录方式。 */
   function saveSession(data) {
     if (!data) return;
     if (data.token) setToken(data.token);
-    if (data.user) setUser(data.user);
+    if (data.user) {
+      setUser(data.user);
+      setLoginModeByUserId(data.user.id, data.loginMode || 'normal', data.tempPasswordExpiresAt || '');
+    }
   }
 
   function applySessionToRoot(vm, data) {
@@ -456,6 +528,11 @@
     clearAuth: clearAuth,
     saveSession: saveSession,
     applySessionToRoot: applySessionToRoot,
+    setLoginModeByUserId: setLoginModeByUserId,
+    getLoginModeByUserId: getLoginModeByUserId,
+    markNormalLogin: markNormalLogin,
+    formatTempPasswordHint: formatTempPasswordHint,
+    resolveUserEmail: resolveUserEmail,
     isAuthPublicPath: isAuthPublicPath,
     isViewerSuper: isViewerSuper,
     isViewerEditorTaskGroup: isViewerEditorTaskGroup,

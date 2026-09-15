@@ -23,8 +23,9 @@
         roleForm: { roleIds: [] },
         resetPwdDlg: false,
         resetPwdSaving: false,
-        resetPwdUser: { id: 0, userName: '', account: '' },
-        resetPwdForm: { newPassword: '', newPasswordConfirm: '' }
+        resetPwdGenerating: false,
+        resetPwdUser: { id: 0, userName: '', account: '', email: '' },
+        resetPwdForm: { password: '' }
       };
     },
     computed: {
@@ -182,6 +183,7 @@
           if (e !== 'cancel') common.toastErr(this, e);
         }
       },
+      /** 打开重置弹窗：输入框只读，必须先点「生成密码」。 */
       openResetPassword: function (row) {
         if (!common.isViewerSuper()) {
           this.$message.warning('仅超级管理员可重置密码');
@@ -194,35 +196,57 @@
         this.resetPwdUser = {
           id: Number(row.id),
           userName: row.userName || '',
-          account: row.account || ''
+          account: row.account || '',
+          email: common.resolveUserEmail(row)
         };
-        this.resetPwdForm = { newPassword: '', newPasswordConfirm: '' };
+        this.resetPwdForm = { password: '' };
         this.resetPwdDlg = true;
       },
+      /** 调后端签发 32 位临时密码并回填，不可手改。 */
+      generateResetPassword: async function () {
+        if (!this.resetPwdUser.id) {
+          this.$message.warning('用户无效');
+          return;
+        }
+        this.resetPwdGenerating = true;
+        try {
+          var d = await common.api('/users/generate-reset-password', {
+            method: 'POST',
+            body: { userId: this.resetPwdUser.id }
+          });
+          this.resetPwdForm.password = (d && d.password) || '';
+          if (d && d.email) this.resetPwdUser.email = d.email;
+          if (!this.resetPwdForm.password) {
+            this.$message.warning('未生成到重置密码');
+            return;
+          }
+          this.$message.success('已生成重置密码');
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.resetPwdGenerating = false;
+        }
+      },
+      /** 确认重置只提交一条 password；有邮箱则尝试发信。 */
       saveResetPassword: async function () {
-        if (!this.resetPwdForm.newPassword || !this.resetPwdForm.newPasswordConfirm) {
-          this.$message.warning('请填写新密码');
-          return;
-        }
-        if (this.resetPwdForm.newPassword.length < 8) {
-          this.$message.warning('密码至少 8 位');
-          return;
-        }
-        if (this.resetPwdForm.newPassword !== this.resetPwdForm.newPasswordConfirm) {
-          this.$message.warning('两次输入的密码不一致');
+        if (!this.resetPwdForm.password) {
+          this.$message.warning('请先生成重置密码');
           return;
         }
         this.resetPwdSaving = true;
         try {
-          await common.api('/users/reset-password', {
+          var d = await common.api('/users/reset-password', {
             method: 'PUT',
             body: {
               id: this.resetPwdUser.id,
-              newPassword: this.resetPwdForm.newPassword,
-              newPasswordConfirm: this.resetPwdForm.newPasswordConfirm
+              password: this.resetPwdForm.password
             }
           });
-          this.$message.success('密码已重置');
+          if (this.resetPwdUser.email) {
+            this.$message.success(d && d.mailSent ? '密码已重置，已发送至用户邮箱' : '密码已重置，邮件发送失败，请人为通知');
+          } else {
+            this.$message.success('密码已重置，用户未绑定邮箱，需人为通知');
+          }
           this.resetPwdDlg = false;
         } catch (e) {
           common.toastErr(this, e);

@@ -57,6 +57,9 @@ Route::group([
     Route::match(['POST', 'PUT'], '/users/status', [
         'dispatch_route' => [StaffUserController::class, 'switchStatus'],
     ]);
+    Route::match(['POST', 'PUT'], '/users/generate-reset-password', [
+        'dispatch_route' => [StaffUserController::class, 'generateResetPassword'],
+    ]);
     Route::match(['POST', 'PUT'], '/users/reset-password', [
         'dispatch_route' => [StaffUserController::class, 'resetPassword'],
     ]);

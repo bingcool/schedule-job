@@ -107,7 +107,9 @@
         passwordForm: { oldPassword: '', newPassword: '', newPasswordConfirm: '' },
         profileDlg: false,
         profileSaving: false,
-        profileForm: { account: '', userName: '' }
+        profileForm: { account: '', userName: '' },
+        loginHintNow: Date.now(),
+        loginHintTimer: null
       };
     },
     computed: {
@@ -125,10 +127,26 @@
       },
       pageSubtitle: function () {
         return (this.$route.meta && this.$route.meta.subtitle) || '';
+      },
+      /** 临时密码登录才有文案；顶部只显示 ❗，完整提示放 tooltip。 */
+      tempPasswordHint: function () {
+        void this.loginHintNow;
+        var user = this.currentUser;
+        if (!user) return '';
+        var rec = common.getLoginModeByUserId(user.id);
+        if (!rec || rec.mode !== 'temp' || !rec.expiresAt) return '';
+        return common.formatTempPasswordHint(rec.expiresAt);
       }
     },
     created: function () {
+      var self = this;
       this.refreshUser();
+      this.loginHintTimer = setInterval(function () {
+        self.loginHintNow = Date.now();
+      }, 30000);
+    },
+    beforeDestroy: function () {
+      if (this.loginHintTimer) clearInterval(this.loginHintTimer);
     },
     watch: {
       '$route': function (to, from) {
@@ -245,6 +263,8 @@
           this.$message.success('密码已修改');
           this.settingsDlg = false;
           this.resetPasswordForm();
+          common.markNormalLogin((this.currentUser || {}).id);
+          this.loginHintNow = Date.now();
         } catch (e) {
           common.toastErr(this, e);
         } finally {

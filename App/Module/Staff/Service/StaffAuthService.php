@@ -16,6 +16,11 @@ use Swoolefy\Support\Auth\AuthUser;
 use Swoolefy\Support\Auth\JwtAuthGuard;
 use Swoolefy\Support\FrameworkContext;
 
+/**
+ * 登录、改密、个人资料。
+ * 登录会先用 {@see ResetPasswordTokenService::parse()} 判断是否临时重置密码：
+ * 能解析则校验 3 天有效期；解析不出则按普通密码验证。
+ */
 class StaffAuthService
 {
     private StaffRoleService $staffRoleService {
@@ -26,6 +31,12 @@ class StaffAuthService
     private StaffUserService $staffUserService {
         get => $this->staffUserService ??= new StaffUserService($this->staffRoleService);
         set => $this->staffUserService = $value;
+    }
+
+    /** 登录时解析密码，区分临时重置密码与普通密码。 */
+    private ResetPasswordTokenService $resetPasswordTokenService {
+        get => $this->resetPasswordTokenService ??= new ResetPasswordTokenService();
+        set => $this->resetPasswordTokenService = $value;
     }
 
     public function __construct(
@@ -45,6 +56,12 @@ class StaffAuthService
         throw StaffException::throw('系统已关闭公开注册，请联系管理员创建账号', -1);
     }
 
+    /**
+     * 登录。
+     * 1）密码能被 ResetPasswordTokenService 解析 → 临时重置密码：先判过期，再核对 userId 与库中哈希。
+     * 2）解析失败 → 普通密码 password_verify。
+     * 临时登录会在 session 里带 loginMode=temp 和到期时间，供前端顶部 ❗ 提示。
+     */
     public function login(LoginDto $dto): AuthSessionDto
     {
         $account = $dto->getAccount();
@@ -55,8 +72,30 @@ class StaffAuthService
             throw StaffException::throw('邮箱格式不对', -1);
         }
 
+        $password = $dto->getPassword();
+        $temp = $this->resetPasswordTokenService->parse($password);
+        if ($temp !== null) {
+            if (!empty($temp['expired'])) {
+                throw StaffException::throw('临时重置密码已过期', -1);
+            }
+            $user = (new StaffUserEntity())->loadByLoginIdentity($account);
+            if (
+                !$user
+                || $user->isDeleted()
+                || (int) $user->id !== (int) $temp['userId']
+                || !StaffUserService::verifyResetPassword($password, (string) $user->password)
+            ) {
+                throw StaffException::throw('账号或密码错误', -1);
+            }
+            if ($user->isDisabled()) {
+                throw StaffException::throw('账号已禁用', -1);
+            }
+
+            return $this->issueSession($user, 'temp', (string) $temp['expiresAt']);
+        }
+
         $user = (new StaffUserEntity())->loadByLoginIdentity($account);
-        if (!$user || $user->isDeleted() || !password_verify($dto->getPassword(), (string) $user->password)) {
+        if (!$user || $user->isDeleted() || !password_verify($password, (string) $user->password)) {
             throw StaffException::throw('账号或密码错误', -1);
         }
         if ($user->isDisabled()) {
@@ -80,6 +119,9 @@ class StaffAuthService
         return $this->profileOf($user);
     }
 
+    /**
+     * 当前用户修改自己的密码。旧密码可能是普通密码，也可能是尚未过期的临时重置密码。
+     */
     public function changePassword(ChangePasswordDto $dto): int
     {
         $authUser = FrameworkContext::userOrFail();
@@ -93,7 +135,7 @@ class StaffAuthService
         if ($dto->getNewPassword() !== $dto->getNewPasswordConfirm()) {
             throw StaffException::throw('两次输入的新密码不一致', -1);
         }
-        if (!password_verify($dto->getOldPassword(), (string) $user->password)) {
+        if (!$this->verifyStoredPassword($dto->getOldPassword(), (string) $user->password)) {
             throw StaffException::throw('旧密码不正确', -1);
         }
         if (password_verify($dto->getNewPassword(), (string) $user->password)) {
@@ -127,8 +169,28 @@ class StaffAuthService
         return $this->profileOf($user);
     }
 
-    private function issueSession(StaffUserEntity $user): AuthSessionDto
+    /**
+     * 校验库中密码哈希：先按普通 bcrypt，再按临时重置密码（sha256 后再 bcrypt）。
+     */
+    private function verifyStoredPassword(string $plain, string $hash): bool
     {
+        if (password_verify($plain, $hash)) {
+            return true;
+        }
+
+        return $this->resetPasswordTokenService->parse($plain) !== null
+            && StaffUserService::verifyResetPassword($plain, $hash);
+    }
+
+    /**
+     * 签发登录 session。
+     * $loginMode=temp 时带上临时密码到期时间，前端按 user_id 写入 localStorage。
+     */
+    private function issueSession(
+        StaffUserEntity $user,
+        string $loginMode = 'normal',
+        string $tempPasswordExpiresAt = '',
+    ): AuthSessionDto {
         $profile = $this->profileOf($user);
         $this->assertHasMenuAccess($profile);
         $roleCodes = array_values(array_filter(array_map(
@@ -149,7 +211,7 @@ class StaffAuthService
         $authConfig = include APP_PATH . '/Config/auth.php';
         $ttl = (int) ($authConfig['jwt']['ttl_seconds'] ?? 3600);
 
-        return AuthSessionDto::of($token, $ttl, $profile);
+        return AuthSessionDto::of($token, $ttl, $profile, $loginMode, $tempPasswordExpiresAt);
     }
 
     /**

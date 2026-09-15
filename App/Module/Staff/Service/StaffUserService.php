@@ -6,9 +6,11 @@ namespace App\Module\Staff\Service;
 
 use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
 use App\Module\Staff\Dto\StaffManager\CreateUserDto;
+use App\Module\Staff\Dto\StaffManager\GeneratedResetPasswordDto;
 use App\Module\Staff\Dto\StaffManager\GrantUserNodeGroupsDto;
 use App\Module\Staff\Dto\StaffManager\GrantUserRolesDto;
 use App\Module\Staff\Dto\StaffManager\ListUsersQueryDto;
+use App\Module\Staff\Dto\StaffManager\ResetPasswordAckDto;
 use App\Module\Staff\Dto\StaffManager\ResetUserPasswordDto;
 use App\Module\Staff\Dto\StaffManager\StaffUserRowDto;
 use App\Module\Staff\Dto\StaffManager\SwitchUserStatusDto;
@@ -23,11 +25,28 @@ use App\Module\Staff\StaffApp;
 use App\Module\Staff\StaffRoleCode;
 use Swoolefy\Support\FrameworkContext;
 
+/**
+ * 用户管理：增删改、角色 / 节点组授权、超级管理员重置密码。
+ * 重置密码分两步：{@see generateResetPassword()} 只签发 32 位临时密码；
+ * {@see resetPasswordBySuperAdmin()} 才写入哈希并尝试发邮件。
+ */
 class StaffUserService
 {
     private StaffRoleService $staffRoleService {
         get => $this->staffRoleService ??= new StaffRoleService();
         set => $this->staffRoleService = $value;
+    }
+
+    /** 签发 / 解析 32 位临时重置密码。 */
+    private ResetPasswordTokenService $resetPasswordTokenService {
+        get => $this->resetPasswordTokenService ??= new ResetPasswordTokenService();
+        set => $this->resetPasswordTokenService = $value;
+    }
+
+    /** 重置成功后按 .env 发邮件；未配置则跳过。 */
+    private StaffMailService $staffMailService {
+        get => $this->staffMailService ??= new StaffMailService();
+        set => $this->staffMailService = $value;
     }
 
     public function __construct(?StaffRoleService $staffRoleService = null)
@@ -380,9 +399,32 @@ class StaffUserService
     }
 
     /**
-     * 超级管理员重置其他用户密码。
+     * 超级管理员为其他用户签发 3 天有效的 32 位临时重置密码。
+     * 此时尚未写入数据库，前端回填「重置的密码」后需再点确认。
      */
-    public function resetPasswordBySuperAdmin(ResetUserPasswordDto $dto): int
+    public function generateResetPassword(int $userId): GeneratedResetPasswordDto
+    {
+        $this->assertSuperViewer();
+        if ($userId <= 0) {
+            throw StaffException::throw('用户不存在', -1);
+        }
+        $this->assertNotSelf($userId, '请使用「修改密码」功能修改自己的密码');
+        $user = $this->requireUser($userId);
+        $issued = $this->resetPasswordTokenService->issue((int) $user->id);
+
+        return GeneratedResetPasswordDto::of(
+            (int) $user->id,
+            $issued['password'],
+            $issued['expiresAt'],
+            $this->notifyEmailOf($user),
+        );
+    }
+
+    /**
+     * 确认重置：校验传入的就是刚签发的临时密码（未过期、userId 匹配），
+     * 再写入哈希。有邮箱则发信；发信失败不影响密码已改，由 mailSent 告知前端。
+     */
+    public function resetPasswordBySuperAdmin(ResetUserPasswordDto $dto): ResetPasswordAckDto
     {
         $this->assertSuperViewer();
 
@@ -392,26 +434,68 @@ class StaffUserService
         }
         $this->assertNotSelf($targetId, '请使用「修改密码」功能修改自己的密码');
 
-        if ($dto->getNewPassword() === '') {
-            throw StaffException::throw('新密码不能为空', -1);
+        $password = trim($dto->getPassword());
+        if ($password === '') {
+            throw StaffException::throw('请先生成重置密码', -1);
         }
-        if ($dto->getNewPassword() !== $dto->getNewPasswordConfirm()) {
-            throw StaffException::throw('两次输入的新密码不一致', -1);
+        $parsed = $this->resetPasswordTokenService->parse($password);
+        if ($parsed === null) {
+            throw StaffException::throw('请先生成重置密码', -1);
         }
-        self::assertPassword($dto->getNewPassword());
+        if (!empty($parsed['expired'])) {
+            throw StaffException::throw('临时重置密码已过期，请重新生成', -1);
+        }
+        if ((int) $parsed['userId'] !== $targetId) {
+            throw StaffException::throw('重置密码与用户不匹配，请重新生成', -1);
+        }
 
         $user = $this->requireUser($targetId);
         $user->setData([
-            'password' => self::hashPassword($dto->getNewPassword()),
+            'password' => self::hashResetPassword($password),
         ]);
         $user->save();
 
-        return (int) $user->id;
+        $email = $this->notifyEmailOf($user);
+        $mailSent = false;
+        if ($email !== '') {
+            $mailSent = $this->staffMailService->sendResetPassword($email, $password);
+        }
+
+        return ResetPasswordAckDto::of((int) $user->id, $mailSent, $email);
+    }
+
+    /**
+     * 通知邮箱：优先用户 email 字段，否则账号本身是邮箱则用账号。
+     * 都没有则返回空串，前端提示需人为通知。
+     */
+    public function notifyEmailOf(StaffUserEntity $user): string
+    {
+        $email = strtolower(trim((string) ($user->email ?? '')));
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false) {
+            return $email;
+        }
+        $fromAccount = self::emailFromAccount((string) ($user->account ?? ''));
+
+        return $fromAccount ?? '';
     }
 
     public static function hashPassword(string $password): string
     {
         return password_hash($password, PASSWORD_BCRYPT);
+    }
+
+    /**
+     * 临时重置密码入库哈希。先 sha256 再 bcrypt，避免密码形态变化影响校验。
+     */
+    public static function hashResetPassword(string $password): string
+    {
+        return self::hashPassword(hash('sha256', $password));
+    }
+
+    /** 与 {@see hashResetPassword()} 成对，登录 / 改密时校验临时密码。 */
+    public static function verifyResetPassword(string $password, string $hash): bool
+    {
+        return password_verify(hash('sha256', $password), $hash);
     }
 
     public static function assertPassword(string $password): void

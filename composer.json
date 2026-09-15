@@ -21,7 +21,8 @@
   "require": {
     "php": "^8.4",
     "bingcool/swoolefy": "^6.3.5",
-    "bingcool/library": "^6.0.1"
+    "bingcool/library": "^6.0.1",
+    "phpmailer/phpmailer": "~7.1.0"
   },
   "require-dev": {
     "kwn/php-rdkafka-stubs": "dev-master",
