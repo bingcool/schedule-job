@@ -20,7 +20,6 @@ use Swoolefy\Script\GenerateApiDoc;
 use Swoolefy\Script\GenerateSdk;
 use Swoolefy\Script\TestScript;
 use Swoolefy\Core\Schedule\Schedule;
-use Swoolefy\Worker\Cron\CronForkProcess;
 
 class Kernel extends AbstractKernel
 {

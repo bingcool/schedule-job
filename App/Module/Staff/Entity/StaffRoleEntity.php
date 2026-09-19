@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Staff\Entity;
 
 use App\Model\ClientModel;
+use Swoolefy\Library\Db\Concern\SoftDelete;
 
 /**
  * @property int $id
@@ -16,9 +17,12 @@ use App\Model\ClientModel;
  * @property int $status
  * @property string $created_at
  * @property string $updated_at
+ * @property string|null $deleted_at
  */
 class StaffRoleEntity extends ClientModel
 {
+    use SoftDelete;
+
     protected static $table = 'staff_roles';
 
     protected $pk = 'id';

@@ -165,6 +165,7 @@ class StaffRoleService
         if ($name === '' || $code === '') {
             throw StaffException::throw('角色名称和唯一标识不能为空', -1);
         }
+        // SoftDelete 下 loadByCode 只命中未删除行，已删角色的 code 可复用
         if ((new StaffRoleEntity())->loadByCode($code)) {
             throw StaffException::throw('角色标识已存在', -1);
         }
@@ -272,6 +273,7 @@ class StaffRoleService
 
         StaffRolePageEntity::query()->where('role_id', (int) $role->id)->delete();
         StaffRolePermissionEntity::query()->where('role_id', (int) $role->id)->delete();
+        // SoftDelete：写入 deleted_at，列表 / loadById / loadByCode 自动排除
         $role->delete();
 
         return (int) $role->id;
