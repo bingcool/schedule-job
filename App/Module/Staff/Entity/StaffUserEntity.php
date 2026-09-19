@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Staff\Entity;
 
 use App\Model\ClientModel;
-use Swoolefy\Library\Db\Query;
+use Swoolefy\Library\Db\Concern\SoftDelete;
 
 /**
  * @property int $id
@@ -22,14 +22,11 @@ use Swoolefy\Library\Db\Query;
  */
 class StaffUserEntity extends ClientModel
 {
+    use SoftDelete;
+
     protected static $table = 'staff_user';
 
     protected $pk = 'id';
-
-    public static function queryActive(): Query
-    {
-        return static::query()->whereNull('delete_at');
-    }
 
     public function loadById(int $id): ?static
     {
@@ -60,8 +57,8 @@ class StaffUserEntity extends ClientModel
         if ($email === '') {
             return null;
         }
-        $emailQb = static::queryActive()->where('email', $email);
-        $accountQb = static::queryActive()->where('account', $email);
+        $emailQb = static::query()->where('email', $email);
+        $accountQb = static::query()->where('account', $email);
         if ($exceptId !== null && $exceptId > 0) {
             $emailQb->where('id', '<>', $exceptId);
             $accountQb->where('id', '<>', $exceptId);

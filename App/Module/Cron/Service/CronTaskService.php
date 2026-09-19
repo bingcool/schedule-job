@@ -48,7 +48,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
 
         // 文档查询范围：node_id + 未软删。status 交给 Runtime Diff 做 ENABLE/DISABLE，
         // 不可在此处只取启用任务，否则 DISABLE 会被误当成 DELETE。
-        $list = CronTaskEntity::queryNotDeleted()->field('*')->where([
+        $list = CronTaskEntity::query()->field('*')->where([
             'node_id' => $nodeId,
             'exec_type' => $execType,
         ])->select()->toArray();

@@ -6,6 +6,7 @@ namespace App\Module\Staff\Entity;
 
 use App\Model\ClientModel;
 use App\Module\Staff\StaffApp;
+use Swoolefy\Library\Db\Concern\SoftDelete;
 use Swoolefy\Library\Db\Query;
 
 /**
@@ -25,15 +26,18 @@ use Swoolefy\Library\Db\Query;
  */
 class StaffMenuPageEntity extends ClientModel
 {
+    use SoftDelete;
+
     protected static $table = 'staff_menu_pages';
 
     protected $pk = 'id';
 
+    /**
+     * 未软删且未标删除态的菜单。delete_at 由 SoftDelete 在 query() 上自动过滤。
+     */
     public static function queryVisible(): Query
     {
-        return static::query()
-            ->where('status', '<>', StaffApp::MENU_STATUS_DELETED)
-            ->whereNull('delete_at');
+        return static::query()->where('status', '<>', StaffApp::MENU_STATUS_DELETED);
     }
 
     public function loadById(int $id): ?static

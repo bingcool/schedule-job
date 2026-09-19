@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS `staff_user` (
     `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `enabled_at` datetime DEFAULT NULL COMMENT '启用时间（新增或再次启用）',
     `disabled_at` datetime DEFAULT NULL COMMENT '启用后，再次禁用的时间',
-    `delete_at` datetime DEFAULT NULL COMMENT '删除时间',
+    `deleted_at` datetime DEFAULT NULL COMMENT '删除时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `account` (`account`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录的用户表';
@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS `staff_user_relate_node_group` (
     `node_group_id` bigint unsigned NOT NULL COMMENT '节点组ID',
     `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `delete_at` datetime DEFAULT NULL COMMENT '删除|禁用时间',
+    `deleted_at` datetime DEFAULT NULL COMMENT '删除|禁用时间',
     PRIMARY KEY (`id`),
     KEY `idx_user_id` (`user_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户拥有的Cron节点组';
@@ -232,7 +232,7 @@ CREATE TABLE IF NOT EXISTS `staff_menu_pages` (
     `status` tinyint(2) unsigned DEFAULT '1' COMMENT '状态：0-禁用(菜单栏不展示)，1-启用，2-删除',
     `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `delete_at` datetime DEFAULT NULL COMMENT '删除|禁用时间',
+    `deleted_at` datetime DEFAULT NULL COMMENT '删除|禁用时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uniq_uri_appid` (`uri`,`app_id`),
     UNIQUE KEY `uniq_code` (`code`),

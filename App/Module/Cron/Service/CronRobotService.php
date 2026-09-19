@@ -35,7 +35,7 @@ class CronRobotService
      */
     public function listRobots(): array
     {
-        $list = CronRobotEntity::queryNotDeleted()
+        $list = CronRobotEntity::query()
             ->order('id', 'desc')
             ->select()
             ->toArray();
@@ -238,7 +238,7 @@ class CronRobotService
 
     private function assertNameUnique(string $name, ?int $exceptId): void
     {
-        $qb = CronRobotEntity::queryNotDeleted()->where('name', $name);
+        $qb = CronRobotEntity::query()->where('name', $name);
         if ($exceptId !== null && $exceptId > 0) {
             $qb->where('id', '<>', $exceptId);
         }

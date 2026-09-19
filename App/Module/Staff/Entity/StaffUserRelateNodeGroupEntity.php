@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Staff\Entity;
 
 use App\Model\ClientModel;
-use Swoolefy\Library\Db\Query;
+use Swoolefy\Library\Db\Concern\SoftDelete;
 
 /**
  * @property int $id
@@ -17,12 +17,9 @@ use Swoolefy\Library\Db\Query;
  */
 class StaffUserRelateNodeGroupEntity extends ClientModel
 {
+    use SoftDelete;
+
     protected static $table = 'staff_user_relate_node_group';
 
     protected $pk = 'id';
-
-    public static function queryActive(): Query
-    {
-        return static::query()->whereNull('delete_at');
-    }
 }

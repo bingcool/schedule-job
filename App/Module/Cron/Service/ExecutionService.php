@@ -222,7 +222,7 @@ class ExecutionService
         if ($id <= 0) {
             return null;
         }
-        $row = CronTaskLogEntity::queryNotDeleted()->where('id', $id)->find();
+        $row = CronTaskLogEntity::query()->where('id', $id)->find();
         if (!$row) {
             return null;
         }
@@ -283,7 +283,7 @@ class ExecutionService
     public function recoverExpiredLeases(int $limit = 100): int
     {
         $now = date('Y-m-d H:i:s');
-        $rows = CronTaskLogEntity::queryNotDeleted()
+        $rows = CronTaskLogEntity::query()
             ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
             ->whereNotNull('lease_until')
             ->where('lease_until', '<', $now)
@@ -585,7 +585,7 @@ class ExecutionService
         if ($cronId <= 0 || $execBatchId === '') {
             return null;
         }
-        $row = CronTaskLogEntity::queryNotDeleted()
+        $row = CronTaskLogEntity::query()
             ->where([
                 'cron_id' => $cronId,
                 'exec_batch_id' => $execBatchId,
@@ -604,7 +604,7 @@ class ExecutionService
      */
     private function findLatestByRequestId(int $requestId): ?array
     {
-        $row = CronTaskLogEntity::queryNotDeleted()
+        $row = CronTaskLogEntity::query()
             ->where('request_id', $requestId)
             ->order('id', 'desc')
             ->find();

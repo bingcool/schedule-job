@@ -30,7 +30,6 @@ abstract class AbstractLog
          * @var Logger $logger
          */
         $logger = LogManager::getInstance()->getLogger(static::$infoLogType);
-        //var_dump($logger);
         $logger->addInfo($message, $is_delay_batch, $context);
     }
 

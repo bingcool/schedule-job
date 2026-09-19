@@ -70,7 +70,7 @@ class CronScheduledTaskRecordService
         $conn = (new CronTaskEntity())->getConnection();
         $conn->beginTransaction();
         try {
-            $task = CronTaskEntity::queryNotDeleted()
+            $task = CronTaskEntity::query()
                 ->where('id', $cronId)
                 ->setOption('lock', true)
                 ->find();

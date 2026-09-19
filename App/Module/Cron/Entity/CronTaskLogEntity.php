@@ -2,7 +2,6 @@
 namespace App\Module\Cron\Entity;
 
 use Swoolefy\Library\Db\Concern\SoftDelete;
-use Swoolefy\Library\Db\Query;
 use App\Model\ClientModel;
 
 // 生成的表【cron_task_log】的属性
@@ -55,16 +54,6 @@ class CronTaskLogEntity extends ClientModel
         'trigger_type' => 'int',
         'duration_ms' => 'int',
     ];
-
-    /**
-     * 统计 / 列表用：排除已软删行。
-     *
-     * Query::select() 不会自动加 SoftDelete 条件。
-     */
-    public static function queryNotDeleted(): Query
-    {
-        return static::query()->whereDeletedAtNull(static::getSoftDeleteField());
-    }
 
     /**
      * @param $id

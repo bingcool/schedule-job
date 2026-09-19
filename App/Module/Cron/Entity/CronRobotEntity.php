@@ -6,7 +6,6 @@ namespace App\Module\Cron\Entity;
 
 use App\Model\ClientModel;
 use Swoolefy\Library\Db\Concern\SoftDelete;
-use Swoolefy\Library\Db\Query;
 
 /**
  * @property int $id
@@ -39,11 +38,6 @@ class CronRobotEntity extends ClientModel
         'status' => 'int',
         'last_test_ok' => 'int',
     ];
-
-    public static function queryNotDeleted(): Query
-    {
-        return static::query()->whereDeletedAtNull(static::getSoftDeleteField());
-    }
 
     public function loadById(int $id): ?static
     {

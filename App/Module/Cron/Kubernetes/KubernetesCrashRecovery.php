@@ -159,7 +159,7 @@ final class KubernetesCrashRecovery
         $cronId = (int) ($row['cron_id'] ?? 0);
         $task = null;
         try {
-            $task = $cronId > 0 ? CronTaskEntity::queryNotDeleted()->where('id', $cronId)->find() : null;
+            $task = $cronId > 0 ? CronTaskEntity::query()->where('id', $cronId)->find() : null;
         } catch (\Throwable) {
             $task = null;
         }

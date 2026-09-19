@@ -2,7 +2,6 @@
 namespace App\Module\Cron\Entity;
 
 use Swoolefy\Library\Db\Concern\SoftDelete;
-use Swoolefy\Library\Db\Query;
 use App\Model\ClientModel;
 
 /**
@@ -30,16 +29,6 @@ class CronAgentNodeEntity extends ClientModel
      * @var string
      */
     protected $pk = 'id';
-
-    /**
-     * 管理端列表 / Dashboard 统计用：排除已软删行。
-     *
-     * Query::select() 不会自动加 SoftDelete 条件（只有 first()/loadOne 会）。
-     */
-    public static function queryNotDeleted(): Query
-    {
-        return static::query()->whereDeletedAtNull(static::getSoftDeleteField());
-    }
 
     /**
      * @param int $id

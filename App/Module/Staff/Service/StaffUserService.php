@@ -62,7 +62,7 @@ class StaffUserService
         $userName = trim((string) ($query->getUserName() ?? ''));
         $status = $query->getStatus();
 
-        $qb = StaffUserEntity::queryActive();
+        $qb = StaffUserEntity::query();
         if ($account !== '') {
             $qb->where('account', 'like', '%' . $account . '%');
         }
@@ -243,7 +243,7 @@ class StaffUserService
             return false;
         }
 
-        return StaffUserRelateNodeGroupEntity::queryActive()
+        return StaffUserRelateNodeGroupEntity::query()
             ->where('user_id', $userId)
             ->where('node_group_id', $nodeGroupId)
             ->count() > 0;
@@ -260,7 +260,7 @@ class StaffUserService
             return [];
         }
 
-        $rows = StaffUserRelateNodeGroupEntity::queryActive()
+        $rows = StaffUserRelateNodeGroupEntity::query()
             ->where('node_group_id', $nodeGroupId)
             ->field(['user_id'])
             ->select()
@@ -276,7 +276,7 @@ class StaffUserService
             return [];
         }
 
-        $users = StaffUserEntity::queryActive()
+        $users = StaffUserEntity::query()
             ->whereIn('id', array_values($userIds))
             ->where('status', 1)
             ->field(['id', 'account', 'user_name'])
@@ -617,7 +617,7 @@ class StaffUserService
 
     private function assertAccountAvailable(string $account, ?string $email, ?int $exceptId): void
     {
-        $existAccount = StaffUserEntity::queryActive()->where('account', $account);
+        $existAccount = StaffUserEntity::query()->where('account', $account);
         if ($exceptId !== null && $exceptId > 0) {
             $existAccount->where('id', '<>', $exceptId);
         }
@@ -712,7 +712,7 @@ class StaffUserService
         if ($userIds === []) {
             return $grouped;
         }
-        $rows = StaffUserRelateNodeGroupEntity::queryActive()->whereIn('user_id', $userIds)->select()->toArray();
+        $rows = StaffUserRelateNodeGroupEntity::query()->whereIn('user_id', $userIds)->select()->toArray();
         foreach ($rows as $row) {
             $grouped[(int) $row['user_id']][] = (int) $row['node_group_id'];
         }

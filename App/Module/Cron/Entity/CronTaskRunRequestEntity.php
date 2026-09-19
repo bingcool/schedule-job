@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Module\Cron\Entity;
 
 use App\Model\ClientModel;
+use Swoolefy\Library\Db\Concern\SoftDelete;
 
 /**
  * 手动执行请求表。独立于 cron_task，避免改 flag 触发 updated_at / fingerprint UPDATE。
+ * 表有 deleted_at，使用 SoftDelete 后 query() 会自动加 deleted_at IS NULL。
  *
  * @property int $id
  * @property int $cron_id
@@ -19,6 +21,8 @@ use App\Model\ClientModel;
  */
 class CronTaskRunRequestEntity extends ClientModel
 {
+    use SoftDelete;
+
     protected static $table = 'cron_task_run_request';
 
     protected $pk = 'id';

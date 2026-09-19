@@ -156,7 +156,7 @@ class CronTaskManagerService
             return $pageResult;
         }
 
-        $qb = CronTaskEntity::queryNotDeleted()->field([
+        $qb = CronTaskEntity::query()->field([
             'id',
             'node_id',
             'cron_name',
@@ -222,7 +222,7 @@ class CronTaskManagerService
             return [];
         }
 
-        $qb = CronTaskEntity::queryNotDeleted()
+        $qb = CronTaskEntity::query()
             ->field([new Raw('created_by')])
             ->where('created_by', '>', 0)
             ->group('created_by');
@@ -463,7 +463,7 @@ class CronTaskManagerService
      */
     public function listNodes(): array
     {
-        $nodesQb = CronAgentNodeEntity::queryNotDeleted()->order('id', 'desc');
+        $nodesQb = CronAgentNodeEntity::query()->order('id', 'desc');
         $allowedGroups = $this->staffUserService->viewerAuthorizedNodeGroupIds();
         if ($allowedGroups !== null) {
             if ($allowedGroups === []) {
@@ -484,7 +484,7 @@ class CronTaskManagerService
         }
         $counts = [];
         if ($nodeIds !== []) {
-            $rows = CronTaskEntity::queryNotDeleted()
+            $rows = CronTaskEntity::query()
                 ->whereIn('node_id', array_values($nodeIds))
                 ->field([
                     new Raw('node_id'),
@@ -664,7 +664,7 @@ class CronTaskManagerService
         $taskName = $query->getTaskName();
         $statusFilter = $applyStatus ? $query->getStatus() : null;
 
-        $qb = CronTaskLogEntity::queryNotDeleted();
+        $qb = CronTaskLogEntity::query();
         $allowedTaskIds = $this->scopedTaskIds();
         if ($allowedTaskIds !== null) {
             if ($allowedTaskIds === [] || ($taskId !== null && $taskId > 0 && !isset($allowedTaskIds[$taskId]))) {
@@ -1047,7 +1047,7 @@ class CronTaskManagerService
         $execBatchId = trim((string)($row['exec_batch_id'] ?? ''));
         $executionService = new ExecutionService();
         if ($execBatchId !== '') {
-            $existing = CronTaskLogEntity::queryNotDeleted()
+            $existing = CronTaskLogEntity::query()
                 ->where([
                     'cron_id' => $cronId,
                     'exec_batch_id' => $execBatchId,
@@ -1217,7 +1217,7 @@ class CronTaskManagerService
      */
     protected function newExecutionStatsQuery(?int $cronId, ?string $start = null, ?string $end = null): Query
     {
-        $qb = CronTaskLogEntity::queryNotDeleted()
+        $qb = CronTaskLogEntity::query()
             ->whereNotNull('exec_batch_id')
             ->where('exec_batch_id', '<>', '');
         $scopedTaskIds = $this->scopedTaskIds();
@@ -1334,7 +1334,7 @@ class CronTaskManagerService
         if ($logId <= 0) {
             throw CronTaskException::throw('id不能为空', -1);
         }
-        $row = CronTaskLogEntity::queryNotDeleted()->where('id', $logId)->find();
+        $row = CronTaskLogEntity::query()->where('id', $logId)->find();
         if (!$row) {
             throw CronTaskException::throw('执行记录不存在', -1);
         }
@@ -1369,7 +1369,7 @@ class CronTaskManagerService
      */
     public function dashboardOverview(): DashboardOverviewDto
     {
-        $taskQb = CronTaskEntity::queryNotDeleted();
+        $taskQb = CronTaskEntity::query();
         $scopedNodeIds = $this->scopedTaskNodeIds(null);
         if ($scopedNodeIds !== null) {
             if ($scopedNodeIds === []) {
@@ -1499,8 +1499,8 @@ class CronTaskManagerService
      */
     public function runtimeOverview(): RuntimeOverviewDto
     {
-        $jobs = (int)CronTaskEntity::queryNotDeleted()->count();
-        $enabled = (int)CronTaskEntity::queryNotDeleted()->where('status', 1)->count();
+        $jobs = (int)CronTaskEntity::query()->count();
+        $enabled = (int)CronTaskEntity::query()->where('status', 1)->count();
         $running = 0;
         $lastSuccessAt = null;
         $lastErrorAt = null;
@@ -1541,7 +1541,7 @@ class CronTaskManagerService
     {
         $node = $this->requireNode($dto->getId());
         $attrs = $node->getAttributes();
-        $attrs['task_count'] = (int)CronTaskEntity::queryNotDeleted()->where('node_id', $dto->getId())->count();
+        $attrs['task_count'] = (int)CronTaskEntity::query()->where('node_id', $dto->getId())->count();
 
         return $this->attachNodeGroupInfo([$attrs])[0];
     }
@@ -1576,7 +1576,7 @@ class CronTaskManagerService
         $node->setData($data);
         $node->save();
         $attrs = $node->getAttributes();
-        $attrs['task_count'] = (int)CronTaskEntity::queryNotDeleted()->where('node_id', $dto->getId())->count();
+        $attrs['task_count'] = (int)CronTaskEntity::query()->where('node_id', $dto->getId())->count();
 
         return $this->attachNodeGroupInfo([$attrs])[0];
     }
@@ -1595,7 +1595,7 @@ class CronTaskManagerService
         $conn = (new CronTaskEntity())->getConnection();
         $conn->beginTransaction();
         try {
-            $existsRows = CronTaskEntity::queryNotDeleted()
+            $existsRows = CronTaskEntity::query()
                 ->whereIn('id', $ids)
                 ->select()
                 ->toArray();
@@ -1616,7 +1616,7 @@ class CronTaskManagerService
                 }
             }
 
-            CronTaskEntity::queryNotDeleted()
+            CronTaskEntity::query()
                 ->whereIn('id', $ids)
                 ->update([
                     'status' => $status,
@@ -1666,7 +1666,7 @@ class CronTaskManagerService
         $attrs['cron_name'] = $this->uniqueCopyName($baseName);
         unset($attrs['name']);
         $attrs['status'] = 0;
-        // 副本必须是未删除行，否则列表 select() 能看见、loadById 因 SoftDelete 找不到
+        // 新副本必须是未删除行，query() 会自动排除 deleted_at 非空
         $attrs['deleted_at'] = null;
         unset($attrs['created_by'], $attrs['createdBy']);
         $userId = $this->currentUserId();
@@ -1825,7 +1825,7 @@ class CronTaskManagerService
      */
     protected function countNodeHeartbeat(): array
     {
-        $nodesQb = CronAgentNodeEntity::queryNotDeleted()
+        $nodesQb = CronAgentNodeEntity::query()
             ->field(['last_heartbeat_at', 'heartbeat_interval']);
         $allowedGroups = $this->staffUserService->viewerAuthorizedNodeGroupIds();
         if ($allowedGroups !== null) {
@@ -1941,7 +1941,7 @@ class CronTaskManagerService
             return 0;
         }
 
-        return (int) CronAgentNodeEntity::queryNotDeleted()->where('group_id', $groupId)->count();
+        return (int) CronAgentNodeEntity::query()->where('group_id', $groupId)->count();
     }
 
     /**
@@ -1954,7 +1954,7 @@ class CronTaskManagerService
         if ($groupIds === []) {
             return $counts;
         }
-        $rows = CronAgentNodeEntity::queryNotDeleted()
+        $rows = CronAgentNodeEntity::query()
             ->whereIn('group_id', $groupIds)
             ->field([
                 new Raw('group_id'),
@@ -2315,7 +2315,7 @@ class CronTaskManagerService
             return [];
         }
         $nodeIds = [];
-        foreach (CronAgentNodeEntity::queryNotDeleted()->field(['id'])->whereIn('group_id', $groupIds)->select()->toArray() as $row) {
+        foreach (CronAgentNodeEntity::query()->field(['id'])->whereIn('group_id', $groupIds)->select()->toArray() as $row) {
             $nodeId = (int) ($row['id'] ?? 0);
             if ($nodeId > 0) {
                 $nodeIds[] = $nodeId;
@@ -2338,7 +2338,7 @@ class CronTaskManagerService
             return [];
         }
         $taskIds = [];
-        foreach (CronTaskEntity::queryNotDeleted()->field(['id'])->whereIn('node_id', $nodeIds)->select()->toArray() as $row) {
+        foreach (CronTaskEntity::query()->field(['id'])->whereIn('node_id', $nodeIds)->select()->toArray() as $row) {
             $id = (int) ($row['id'] ?? 0);
             if ($id > 0) {
                 $taskIds[$id] = $id;
@@ -2366,7 +2366,7 @@ class CronTaskManagerService
      */
     protected function resolveNodeIdsForGroupFilter(int $groupId): array
     {
-        $nodeQb = CronAgentNodeEntity::queryNotDeleted()->field(['id']);
+        $nodeQb = CronAgentNodeEntity::query()->field(['id']);
         if ($groupId === -1) {
             $nodeQb->where('group_id', 0);
         } elseif ($groupId > 0) {
@@ -2686,7 +2686,7 @@ class CronTaskManagerService
      */
     private function queryTaskIdsByExecTypeAndName(?int $execType, ?string $taskName): array
     {
-        $qb = CronTaskEntity::queryNotDeleted()->field(['id']);
+        $qb = CronTaskEntity::query()->field(['id']);
         $scopedNodeIds = $this->scopedTaskNodeIds(null);
         if ($scopedNodeIds !== null) {
             if ($scopedNodeIds === []) {
@@ -2738,7 +2738,7 @@ class CronTaskManagerService
         if ($cronIds === []) {
             return [];
         }
-        $rows = CronTaskEntity::queryNotDeleted()
+        $rows = CronTaskEntity::query()
             ->whereIn('id', $cronIds)
             ->field(['id', 'cron_name', 'exec_type'])
             ->select()
