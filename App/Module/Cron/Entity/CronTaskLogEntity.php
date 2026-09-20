@@ -12,7 +12,7 @@ use App\Model\ClientModel;
  * @property int pid 执行进程 PID
  * @property int status 执行状态：0-register 1-running 2-success 3-failed 4-skipped 5-timeout 6-cancelled 7-unregister 8-cancel_requested
  * @property int trigger_type 触发类型：1-scheduler 2-run_once
- * @property int|null request_id 关联 cron_task_run_request.id
+ * @property int|null request_id 关联 cron_task_run_request.id；UNIQUE，普通 Cron / SKIPPED 为 NULL
  * @property int node_id 执行节点快照
  * @property string lease_owner
  * @property string|null lease_until

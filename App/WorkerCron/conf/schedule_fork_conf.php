@@ -30,6 +30,9 @@ return [
             'run_once_precheck' => static function (int $requestId): string {
                 return (new \App\Module\Cron\Service\ExecutionService())->precheckRunOnce($requestId);
             },
+            'run_once_claim' => static function (int $requestId): string {
+                return (new \App\Module\Cron\Service\ExecutionService())->claimRunOnce($requestId);
+            },
             // 同一 cron_id + 调度点只允许一个赢家；返回 CronScheduleSlotClaimConst::CREATED|DUPLICATE|FAILED。RunOnce 不走。
             'schedule_slot_claim' => static function (int $cronTaskId, int $plannedAt): string {
                 return (new \App\Module\Cron\Service\CronScheduledTaskRecordService())->claim($cronTaskId, $plannedAt);

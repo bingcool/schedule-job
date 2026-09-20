@@ -8,15 +8,23 @@ use App\Module\Cron\CronTaskLogMessageConfig;
 use App\Module\Cron\Dto\CronTaskManager\ExecutionCancelResultDto;
 use App\Module\Cron\Entity\CronTaskLogEntity;
 use App\Module\Cron\ExecutionLeaseConfig;
+use App\Module\Cron\ExecutionRecoveryResult;
 use App\Module\Cron\ExecutionWorkerIdentity;
 use App\Module\Cron\FailureReason;
 use App\Module\Cron\Kubernetes\KubernetesCrashRecovery;
+use Swoolefy\Core\Log\LogManager;
 use Swoolefy\Core\Schedule\ScheduleEvent;
+use Swoolefy\Worker\Cron\CronRunOnceAlreadyClaimedException;
+use Swoolefy\Worker\Cron\CronRunOnceClaimConst;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
 
 /**
  * Execution 生命周期唯一入口：upsert + CAS，不把 status 散落到各处直接 UPDATE。
+ *
+ * Recovery 必须走 {@see recoverLease()} 的 Lease Snapshot CAS。
+ * RunOnce 的执行权是 RUNNING INSERT + UNIQUE(request_id)；1062 抛
+ * {@see CronRunOnceAlreadyClaimedException}，禁止再进执行器。
  */
 class ExecutionService
 {
@@ -66,6 +74,14 @@ class ExecutionService
             }
         }
         if (isset($row['request_id']) && (int) $row['request_id'] <= 0) {
+            unset($row['request_id']);
+        }
+        $status = (int) ($row['status'] ?? ($execution['status'] ?? 0));
+        if (in_array($status, [
+            ExecutionStatus::SKIPPED,
+            ExecutionStatus::REGISTER,
+            ExecutionStatus::UNREGISTER,
+        ], true)) {
             unset($row['request_id']);
         }
 
@@ -175,6 +191,8 @@ class ExecutionService
 
     /**
      * RunOnce 消费前闸门：ack=已有终态只确认；defer=租约仍有效；execute=需要跑。
+     *
+     * UNIQUE(request_id) 落地后是 at-most-once：FAILED 也 ack，Recovery 成功不再重跑。
      */
     public function precheckRunOnce(int $requestId): string
     {
@@ -188,30 +206,43 @@ class ExecutionService
         $status = (int) ($row['status'] ?? 0);
         if (in_array($status, [
             ExecutionStatus::SUCCESS,
+            ExecutionStatus::FAILED,
             ExecutionStatus::TIMEOUT,
             ExecutionStatus::CANCELLED,
         ], true)) {
             return 'ack';
         }
-        if ($status === ExecutionStatus::RUNNING) {
+        if ($status === ExecutionStatus::RUNNING || $status === ExecutionStatus::CANCEL_REQUESTED) {
             if ($this->leaseValid($row)) {
                 return 'defer';
             }
-            if ($this->recoverRow($row, FailureReason::WORKER_CRASH)) {
-                return 'execute';
-            }
-            $fresh = $this->findLatestByRequestId($requestId);
-            if ($fresh !== null && (int) ($fresh['status'] ?? 0) === ExecutionStatus::RUNNING) {
-                return 'defer';
+            $recovered = $this->recoverLease($row, FailureReason::WORKER_CRASH);
+            if ($recovered->recovered) {
+                return 'ack';
             }
 
-            return 'execute';
-        }
-        if ($status === ExecutionStatus::CANCEL_REQUESTED) {
             return 'defer';
         }
 
         return 'execute';
+    }
+
+    /**
+     * CronManager run_once_claim 闸门。created 才允许 INSERT；ack/defer 短路执行器。
+     */
+    public function claimRunOnce(int $requestId): string
+    {
+        try {
+            $gate = $this->precheckRunOnce($requestId);
+        } catch (\Throwable) {
+            return CronRunOnceClaimConst::FAILED;
+        }
+
+        return match ($gate) {
+            'ack' => CronRunOnceClaimConst::ACK,
+            'defer' => CronRunOnceClaimConst::DEFER,
+            default => CronRunOnceClaimConst::CREATED,
+        };
     }
 
     /**
@@ -292,14 +323,9 @@ class ExecutionService
             ->select()
             ->toArray();
         $closed = 0;
-        $nodeId = ExecutionWorkerIdentity::nodeId();
         foreach ($rows as $row) {
-            if ($this->recoverRow($row, FailureReason::WORKER_CRASH)) {
+            if ($this->recoverLease($row, FailureReason::WORKER_CRASH, $now)->recovered) {
                 $closed++;
-                $pid = (int) ($row['pid'] ?? 0);
-                if ($nodeId > 0 && (int) ($row['node_id'] ?? 0) === $nodeId && $pid > 0) {
-                    ExecutionRuntimeGuard::signalPid($pid, 9);
-                }
             }
         }
 
@@ -359,44 +385,139 @@ class ExecutionService
     }
 
     /**
-     * 收尾一条过期租约。返回 false 表示本轮不改记录（K8s Job 仍在跑、集群不可达，或 CAS 失败）。
+     * 按读取时的 Lease 快照收尾。CAS 失败不得 terminate。
      *
      * @param array<string, mixed> $row
      */
-    private function recoverRow(array $row, string $reason): bool
+    public function recoverLease(array $row, string $reason, ?string $recoveryNow = null): ExecutionRecoveryResult
     {
         $id = (int) ($row['id'] ?? 0);
         $from = (int) ($row['status'] ?? 0);
-        $now = date('Y-m-d H:i:s');
+        $oldOwner = (string) ($row['lease_owner'] ?? '');
+        $oldLeaseUntil = (string) ($row['lease_until'] ?? '');
+        $recoveryNow = $recoveryNow ?: date('Y-m-d H:i:s');
+        if ($id <= 0 || !in_array($from, [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED], true)) {
+            return ExecutionRecoveryResult::notRecoverable();
+        }
+        if ($oldLeaseUntil === '') {
+            return ExecutionRecoveryResult::notRecoverable();
+        }
+        $leaseTs = strtotime($oldLeaseUntil);
+        $recoveryTs = strtotime($recoveryNow);
+        if ($leaseTs === false || $recoveryTs === false || $leaseTs >= $recoveryTs) {
+            return ExecutionRecoveryResult::notExpired();
+        }
+
         $to = ExecutionStatus::FAILED;
         $message = 'RECOVERED ' . $reason;
+        $deleteNamespace = null;
+        $deleteJobName = null;
+        $k8s = null;
         try {
-            $k8s = (new KubernetesCrashRecovery())->resolve($row);
+            $k8s = (new KubernetesCrashRecovery())->observe($row);
         } catch (\Throwable) {
             $k8s = null;
         }
         if (is_array($k8s) && !empty($k8s[KubernetesCrashRecovery::KEY_DEFER])) {
-            return false;
+            return ExecutionRecoveryResult::deferred();
         }
-        if ($k8s !== null) {
+        if (is_array($k8s)) {
             $to = (int) $k8s['status'];
             $reason = (string) $k8s['failure_reason'];
             $message = 'RECOVERED ' . $k8s['message'];
+            if (!empty($k8s[KubernetesCrashRecovery::KEY_DELETE_JOB])) {
+                $deleteNamespace = (string) ($k8s['namespace'] ?? '');
+                $deleteJobName = (string) ($k8s['job_name'] ?? '');
+            }
         }
         if ($from === ExecutionStatus::CANCEL_REQUESTED) {
             $to = ExecutionStatus::CANCELLED;
             $reason = FailureReason::CANCELLED;
         }
         $extra = [
-            'finished_at' => $now,
+            'finished_at' => $recoveryNow,
             'message' => $this->mergeMessage((string) ($row['message'] ?? ''), $message),
+            'lease_until' => null,
         ];
         if ($reason !== '') {
             $extra['failure_reason'] = $reason;
         }
-        $ok = $this->transition($id, $from, $to, $extra);
+        $ok = $this->recoverTransition($id, $from, $to, $oldOwner, $oldLeaseUntil, $recoveryNow, $extra);
+        if (!$ok) {
+            $this->logInfo(sprintf(
+                'execution lease recovery cas conflict execution_id=%d owner=%s lease_until=%s',
+                $id,
+                $oldOwner,
+                $oldLeaseUntil,
+            ));
+
+            return ExecutionRecoveryResult::casConflict();
+        }
+
+        $result = ExecutionRecoveryResult::recovered($deleteNamespace, $deleteJobName);
+        $this->terminateAfterRecovery($row, $result);
+
+        return $result;
+    }
+
+    /**
+     * Recovery 专用 CAS：id + status + lease_owner + lease_until + expiry。
+     *
+     * @param array<string, mixed> $extra
+     */
+    private function recoverTransition(
+        int $id,
+        int $fromStatus,
+        int $toStatus,
+        string $oldOwner,
+        string $oldLeaseUntil,
+        string $recoveryNow,
+        array $extra,
+    ): bool {
+        if ($id <= 0 || !$this->isLegalTransition($fromStatus, $toStatus)) {
+            return false;
+        }
+        $data = $extra;
+        $data['status'] = $toStatus;
+        if ($this->isTerminal($toStatus) && empty($data['finished_at'])) {
+            $data['finished_at'] = $recoveryNow;
+        }
+        $n = CronTaskLogEntity::query()
+            ->where('id', $id)
+            ->where('status', $fromStatus)
+            ->where('lease_owner', $oldOwner)
+            ->where('lease_until', $oldLeaseUntil)
+            ->where('lease_until', '<', $recoveryNow)
+            ->update($data);
+
+        $ok = $this->affected($n);
+        if ($ok) {
+            AlertDispatcher::dispatchIfNeeded($id, $toStatus);
+        }
 
         return $ok;
+    }
+
+    /**
+     * CAS 成功后才允许 SIGKILL / 删 K8s Job。
+     *
+     * @param array<string, mixed> $row
+     */
+    private function terminateAfterRecovery(array $row, ExecutionRecoveryResult $result): void
+    {
+        if ($result->shouldDeleteJob()) {
+            (new KubernetesCrashRecovery())->deleteJob(
+                (string) $result->deleteNamespace,
+                (string) $result->deleteJobName,
+            );
+
+            return;
+        }
+        $pid = (int) ($row['pid'] ?? 0);
+        $nodeId = ExecutionWorkerIdentity::nodeId();
+        if ($nodeId > 0 && (int) ($row['node_id'] ?? 0) === $nodeId && $pid > 0) {
+            ExecutionRuntimeGuard::signalPid($pid, 9);
+        }
     }
 
     /**
@@ -418,7 +539,17 @@ class ExecutionService
         if ($status === ExecutionStatus::RUNNING) {
             $this->applyLease($row, $execution, $scheduleTask);
         }
-        CronTaskLogEntity::query()->insert($row);
+        try {
+            CronTaskLogEntity::query()->insert($row);
+        } catch (\Throwable $e) {
+            $requestId = (int) ($row['request_id'] ?? 0);
+            if ($requestId > 0 && $this->isDuplicateKey($e)) {
+                $gate = $this->resolveRunOnceDuplicateGate($requestId);
+                $this->logInfo('run once execution already claimed request_id=' . $requestId);
+                throw new CronRunOnceAlreadyClaimedException($gate);
+            }
+            throw $e;
+        }
         $saved = $this->findByBatch((int) $row['cron_id'], (string) $row['exec_batch_id']);
         if ($saved && $status === ExecutionStatus::RUNNING) {
             $id = (int) $saved['id'];
@@ -600,6 +731,52 @@ class ExecutionService
     }
 
     /**
+     * UNIQUE 冲突后看已有行：终态 ack，租约有效 defer，过期则再走 Recovery CAS。
+     */
+    private function resolveRunOnceDuplicateGate(int $requestId): string
+    {
+        $existing = $this->findLatestByRequestId($requestId);
+        if ($existing === null) {
+            return CronRunOnceClaimConst::ACK;
+        }
+        $status = (int) ($existing['status'] ?? 0);
+        if (in_array($status, [
+            ExecutionStatus::SUCCESS,
+            ExecutionStatus::FAILED,
+            ExecutionStatus::TIMEOUT,
+            ExecutionStatus::CANCELLED,
+        ], true)) {
+            return CronRunOnceClaimConst::ACK;
+        }
+        if ($status === ExecutionStatus::RUNNING || $status === ExecutionStatus::CANCEL_REQUESTED) {
+            if ($this->leaseValid($existing)) {
+                return CronRunOnceClaimConst::DEFER;
+            }
+            $recovered = $this->recoverLease($existing, FailureReason::WORKER_CRASH);
+
+            return $recovered->recovered ? CronRunOnceClaimConst::ACK : CronRunOnceClaimConst::DEFER;
+        }
+
+        return CronRunOnceClaimConst::ACK;
+    }
+
+    /**
+     * MySQL UNIQUE 冲突：errno 1062 或文案 Duplicate entry。
+     */
+    private function isDuplicateKey(\Throwable $e): bool
+    {
+        if ($e instanceof \PDOException) {
+            $driver = (int) ($e->errorInfo[1] ?? 0);
+            if ($driver === 1062) {
+                return true;
+            }
+        }
+        $msg = $e->getMessage();
+
+        return str_contains($msg, '1062') || str_contains($msg, 'Duplicate entry');
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function findLatestByRequestId(int $requestId): ?array
@@ -722,5 +899,13 @@ class ExecutionService
     private function affected(mixed $n): bool
     {
         return $n === true || (int) $n === 1;
+    }
+
+    private function logInfo(string $message): void
+    {
+        try {
+            LogManager::getInstance()->getLogger(LogManager::CRON_FORK_LOG)?->info($message);
+        } catch (\Throwable) {
+        }
     }
 }

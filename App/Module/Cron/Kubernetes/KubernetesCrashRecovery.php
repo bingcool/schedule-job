@@ -20,24 +20,30 @@ use Swoolefy\Support\Kubernetes\JobTemplateBuilder;
  *
  * 不能走 Shell 语义「过期 = WORKER_CRASH」：Job 可能已经 Complete，
  * 也可能还在跑。仍 Active、或集群 API 暂时不可达时，不删 Job、不改执行记录
- * （{@see self::KEY_DEFER}），等下一轮再看。Admin 已取消且 Job 仍 Active：DELETE。
+ * （{@see self::KEY_DEFER}），等下一轮再看。Admin 已取消且 Job 仍 Active：
+ * 只标记待删，CAS 成功后才 {@see deleteJob()}。
  * 不补 Create。
  */
 final class KubernetesCrashRecovery
 {
-    /** resolve() 返回此键为 true 时：本轮不收尾（Job 仍在跑，或集群暂时不可达）。 */
+    /** observe() 返回此键为 true 时：本轮不收尾（Job 仍在跑，或集群暂时不可达）。 */
     public const KEY_DEFER = 'defer';
+
+    /** observe() 返回此键为 true 时：CAS 成功后才允许删除 Job。 */
+    public const KEY_DELETE_JOB = 'delete_job';
 
     public function __construct(private readonly ?ClientInterface $client = null)
     {
     }
 
     /**
+     * 只读观察集群 Job。禁止在这里 DELETE。
+     *
      * @param array<string, mixed> $row cron_task_log 行
-     * @return array{status:int,failure_reason:string,message:string,defer?:bool}|null
+     * @return array{status:int,failure_reason:string,message:string,defer?:bool,delete_job?:bool,namespace?:string,job_name?:string}|null
      *         null=不是 K8s 执行，走默认 Recovery
      */
-    public function resolve(array $row): ?array
+    public function observe(array $row): ?array
     {
         $context = $this->resolveContext($row);
         if ($context === null) {
@@ -116,17 +122,16 @@ final class KubernetesCrashRecovery
         }
 
         if ($from === ExecutionStatus::CANCEL_REQUESTED) {
-            try {
-                $client->deleteJob($namespace, $jobName);
-            } catch (\Throwable) {
-            }
-
             return $this->decision(
                 $from,
                 ExecutionStatus::CANCELLED,
                 FailureReason::CANCELLED,
-                sprintf('取消请求已生效，已删除仍在运行的 Kubernetes Job %s/%s', $namespace, $jobName),
-            );
+                sprintf('取消请求已生效，CAS 成功后删除仍在运行的 Kubernetes Job %s/%s', $namespace, $jobName),
+            ) + [
+                self::KEY_DELETE_JOB => true,
+                'namespace' => $namespace,
+                'job_name' => $jobName,
+            ];
         }
 
         return $this->defer(sprintf(
@@ -134,6 +139,35 @@ final class KubernetesCrashRecovery
             $namespace,
             $jobName,
         ));
+    }
+
+    /**
+     * @deprecated 使用 {@see observe()}；保留以免外部误调旧名
+     * @param array<string, mixed> $row
+     * @return array{status:int,failure_reason:string,message:string,defer?:bool,delete_job?:bool,namespace?:string,job_name?:string}|null
+     */
+    public function resolve(array $row): ?array
+    {
+        return $this->observe($row);
+    }
+
+    /**
+     * CAS 成功后才删 Job。Job 已不存在视为成功。失败留给 TTL / Deadline 兜底。
+     */
+    public function deleteJob(string $namespace, string $jobName): bool
+    {
+        $namespace = trim($namespace);
+        $jobName = trim($jobName);
+        if ($namespace === '' || $jobName === '') {
+            return false;
+        }
+        try {
+            $client = $this->client ?? Client::fromEnv();
+
+            return $client->deleteJob($namespace, $jobName);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

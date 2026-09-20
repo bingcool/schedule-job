@@ -169,12 +169,6 @@ final class ExecutionRuntimeGuard
     {
         $service = new ExecutionService();
         $now = time();
-        $recoveryEvery = ExecutionLeaseConfig::recoveryInterval();
-        if ($now - self::$lastRecoveryAt >= $recoveryEvery) {
-            self::$lastRecoveryAt = $now;
-            $service->recoverExpiredLeases();
-        }
-
         $owner = ExecutionWorkerIdentity::owner();
         $grace = ExecutionLeaseConfig::terminateGracePeriod();
         $heartbeatEvery = ExecutionLeaseConfig::heartbeatInterval();
@@ -182,6 +176,31 @@ final class ExecutionRuntimeGuard
         if ($doHeartbeat) {
             self::$lastHeartbeatAt = $now;
         }
+
+        // Heartbeat 先于 Recovery，降低本 Worker 因事件循环延迟先把自己判过期的概率。
+        // 正确性边界仍是 Lease Snapshot CAS，不是这个顺序。
+        foreach (self::$watched as $logId => $state) {
+            $row = $service->findById($logId);
+            if ($row === null) {
+                self::unwatch($logId);
+                continue;
+            }
+            if ((string) ($row['lease_owner'] ?? '') !== $owner) {
+                self::unwatch($logId);
+                continue;
+            }
+            $status = (int) ($row['status'] ?? 0);
+            if ($doHeartbeat && in_array($status, [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED], true)) {
+                $service->heartbeat($logId, $owner);
+            }
+        }
+
+        $recoveryEvery = ExecutionLeaseConfig::recoveryInterval();
+        if ($now - self::$lastRecoveryAt >= $recoveryEvery) {
+            self::$lastRecoveryAt = $now;
+            $service->recoverExpiredLeases();
+        }
+
         foreach (self::$watched as $logId => $state) {
             $row = $service->findById($logId);
             if ($row === null) {
@@ -210,10 +229,6 @@ final class ExecutionRuntimeGuard
             if ((string) ($row['lease_owner'] ?? '') !== $owner) {
                 self::unwatch($logId);
                 continue;
-            }
-
-            if ($doHeartbeat && in_array($status, [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED], true)) {
-                $service->heartbeat($logId, $owner);
             }
 
             // 有 terminator 时也要接管：否则 pid=0 的 Kubernetes 任务超时后 Guard 什么都不做，

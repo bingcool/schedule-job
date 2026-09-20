@@ -129,7 +129,7 @@ CREATE TABLE `cron_task_log` (
     KEY `idx_cron_status_created_at` (`cron_id`, `status`, `created_at`),
     KEY `idx_status_created_at` (`status`, `created_at`),
     KEY `idx_cron_exec_batch` (`cron_id`, `exec_batch_id`),
-    KEY `idx_request_id` (`request_id`) COMMENT '按 RunOnce request_id 查找 Execution，用于 ACK 前去重',
+    UNIQUE KEY `uk_request_id` (`request_id`) COMMENT 'RunOnce request_id 原子 Claim；普通 Cron 为 NULL',
     KEY `idx_lease_running` (`status`, `lease_until`) COMMENT '扫描过期 RUNNING/cancel_requested 做 Crash Recovery',
     KEY `idx_node_status` (`node_id`, `status`) COMMENT '按节点过滤进行中/过期 Execution'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行记录（Execution Record）';
