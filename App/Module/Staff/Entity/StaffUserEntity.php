@@ -49,33 +49,6 @@ class StaffUserEntity extends ClientModel
     }
 
     /**
-     * 邮箱是否已被其他用户占用（email 或 account）。
-     */
-    public static function findIdUsingEmail(string $email, ?int $exceptId = null): ?int
-    {
-        $email = strtolower(trim($email));
-        if ($email === '') {
-            return null;
-        }
-        $emailQb = static::query()->where('email', $email);
-        $accountQb = static::query()->where('account', $email);
-        if ($exceptId !== null && $exceptId > 0) {
-            $emailQb->where('id', '<>', $exceptId);
-            $accountQb->where('id', '<>', $exceptId);
-        }
-        $row = $emailQb->field(['id'])->find();
-        if ($row) {
-            return (int) ($row['id'] ?? 0) ?: null;
-        }
-        $row = $accountQb->field(['id'])->find();
-        if ($row) {
-            return (int) ($row['id'] ?? 0) ?: null;
-        }
-
-        return null;
-    }
-
-    /**
      * 登录标识：含 @ 按邮箱查（email，兼容账号本身是该邮箱）；否则按 account 查。
      */
     public function loadByLoginIdentity(string $identity): ?static

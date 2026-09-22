@@ -19,16 +19,38 @@ use App\Module\Staff\Dto\StaffManager\UpdateMenuDto;
 use App\Module\Staff\Dto\StaffManager\UpdateRoleDto;
 use App\Module\Staff\Entity\StaffMenuPageEntity;
 use App\Module\Staff\Entity\StaffRoleEntity;
-use App\Module\Staff\Entity\StaffRolePageEntity;
-use App\Module\Staff\Entity\StaffRolePermissionEntity;
-use App\Module\Staff\Entity\StaffUserRoleEntity;
 use App\Module\Staff\Exception\StaffException;
+use App\Module\Staff\Repository\StaffMenuPageRepository;
+use App\Module\Staff\Repository\StaffRolePageRepository;
+use App\Module\Staff\Repository\StaffRolePermissionRepository;
+use App\Module\Staff\Repository\StaffRoleRepository;
+use App\Module\Staff\Repository\StaffUserRoleRepository;
 use App\Module\Staff\Response\StaffManager\ListRolesPageResult;
 use App\Module\Staff\StaffApp;
 use App\Module\Staff\StaffRoleCode;
 
 class StaffRoleService
 {
+    private StaffRoleRepository $roleRepository {
+        get => $this->roleRepository ??= new StaffRoleRepository();
+    }
+
+    private StaffUserRoleRepository $userRoleRepository {
+        get => $this->userRoleRepository ??= new StaffUserRoleRepository();
+    }
+
+    private StaffMenuPageRepository $menuRepository {
+        get => $this->menuRepository ??= new StaffMenuPageRepository();
+    }
+
+    private StaffRolePageRepository $rolePageRepository {
+        get => $this->rolePageRepository ??= new StaffRolePageRepository();
+    }
+
+    private StaffRolePermissionRepository $rolePermissionRepository {
+        get => $this->rolePermissionRepository ??= new StaffRolePermissionRepository();
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -74,23 +96,15 @@ class StaffRoleService
         $status = $query->getStatus();
         $appId = StaffApp::appId();
 
-        $qb = StaffRoleEntity::query()->where('app_id', $appId);
-        if ($name !== '') {
-            $qb->where('name', 'like', '%' . $name . '%');
-        }
-        if ($status !== null) {
-            $qb->where('status', $status);
-        }
-
         $pageResult = new ListRolesPageResult();
         $pageResult->setPage($query->getPage());
         $pageResult->setPageSize($query->getPageSize());
-        $pageResult->setTotal((int) $qb->clone()->count());
+        $pageResult->setTotal($this->roleRepository->countByListQuery($query));
 
-        $rows = $qb->order('id', 'desc')->limit($query->getOffset(), $query->getPageSize())->select()->toArray();
+        $rows = $this->roleRepository->listRowsByListQuery($query);
         $roleIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
-        $userCounts = $this->countUsersByRoleIds($roleIds);
-        $menuCounts = $this->countMenusByRoleIds($roleIds);
+        $userCounts = $this->userRoleRepository->countUsersGroupedByRoleIds($roleIds);
+        $menuCounts = $this->rolePageRepository->countPagesGroupedByRoleIds($roleIds);
 
         foreach ($rows as $row) {
             $roleId = (int) $row['id'];
@@ -107,8 +121,7 @@ class StaffRoleService
      */
     public function roleStats(): array
     {
-        $appId = StaffApp::appId();
-        $roles = StaffRoleEntity::query()->where('app_id', $appId)->select()->toArray();
+        $roles = $this->roleRepository->listAllRowsForApp();
         $enabled = 0;
         $super = 0;
         foreach ($roles as $role) {
@@ -119,7 +132,7 @@ class StaffRoleService
                 $super++;
             }
         }
-        $userCount = (int) StaffUserRoleEntity::query()->where('app_id', $appId)->count();
+        $userCount = $this->userRoleRepository->countByApp();
 
         return [
             'total' => count($roles),
@@ -135,12 +148,7 @@ class StaffRoleService
      */
     public function listRoleOptions(): array
     {
-        $rows = StaffRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->where('status', 1)
-            ->order('id', 'asc')
-            ->select()
-            ->toArray();
+        $rows = $this->roleRepository->listEnabledOptionRows();
 
         $list = [];
         foreach ($rows as $row) {
@@ -166,15 +174,14 @@ class StaffRoleService
             throw StaffException::throw('角色名称和唯一标识不能为空', -1);
         }
         // SoftDelete 下 loadByCode 只命中未删除行，已删角色的 code 可复用
-        if ((new StaffRoleEntity())->loadByCode($code)) {
+        if ($this->roleRepository->findByCode($code)) {
             throw StaffException::throw('角色标识已存在', -1);
         }
         if (StaffRoleCode::isSystem($code)) {
             throw StaffException::throw('不能使用系统保留的角色标识', -1);
         }
 
-        $role = new StaffRoleEntity();
-        $role->setData([
+        $role = $this->roleRepository->insert([
             'app_id' => StaffApp::appId(),
             'name' => $name,
             'code' => $code,
@@ -182,7 +189,6 @@ class StaffRoleService
             'status' => $dto->getStatus(),
             'is_super_role' => 0,
         ]);
-        $role->save();
 
         return $this->getRole(RoleIdDto::of((int) $role->id));
     }
@@ -202,12 +208,11 @@ class StaffRoleService
             throw StaffException::throw('角色唯一标识创建后不可修改', -1);
         }
 
-        $role->setData([
+        $this->roleRepository->save($role->setData([
             'name' => $dto->getName(),
             'desc' => $dto->getDesc(),
             'status' => $this->isStatusLockedRole($role) ? 1 : $dto->getStatus(),
-        ]);
-        $role->save();
+        ]));
 
         return $this->getRole(RoleIdDto::of($id));
     }
@@ -226,11 +231,7 @@ class StaffRoleService
 
         $pageIds = array_values(array_filter($dto->getPageIds(), static fn (int $id): bool => $id > 0));
         if ($pageIds !== []) {
-            $rows = StaffMenuPageEntity::queryVisible()
-                ->where('app_id', StaffApp::appId())
-                ->whereIn('id', $pageIds)
-                ->select()
-                ->toArray();
+            $rows = $this->menuRepository->listVisibleRowsByIds($pageIds);
             if (count($rows) !== count(array_unique($pageIds))) {
                 throw StaffException::throw('菜单页面不存在或已失效', -1);
             }
@@ -271,10 +272,10 @@ class StaffRoleService
             throw StaffException::throw('角色已被 ' . $userCount . ' 个用户关联使用，无法删除', -1);
         }
 
-        StaffRolePageEntity::query()->where('role_id', (int) $role->id)->delete();
-        StaffRolePermissionEntity::query()->where('role_id', (int) $role->id)->delete();
+        $this->rolePageRepository->deleteByRoleId((int) $role->id);
+        $this->rolePermissionRepository->deleteByRoleId((int) $role->id);
         // SoftDelete：写入 deleted_at，列表 / loadById / loadByCode 自动排除
-        $role->delete();
+        $this->roleRepository->delete($role);
 
         return (int) $role->id;
     }
@@ -287,8 +288,7 @@ class StaffRoleService
             throw StaffException::throw('系统角色不能禁用', -1);
         }
 
-        $role->setData(['status' => $status]);
-        $role->save();
+        $this->roleRepository->save($role->setData(['status' => $status]));
 
         return SwitchRoleStatusDto::of((int) $role->id, $status);
     }
@@ -326,8 +326,7 @@ class StaffRoleService
         $this->assertMenuUnique($dto->getCode(), $uri, 0);
         $parentPrefix = $this->resolveParentPrefix($dto->getParentId());
 
-        $menu = new StaffMenuPageEntity();
-        $menu->setData([
+        $menu = $this->menuRepository->insert([
             'app_id' => StaffApp::appId(),
             'name' => $dto->getName(),
             'code' => $dto->getCode(),
@@ -338,7 +337,6 @@ class StaffRoleService
             'sort' => $dto->getSort(),
             'status' => StaffApp::MENU_STATUS_ENABLED,
         ]);
-        $menu->save();
 
         return $menu->getAttributes();
     }
@@ -357,7 +355,7 @@ class StaffRoleService
         }
         $parentPrefix = $this->resolveParentPrefix($dto->getParentId());
 
-        $menu->setData([
+        $this->menuRepository->save($menu->setData([
             'name' => $dto->getName(),
             'code' => $dto->getCode(),
             'uri' => $uri,
@@ -365,8 +363,7 @@ class StaffRoleService
             'parent_id' => $dto->getParentId(),
             'parent_prefix' => $parentPrefix,
             'sort' => $dto->getSort(),
-        ]);
-        $menu->save();
+        ]));
 
         return $menu->getAttributes();
     }
@@ -378,8 +375,7 @@ class StaffRoleService
             ? StaffApp::MENU_STATUS_ENABLED
             : StaffApp::MENU_STATUS_DISABLED;
 
-        $menu->setData(['status' => $status]);
-        $menu->save();
+        $this->menuRepository->save($menu->setData(['status' => $status]));
 
         return SwitchMenuStatusDto::of((int) $menu->id, $status);
     }
@@ -395,11 +391,7 @@ class StaffRoleService
             throw StaffException::throw('排序列表不能为空', -1);
         }
 
-        $rows = StaffMenuPageEntity::queryVisible()
-            ->where('app_id', StaffApp::appId())
-            ->where('parent_id', $parentId)
-            ->select()
-            ->toArray();
+        $rows = $this->menuRepository->listSiblingRows($parentId);
         $siblingIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
         sort($siblingIds);
 
@@ -418,8 +410,7 @@ class StaffRoleService
         $count = count($ids);
         foreach ($ids as $index => $id) {
             $menu = $this->requireMenu($id);
-            $menu->setData(['sort' => $count - $index]);
-            $menu->save();
+            $this->menuRepository->save($menu->setData(['sort' => $count - $index]));
         }
 
         return $ids;
@@ -436,17 +427,15 @@ class StaffRoleService
     public function deleteMenu(MenuIdDto $dto): int
     {
         $menu = $this->requireMenu($dto->getId());
-        $child = StaffMenuPageEntity::queryVisible()->where('parent_id', (int) $menu->id)->find();
-        if ($child) {
+        if ($this->menuRepository->hasVisibleChild((int) $menu->id)) {
             throw StaffException::throw('请先删除子菜单', -1);
         }
 
-        $menu->setData([
+        $this->menuRepository->save($menu->setData([
             'status' => StaffApp::MENU_STATUS_DELETED,
             'delete_at' => date('Y-m-d H:i:s'),
-        ]);
-        $menu->save();
-        StaffRolePageEntity::query()->where('page_id', (int) $menu->id)->delete();
+        ]));
+        $this->rolePageRepository->deleteByPageId((int) $menu->id);
 
         return (int) $menu->id;
     }
@@ -471,18 +460,22 @@ class StaffRoleService
             false,
         );
 
-        return (new StaffRoleEntity())->loadByCode(StaffRoleCode::SUPER_ADMIN);
+        $super = $this->roleRepository->findByCode(StaffRoleCode::SUPER_ADMIN);
+        if ($super === null) {
+            throw StaffException::throw('超级管理员角色初始化失败', -1);
+        }
+
+        return $super;
     }
 
     private function ensureSystemRole(string $code, string $name, string $desc, bool $isSuper): StaffRoleEntity
     {
-        $role = (new StaffRoleEntity())->loadByCode($code);
+        $role = $this->roleRepository->findByCode($code);
         if ($role) {
             return $role;
         }
 
-        $role = new StaffRoleEntity();
-        $role->setData([
+        return $this->roleRepository->insert([
             'app_id' => StaffApp::appId(),
             'name' => $name,
             'code' => $code,
@@ -490,9 +483,6 @@ class StaffRoleService
             'status' => 1,
             'is_super_role' => $isSuper ? 1 : 0,
         ]);
-        $role->save();
-
-        return $role;
     }
 
     /**
@@ -506,15 +496,11 @@ class StaffRoleService
             return $grouped;
         }
 
-        $rels = StaffUserRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('user_id', $userIds)
-            ->select()
-            ->toArray();
+        $rels = $this->userRoleRepository->listRowsByUserIds($userIds);
         $roleIds = array_values(array_unique(array_map(static fn (array $row): int => (int) $row['role_id'], $rels)));
         $roles = [];
         if ($roleIds !== []) {
-            foreach (StaffRoleEntity::query()->whereIn('id', $roleIds)->where('status', 1)->select()->toArray() as $row) {
+            foreach ($this->roleRepository->listEnabledRowsByIds($roleIds) as $row) {
                 $roles[(int) $row['id']] = [
                     'id' => (int) $row['id'],
                     'name' => (string) $row['name'],
@@ -543,8 +529,7 @@ class StaffRoleService
         if ($roleIds === []) {
             return;
         }
-        $rows = StaffRoleEntity::query()->whereIn('id', $roleIds)->where('app_id', StaffApp::appId())->select()->toArray();
-        if (count($rows) !== count(array_unique($roleIds))) {
+        if ($this->roleRepository->countExistingForApp($roleIds) !== count(array_unique($roleIds))) {
             throw StaffException::throw('角色不存在或已失效', -1);
         }
     }
@@ -561,7 +546,7 @@ class StaffRoleService
 
         $roleIds = array_map(
             static fn (array $row): int => (int) $row['role_id'],
-            StaffUserRoleEntity::query()->where('app_id', StaffApp::appId())->where('user_id', $userId)->select()->toArray()
+            $this->userRoleRepository->listRowsByUserId($userId),
         );
         $roleIds = $this->enabledRoleIds($roleIds);
         if ($roleIds === []) {
@@ -570,7 +555,7 @@ class StaffRoleService
 
         $pageIds = array_map(
             static fn (array $row): int => (int) $row['page_id'],
-            StaffRolePageEntity::query()->where('app_id', StaffApp::appId())->whereIn('role_id', $roleIds)->select()->toArray()
+            $this->rolePageRepository->listRowsByRoleIds($roleIds),
         );
         $byId = [];
         foreach ($all as $row) {
@@ -602,21 +587,7 @@ class StaffRoleService
      */
     public function replaceRolePages(int $roleId, array $pageIds): void
     {
-        $appId = StaffApp::appId();
-        StaffRolePageEntity::query()->where('app_id', $appId)->where('role_id', $roleId)->delete();
-
-        foreach (array_unique($pageIds) as $pageId) {
-            if ($pageId <= 0) {
-                continue;
-            }
-            $rel = new StaffRolePageEntity();
-            $rel->setData([
-                'app_id' => $appId,
-                'role_id' => $roleId,
-                'page_id' => $pageId,
-            ]);
-            $rel->save();
-        }
+        $this->rolePageRepository->replaceForRole($roleId, $pageIds);
     }
 
     /**
@@ -625,32 +596,7 @@ class StaffRoleService
      */
     public function replaceRolePermissions(int $roleId, array $apiPerIds, array $taskPerIds): void
     {
-        $appId = StaffApp::appId();
-        StaffRolePermissionEntity::query()->where('app_id', $appId)->where('role_id', $roleId)->delete();
-
-        $this->insertPermissions($roleId, StaffApp::PERMISSION_TYPE_API, $apiPerIds);
-        $this->insertPermissions($roleId, StaffApp::PERMISSION_TYPE_TASK, $taskPerIds);
-    }
-
-    /**
-     * @param array<int, int> $perIds
-     */
-    private function insertPermissions(int $roleId, int $type, array $perIds): void
-    {
-        $appId = StaffApp::appId();
-        foreach (array_unique($perIds) as $perId) {
-            if ($perId <= 0) {
-                continue;
-            }
-            $rel = new StaffRolePermissionEntity();
-            $rel->setData([
-                'app_id' => $appId,
-                'type' => $type,
-                'role_id' => $roleId,
-                'per_id' => $perId,
-            ]);
-            $rel->save();
-        }
+        $this->rolePermissionRepository->replaceForRole($roleId, $apiPerIds, $taskPerIds);
     }
 
     private function requireRole(int $id): StaffRoleEntity
@@ -658,7 +604,7 @@ class StaffRoleService
         if ($id <= 0) {
             throw StaffException::throw('id不能为空', -1);
         }
-        $role = (new StaffRoleEntity())->loadById($id);
+        $role = $this->roleRepository->findById($id);
         if (!$role || (int) $role->app_id !== StaffApp::appId()) {
             throw StaffException::throw('角色不存在', -1);
         }
@@ -671,7 +617,7 @@ class StaffRoleService
         if ($id <= 0) {
             throw StaffException::throw('id不能为空', -1);
         }
-        $menu = (new StaffMenuPageEntity())->loadById($id);
+        $menu = $this->menuRepository->findById($id);
         if (!$menu || (int) $menu->status === StaffApp::MENU_STATUS_DELETED) {
             throw StaffException::throw('菜单不存在', -1);
         }
@@ -704,17 +650,10 @@ class StaffRoleService
 
     private function assertMenuUnique(string $code, string $uri, int $exceptId): void
     {
-        $appId = StaffApp::appId();
-        $codeQb = StaffMenuPageEntity::queryVisible()->where('code', $code);
-        $uriQb = StaffMenuPageEntity::queryVisible()->where('uri', $uri)->where('app_id', $appId);
-        if ($exceptId > 0) {
-            $codeQb->where('id', '<>', $exceptId);
-            $uriQb->where('id', '<>', $exceptId);
-        }
-        if ($codeQb->find()) {
+        if ($this->menuRepository->existsVisibleCode($code, $exceptId)) {
             throw StaffException::throw('菜单标识已存在', -1);
         }
-        if ($uriQb->find()) {
+        if ($this->menuRepository->existsVisibleUriForApp($uri, $exceptId)) {
             throw StaffException::throw('菜单 URI 已存在', -1);
         }
     }
@@ -737,12 +676,7 @@ class StaffRoleService
      */
     private function loadMenuRows(?int $status = null): array
     {
-        $qb = StaffMenuPageEntity::queryVisible()->where('app_id', StaffApp::appId());
-        if ($status !== null) {
-            $qb->where('status', $status);
-        }
-
-        return $qb->order('sort', 'desc')->order('id', 'asc')->select()->toArray();
+        return $this->menuRepository->listVisibleRows($status);
     }
 
     /**
@@ -790,13 +724,7 @@ class StaffRoleService
      */
     private function pageIdsOfRole(int $roleId): array
     {
-        $rows = StaffRolePageEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->where('role_id', $roleId)
-            ->select()
-            ->toArray();
-
-        return array_values(array_map(static fn (array $row): int => (int) $row['page_id'], $rows));
+        return $this->rolePageRepository->listPageIdsByRoleId($roleId);
     }
 
     /**
@@ -804,14 +732,7 @@ class StaffRoleService
      */
     private function permissionIdsOfRole(int $roleId, int $type): array
     {
-        $rows = StaffRolePermissionEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->where('role_id', $roleId)
-            ->where('type', $type)
-            ->select()
-            ->toArray();
-
-        return array_values(array_map(static fn (array $row): int => (int) $row['per_id'], $rows));
+        return $this->rolePermissionRepository->listPermissionIdsByRoleAndType($roleId, $type);
     }
 
     /**
@@ -821,7 +742,7 @@ class StaffRoleService
     {
         $roleIds = array_map(
             static fn (array $row): int => (int) $row['role_id'],
-            StaffUserRoleEntity::query()->where('app_id', StaffApp::appId())->where('user_id', $userId)->select()->toArray()
+            $this->userRoleRepository->listRowsByUserId($userId),
         );
 
         return $this->enabledRoleIds($roleIds);
@@ -836,14 +757,10 @@ class StaffRoleService
         if ($roleIds === []) {
             return [];
         }
-        $rows = StaffRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('id', $roleIds)
-            ->where('status', 1)
-            ->select()
-            ->toArray();
-
-        return array_values(array_map(static fn (array $row): int => (int) $row['id'], $rows));
+        return array_values(array_map(
+            static fn (array $row): int => (int) $row['id'],
+            $this->roleRepository->listEnabledRowsByIds($roleIds),
+        ));
     }
 
     /**
@@ -852,21 +769,7 @@ class StaffRoleService
      */
     private function countUsersByRoleIds(array $roleIds): array
     {
-        $counts = [];
-        if ($roleIds === []) {
-            return $counts;
-        }
-        $rows = StaffUserRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('role_id', $roleIds)
-            ->select()
-            ->toArray();
-        foreach ($rows as $row) {
-            $roleId = (int) $row['role_id'];
-            $counts[$roleId] = ($counts[$roleId] ?? 0) + 1;
-        }
-
-        return $counts;
+        return $this->userRoleRepository->countUsersGroupedByRoleIds($roleIds);
     }
 
     /**
@@ -875,21 +778,7 @@ class StaffRoleService
      */
     private function countMenusByRoleIds(array $roleIds): array
     {
-        $counts = [];
-        if ($roleIds === []) {
-            return $counts;
-        }
-        $rows = StaffRolePageEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('role_id', $roleIds)
-            ->select()
-            ->toArray();
-        foreach ($rows as $row) {
-            $roleId = (int) $row['role_id'];
-            $counts[$roleId] = ($counts[$roleId] ?? 0) + 1;
-        }
-
-        return $counts;
+        return $this->rolePageRepository->countPagesGroupedByRoleIds($roleIds);
     }
 
     /**
@@ -928,8 +817,7 @@ class StaffRoleService
 
     private function ensureDefaultMenus(): void
     {
-        $exists = StaffMenuPageEntity::queryVisible()->where('app_id', StaffApp::appId())->find();
-        if ($exists) {
+        if ($this->menuRepository->hasAnyForApp()) {
             return;
         }
 
@@ -941,7 +829,7 @@ class StaffRoleService
             $parentPrefix = '';
             if ($def['parent'] !== '' && isset($codeIds[$def['parent']])) {
                 $parentId = $codeIds[$def['parent']];
-                $parent = (new StaffMenuPageEntity())->loadById($parentId);
+                $parent = $this->menuRepository->findById($parentId);
                 if ($parent) {
                     $prefix = trim((string) $parent->parent_prefix, ',');
                     $ids = $prefix === '' ? [] : explode(',', $prefix);
@@ -949,8 +837,7 @@ class StaffRoleService
                     $parentPrefix = implode(',', $ids);
                 }
             }
-            $menu = new StaffMenuPageEntity();
-            $menu->setData([
+            $menu = $this->menuRepository->insert([
                 'app_id' => StaffApp::appId(),
                 'name' => $def['name'],
                 'code' => $def['code'],
@@ -961,7 +848,6 @@ class StaffRoleService
                 'sort' => $def['sort'],
                 'status' => StaffApp::MENU_STATUS_ENABLED,
             ]);
-            $menu->save();
             $codeIds[$def['code']] = (int) $menu->id;
         }
     }
@@ -976,18 +862,16 @@ class StaffRoleService
             if (!$page) {
                 continue;
             }
-            $page->setData([
+            $this->menuRepository->save($page->setData([
                 'status' => StaffApp::MENU_STATUS_DELETED,
                 'delete_at' => date('Y-m-d H:i:s'),
-            ]);
-            $page->save();
-            StaffRolePageEntity::query()->where('page_id', (int) $page->id)->delete();
+            ]));
+            $this->rolePageRepository->deleteByPageId((int) $page->id);
         }
 
         $cronGroup = $this->findVisibleByCode('cron');
         if (!$cronGroup) {
-            $cronGroup = new StaffMenuPageEntity();
-            $cronGroup->setData([
+            $cronGroup = $this->menuRepository->insert([
                 'app_id' => StaffApp::appId(),
                 'name' => 'Cron 管理',
                 'code' => 'cron',
@@ -998,7 +882,6 @@ class StaffRoleService
                 'sort' => 100,
                 'status' => StaffApp::MENU_STATUS_ENABLED,
             ]);
-            $cronGroup->save();
         }
 
         $cronGroupId = (int) $cronGroup->id;
@@ -1008,22 +891,16 @@ class StaffRoleService
             if (!$item || (int) $item->parent_id === $cronGroupId) {
                 continue;
             }
-            $item->setData([
+            $this->menuRepository->save($item->setData([
                 'parent_id' => $cronGroupId,
                 'parent_prefix' => $cronPrefix,
-            ]);
-            $item->save();
+            ]));
         }
     }
 
     private function findVisibleByCode(string $code): ?StaffMenuPageEntity
     {
-        $row = StaffMenuPageEntity::queryVisible()->where('code', $code)->find();
-        if (!$row) {
-            return null;
-        }
-
-        return (new StaffMenuPageEntity())->loadById((int) $row['id']);
+        return $this->menuRepository->findVisibleByCode($code);
     }
 
     private function isStatusLockedRole(StaffRoleEntity $role): bool

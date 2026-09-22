@@ -64,7 +64,7 @@ use App\Module\Cron\ShellCommandGuard;
 use App\Module\Cron\Response\CronTaskManager\ListTasksPageResult;
 use App\Module\Cron\Response\CronTaskManager\TaskOperationLogsPageResult;
 use App\Module\Cron\Response\CronTaskManager\TaskLogsPageResult;
-use App\Module\Staff\Entity\StaffUserEntity;
+use App\Module\Staff\Repository\StaffUserRepository;
 use App\Module\Staff\Service\StaffUserService;
 use Swoolefy\Support\FrameworkContext;
 
@@ -105,6 +105,10 @@ class CronTaskManagerService
 
     private CronRobotService $cronRobotService {
         get => $this->cronRobotService ??= new CronRobotService();
+    }
+
+    private StaffUserRepository $staffUserRepository {
+        get => $this->staffUserRepository ??= new StaffUserRepository();
     }
 
     /**
@@ -245,11 +249,7 @@ class CronTaskManagerService
             return [];
         }
 
-        $users = StaffUserEntity::query()
-            ->whereIn('id', array_values($userIds))
-            ->field(['id', 'account', 'user_name'])
-            ->select()
-            ->toArray();
+        $users = $this->staffUserRepository->listBriefRowsByIds(array_values($userIds));
         $userMap = [];
         foreach ($users as $user) {
             $id = (int) ($user['id'] ?? 0);
@@ -888,11 +888,7 @@ class CronTaskManagerService
             return [];
         }
 
-        $users = StaffUserEntity::query()
-            ->whereIn('id', array_values($operatorIds))
-            ->field(['id', 'account', 'user_name'])
-            ->select()
-            ->toArray();
+        $users = $this->staffUserRepository->listBriefRowsByIds(array_values($operatorIds));
         $userMap = [];
         foreach ($users as $user) {
             $id = (int) ($user['id'] ?? 0);
@@ -2051,11 +2047,7 @@ class CronTaskManagerService
         /** @var array<int, array{account: string, user_name: string}> $users */
         $users = [];
         if ($userIds !== []) {
-            $rows = StaffUserEntity::query()
-                ->whereIn('id', array_values($userIds))
-                ->field(['id', 'account', 'user_name'])
-                ->select()
-                ->toArray();
+            $rows = $this->staffUserRepository->listBriefRowsByIds(array_values($userIds));
             foreach ($rows as $user) {
                 $id = (int) ($user['id'] ?? 0);
                 if ($id <= 0) {
@@ -2232,7 +2224,7 @@ class CronTaskManagerService
             return ['operator_id' => 0, 'operator_name' => ''];
         }
 
-        $user = (new StaffUserEntity())->loadById($userId);
+        $user = $this->staffUserRepository->findById($userId);
         if (!$user) {
             return ['operator_id' => $userId, 'operator_name' => ''];
         }

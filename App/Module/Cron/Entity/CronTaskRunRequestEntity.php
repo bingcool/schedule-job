@@ -26,4 +26,9 @@ class CronTaskRunRequestEntity extends ClientModel
     protected static $table = 'cron_task_run_request';
 
     protected $pk = 'id';
+
+    public function loadById(int $id): ?static
+    {
+        return $id <= 0 ? null : $this->loadOne(['id' => $id]);
+    }
 }

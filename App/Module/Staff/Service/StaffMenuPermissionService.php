@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Service;
 
-use App\Module\Staff\Entity\StaffMenuPageEntity;
-use App\Module\Staff\Entity\StaffRolePageEntity;
+use App\Module\Staff\Repository\StaffMenuPageRepository;
+use App\Module\Staff\Repository\StaffRolePageRepository;
 use App\Module\Staff\StaffApp;
 use Swoolefy\Support\Auth\AuthException;
 use Swoolefy\Support\FrameworkContext;
@@ -82,6 +82,14 @@ class StaffMenuPermissionService
 
     private StaffRoleService $staffRoleService {
         get => $this->staffRoleService ??= new StaffRoleService();
+    }
+
+    private StaffRolePageRepository $rolePageRepository {
+        get => $this->rolePageRepository ??= new StaffRolePageRepository();
+    }
+
+    private StaffMenuPageRepository $menuRepository {
+        get => $this->menuRepository ??= new StaffMenuPageRepository();
     }
 
     public function __construct(?StaffRoleService $staffRoleService = null)
@@ -161,18 +169,13 @@ class StaffMenuPermissionService
 
         $pageIds = array_values(array_unique(array_map(
             static fn (array $row): int => (int) $row['page_id'],
-            StaffRolePageEntity::query()->where('app_id', StaffApp::appId())->whereIn('role_id', $roleIds)->select()->toArray()
+            $this->rolePageRepository->listRowsByRoleIds($roleIds),
         )));
         if ($pageIds === []) {
             return [];
         }
 
-        $rows = StaffMenuPageEntity::queryVisible()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('id', $pageIds)
-            ->where('status', StaffApp::MENU_STATUS_ENABLED)
-            ->select()
-            ->toArray();
+        $rows = $this->menuRepository->listEnabledVisibleRowsByIds($pageIds);
 
         $uris = [];
         foreach ($rows as $row) {

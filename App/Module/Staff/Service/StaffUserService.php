@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Service;
 
-use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
+use App\Module\Cron\Repository\CronAgentNodeGroupRepository;
 use App\Module\Staff\Dto\StaffManager\CreateUserDto;
 use App\Module\Staff\Dto\StaffManager\GeneratedResetPasswordDto;
 use App\Module\Staff\Dto\StaffManager\GrantUserNodeGroupsDto;
@@ -17,11 +17,11 @@ use App\Module\Staff\Dto\StaffManager\SwitchUserStatusDto;
 use App\Module\Staff\Dto\StaffManager\UpdateUserDto;
 use App\Module\Staff\Dto\StaffManager\UserIdDto;
 use App\Module\Staff\Entity\StaffUserEntity;
-use App\Module\Staff\Entity\StaffUserRelateNodeGroupEntity;
-use App\Module\Staff\Entity\StaffUserRoleEntity;
 use App\Module\Staff\Exception\StaffException;
+use App\Module\Staff\Repository\StaffUserRelateNodeGroupRepository;
+use App\Module\Staff\Repository\StaffUserRepository;
+use App\Module\Staff\Repository\StaffUserRoleRepository;
 use App\Module\Staff\Response\StaffManager\ListUsersPageResult;
-use App\Module\Staff\StaffApp;
 use App\Module\Staff\StaffRoleCode;
 use Swoolefy\Support\FrameworkContext;
 
@@ -49,6 +49,22 @@ class StaffUserService
         set => $this->staffMailService = $value;
     }
 
+    private StaffUserRepository $userRepository {
+        get => $this->userRepository ??= new StaffUserRepository();
+    }
+
+    private StaffUserRoleRepository $userRoleRepository {
+        get => $this->userRoleRepository ??= new StaffUserRoleRepository();
+    }
+
+    private StaffUserRelateNodeGroupRepository $userNodeGroupRepository {
+        get => $this->userNodeGroupRepository ??= new StaffUserRelateNodeGroupRepository();
+    }
+
+    private CronAgentNodeGroupRepository $nodeGroupRepository {
+        get => $this->nodeGroupRepository ??= new CronAgentNodeGroupRepository();
+    }
+
     public function __construct(?StaffRoleService $staffRoleService = null)
     {
         if ($staffRoleService !== null) {
@@ -62,23 +78,12 @@ class StaffUserService
         $userName = trim((string) ($query->getUserName() ?? ''));
         $status = $query->getStatus();
 
-        $qb = StaffUserEntity::query();
-        if ($account !== '') {
-            $qb->where('account', 'like', '%' . $account . '%');
-        }
-        if ($userName !== '') {
-            $qb->where('user_name', 'like', '%' . $userName . '%');
-        }
-        if ($status === 1 || $status === 0) {
-            $qb->where('status', $status);
-        }
-
         $pageResult = new ListUsersPageResult();
         $pageResult->setPage($query->getPage());
         $pageResult->setPageSize($query->getPageSize());
-        $pageResult->setTotal((int) $qb->clone()->count());
+        $pageResult->setTotal($this->userRepository->countByListQuery($query));
 
-        $rows = $qb->order('id', 'desc')->limit($query->getOffset(), $query->getPageSize())->select()->toArray();
+        $rows = $this->userRepository->listRowsByListQuery($query);
         $userIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
         $rolesMap = $this->staffRoleService->rolesGroupedByUserIds($userIds);
         $groupsMap = $this->nodeGroupIdsGroupedByUserIds($userIds);
@@ -115,8 +120,7 @@ class StaffUserService
         $account = $dto->getAccount();
         $email = $this->resolveStoredEmail($account, $dto->getEmail());
         $this->assertAccountAvailable($account, $email, null);
-        $user = new StaffUserEntity();
-        $user->setData([
+        $user = $this->userRepository->insert([
             'account' => $account,
             'email' => $email,
             'user_name' => $dto->getUserName(),
@@ -124,7 +128,6 @@ class StaffUserService
             'status' => 1,
             'enabled_at' => date('Y-m-d H:i:s'),
         ]);
-        $user->save();
 
         return $this->getUser(UserIdDto::of((int) $user->id));
     }
@@ -152,8 +155,7 @@ class StaffUserService
             'email' => $email,
             'user_name' => $dto->getUserName(),
         ];
-        $user->setData($data);
-        $user->save();
+        $this->userRepository->save($user->setData($data));
 
         return $this->getUser(UserIdDto::of((int) $user->id));
     }
@@ -168,12 +170,9 @@ class StaffUserService
         if ($userName === '') {
             throw StaffException::throw('用户名称不能为空', -1);
         }
-        $user->setData([
+        return $this->userRepository->save($user->setData([
             'user_name' => $userName,
-        ]);
-        $user->save();
-
-        return $user;
+        ]));
     }
 
     /**
@@ -243,10 +242,7 @@ class StaffUserService
             return false;
         }
 
-        return StaffUserRelateNodeGroupEntity::query()
-            ->where('user_id', $userId)
-            ->where('node_group_id', $nodeGroupId)
-            ->count() > 0;
+        return $this->userNodeGroupRepository->existsForUserAndGroup($userId, $nodeGroupId);
     }
 
     /**
@@ -260,29 +256,12 @@ class StaffUserService
             return [];
         }
 
-        $rows = StaffUserRelateNodeGroupEntity::query()
-            ->where('node_group_id', $nodeGroupId)
-            ->field(['user_id'])
-            ->select()
-            ->toArray();
-        $userIds = [];
-        foreach ($rows as $row) {
-            $userId = (int) ($row['user_id'] ?? 0);
-            if ($userId > 0) {
-                $userIds[$userId] = $userId;
-            }
-        }
+        $userIds = $this->userNodeGroupRepository->listUserIdsByNodeGroupId($nodeGroupId);
         if ($userIds === []) {
             return [];
         }
 
-        $users = StaffUserEntity::query()
-            ->whereIn('id', array_values($userIds))
-            ->where('status', 1)
-            ->field(['id', 'account', 'user_name'])
-            ->order('id', 'desc')
-            ->select()
-            ->toArray();
+        $users = $this->userRepository->listActiveBriefRowsByIds($userIds);
 
         $list = [];
         foreach ($users as $user) {
@@ -365,13 +344,12 @@ class StaffUserService
         $this->assertNotSelf((int) $user->id, '不能删除当前登录账号');
 
         $userId = (int) $user->id;
-        $user->setData([
+        $this->userRepository->save($user->setData([
             'status' => 0,
             'disabled_at' => date('Y-m-d H:i:s'),
-        ]);
-        $user->save();
-        StaffUserRoleEntity::query()->where('user_id', $userId)->delete();
-        StaffUserRelateNodeGroupEntity::query()->where('user_id', $userId)->delete();
+        ]));
+        $this->userRoleRepository->deleteByUserId($userId);
+        $this->userNodeGroupRepository->deleteByUserId($userId);
         $user->delete();
 
         return $userId;
@@ -392,8 +370,7 @@ class StaffUserService
         } else {
             $data['disabled_at'] = $now;
         }
-        $user->setData($data);
-        $user->save();
+        $this->userRepository->save($user->setData($data));
 
         return SwitchUserStatusDto::of((int) $user->id, $status);
     }
@@ -450,10 +427,9 @@ class StaffUserService
         }
 
         $user = $this->requireUser($targetId);
-        $user->setData([
+        $this->userRepository->save($user->setData([
             'password' => self::hashResetPassword($password),
-        ]);
-        $user->save();
+        ]));
 
         $email = $this->notifyEmailOf($user);
         $mailSent = false;
@@ -534,7 +510,7 @@ class StaffUserService
         if ($id <= 0) {
             throw StaffException::throw('id不能为空', -1);
         }
-        $user = (new StaffUserEntity())->loadById($id);
+        $user = $this->userRepository->findById($id);
         if (!$user || $user->isDeleted()) {
             throw StaffException::throw('用户不存在', -1);
         }
@@ -547,20 +523,7 @@ class StaffUserService
      */
     public function replaceUserRoles(int $userId, array $roleIds): void
     {
-        $appId = StaffApp::appId();
-        StaffUserRoleEntity::query()->where('app_id', $appId)->where('user_id', $userId)->delete();
-        foreach (array_unique($roleIds) as $roleId) {
-            if ($roleId <= 0) {
-                continue;
-            }
-            $rel = new StaffUserRoleEntity();
-            $rel->setData([
-                'app_id' => $appId,
-                'user_id' => $userId,
-                'role_id' => $roleId,
-            ]);
-            $rel->save();
-        }
+        $this->userRoleRepository->replaceForUser($userId, $roleIds);
     }
 
     /**
@@ -568,18 +531,7 @@ class StaffUserService
      */
     public function replaceUserNodeGroups(int $userId, array $groupIds): void
     {
-        StaffUserRelateNodeGroupEntity::query()->where('user_id', $userId)->delete();
-        foreach (array_unique($groupIds) as $groupId) {
-            if ($groupId <= 0) {
-                continue;
-            }
-            $rel = new StaffUserRelateNodeGroupEntity();
-            $rel->setData([
-                'user_id' => $userId,
-                'node_group_id' => $groupId,
-            ]);
-            $rel->save();
-        }
+        $this->userNodeGroupRepository->replaceForUser($userId, $groupIds);
     }
 
     /**
@@ -617,11 +569,7 @@ class StaffUserService
 
     private function assertAccountAvailable(string $account, ?string $email, ?int $exceptId): void
     {
-        $existAccount = StaffUserEntity::query()->where('account', $account);
-        if ($exceptId !== null && $exceptId > 0) {
-            $existAccount->where('id', '<>', $exceptId);
-        }
-        if ($existAccount->find()) {
+        if ($this->userRepository->existsAccount($account, $exceptId)) {
             throw StaffException::throw('账号已存在', -1);
         }
         $this->assertEmailAvailable($email, $exceptId);
@@ -632,7 +580,7 @@ class StaffUserService
         if ($email === null || $email === '') {
             return;
         }
-        if (StaffUserEntity::findIdUsingEmail($email, $exceptId) !== null) {
+        if ($this->userRepository->findIdUsingEmail($email, $exceptId) !== null) {
             throw StaffException::throw('邮箱已被使用', -1);
         }
     }
@@ -653,8 +601,7 @@ class StaffUserService
         if ($groupIds === []) {
             return;
         }
-        $rows = CronAgentNodeGroupEntity::query()->whereIn('id', $groupIds)->select()->toArray();
-        if (count($rows) !== count(array_unique($groupIds))) {
+        if ($this->nodeGroupRepository->countExistingIds($groupIds) !== count(array_unique($groupIds))) {
             throw StaffException::throw('节点组不存在', -1);
         }
     }
@@ -665,23 +612,7 @@ class StaffUserService
      */
     private function nodeGroupsByIds(array $groupIds): array
     {
-        $map = [];
-        if ($groupIds === []) {
-            return $map;
-        }
-        $rows = CronAgentNodeGroupEntity::query()->whereIn('id', $groupIds)->select()->toArray();
-        foreach ($rows as $row) {
-            $id = (int) ($row['id'] ?? 0);
-            if ($id <= 0) {
-                continue;
-            }
-            $map[$id] = [
-                'id' => $id,
-                'groupName' => (string) ($row['group_name'] ?? ''),
-            ];
-        }
-
-        return $map;
+        return $this->nodeGroupRepository->briefMapByIds($groupIds);
     }
 
     /**
@@ -712,12 +643,7 @@ class StaffUserService
         if ($userIds === []) {
             return $grouped;
         }
-        $rows = StaffUserRelateNodeGroupEntity::query()->whereIn('user_id', $userIds)->select()->toArray();
-        foreach ($rows as $row) {
-            $grouped[(int) $row['user_id']][] = (int) $row['node_group_id'];
-        }
-
-        return $grouped;
+        return $this->userNodeGroupRepository->nodeGroupIdsGroupedByUserIds($userIds);
     }
 
     /**

@@ -22,6 +22,11 @@ class CronTaskOperationLogEntity extends ClientModel
 
     protected $pk = 'id';
 
+    public function loadById(int $id): ?static
+    {
+        return $id <= 0 ? null : $this->loadOne(['id' => (int) $id]);
+    }
+
     protected $casts = [
         'content_before' => 'array',
         'content_after' => 'array',

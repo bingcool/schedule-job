@@ -20,4 +20,9 @@ class StaffRolePermissionEntity extends ClientModel
     protected static $table = 'staff_role_permission';
 
     protected $pk = 'id';
+
+    public function loadById(int $id): ?static
+    {
+        return $id <= 0 ? null : $this->loadOne(['id' => $id]);
+    }
 }

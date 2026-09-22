@@ -11,6 +11,7 @@ use App\Module\Staff\Dto\StaffManager\RegisterDto;
 use App\Module\Staff\Dto\StaffManager\UpdateProfileDto;
 use App\Module\Staff\Entity\StaffUserEntity;
 use App\Module\Staff\Exception\StaffException;
+use App\Module\Staff\Repository\StaffUserRepository;
 use Swoolefy\Core\Application;
 use Swoolefy\Support\Auth\AuthUser;
 use Swoolefy\Support\Auth\JwtAuthGuard;
@@ -37,6 +38,10 @@ class StaffAuthService
     private ResetPasswordTokenService $resetPasswordTokenService {
         get => $this->resetPasswordTokenService ??= new ResetPasswordTokenService();
         set => $this->resetPasswordTokenService = $value;
+    }
+
+    private StaffUserRepository $userRepository {
+        get => $this->userRepository ??= new StaffUserRepository();
     }
 
     public function __construct(
@@ -78,7 +83,7 @@ class StaffAuthService
             if (!empty($temp['expired'])) {
                 throw StaffException::throw('临时重置密码已过期', -1);
             }
-            $user = (new StaffUserEntity())->loadByLoginIdentity($account);
+            $user = $this->userRepository->findByLoginIdentity($account);
             if (
                 !$user
                 || $user->isDeleted()
@@ -94,7 +99,7 @@ class StaffAuthService
             return $this->issueSession($user, 'temp', (string) $temp['expiresAt']);
         }
 
-        $user = (new StaffUserEntity())->loadByLoginIdentity($account);
+        $user = $this->userRepository->findByLoginIdentity($account);
         if (!$user || $user->isDeleted() || !password_verify($password, (string) $user->password)) {
             throw StaffException::throw('账号或密码错误', -1);
         }

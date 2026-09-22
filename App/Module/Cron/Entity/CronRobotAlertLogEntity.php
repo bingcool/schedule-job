@@ -28,6 +28,11 @@ class CronRobotAlertLogEntity extends ClientModel
 
     protected $pk = 'id';
 
+    public function loadById(int $id): ?static
+    {
+        return $id <= 0 ? null : $this->loadOne(['id' => $id]);
+    }
+
     protected $casts = [
         'execution_id' => 'int',
         'cron_id' => 'int',

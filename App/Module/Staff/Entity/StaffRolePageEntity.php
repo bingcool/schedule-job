@@ -19,4 +19,9 @@ class StaffRolePageEntity extends ClientModel
     protected static $table = 'staff_role_page';
 
     protected $pk = 'id';
+
+    public function loadById(int $id): ?static
+    {
+        return $id <= 0 ? null : $this->loadOne(['id' => $id]);
+    }
 }

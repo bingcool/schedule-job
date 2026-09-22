@@ -27,6 +27,11 @@ class CronScheduledTaskRecordEntity extends ClientModel
 
     protected $pk = 'id';
 
+    public function loadById(int $id): ?static
+    {
+        return $id <= 0 ? null : $this->loadOne(['id' => $id]);
+    }
+
     protected $casts = [
         'cron_id' => 'int',
         'execution_id' => 'int',

@@ -20,8 +20,8 @@
   "prefer-stable": true,
   "require": {
     "php": "^8.4",
-    "bingcool/swoolefy": "^6.3.5",
-    "bingcool/library": "^6.0.1",
+    "bingcool/swoolefy": "dev-swoolefy-6.2-x",
+    "bingcool/library": "dev-library-6.x",
     "phpmailer/phpmailer": "~7.1.0"
   },
   "require-dev": {
@@ -35,5 +35,15 @@
       "php-http/discovery": false,
       "tbachert/spi": false
     }
-  }
+  },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../library"
+    },
+    {
+      "type": "path",
+      "url": "../swoolefy"
+    }
+  ]
 }

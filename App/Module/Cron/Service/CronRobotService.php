@@ -8,8 +8,9 @@ use App\Module\Cron\Dto\CronRobot\CreateRobotDto;
 use App\Module\Cron\Dto\CronRobot\RobotIdDto;
 use App\Module\Cron\Dto\CronRobot\SwitchRobotStatusDto;
 use App\Module\Cron\Dto\CronRobot\UpdateRobotDto;
-use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
 use App\Module\Cron\Entity\CronRobotEntity;
+use App\Module\Cron\Repository\CronAgentNodeGroupRepository;
+use App\Module\Cron\Repository\CronRobotRepository;
 use App\Module\Cron\Exception\CronTaskException;
 use App\Module\Cron\Robot\RobotAlertMessage;
 use App\Module\Cron\Robot\RobotConfig;
@@ -30,15 +31,20 @@ class CronRobotService
         get => $this->strategyFactory ??= new RobotStrategyFactory();
     }
 
+    private CronRobotRepository $robotRepository {
+        get => $this->robotRepository ??= new CronRobotRepository();
+    }
+
+    private CronAgentNodeGroupRepository $nodeGroupRepository {
+        get => $this->nodeGroupRepository ??= new CronAgentNodeGroupRepository();
+    }
+
     /**
      * @return list<array<string, mixed>>
      */
     public function listRobots(): array
     {
-        $list = CronRobotEntity::query()
-            ->order('id', 'desc')
-            ->select()
-            ->toArray();
+        $list = $this->robotRepository->listAllRows();
 
         return array_map(fn (array $row): array => $this->present($row), $list);
     }
@@ -63,8 +69,7 @@ class CronRobotService
         $webhook = $this->assertWebhook($dto->getWebhookUrl(), $platform);
         $secret = $this->normalizeSecret($dto->getSecret());
 
-        $robot = new CronRobotEntity();
-        $robot->setData([
+        $robot = $this->robotRepository->insert([
             'name' => $name,
             'platform' => $platform,
             'webhook_url' => $webhook,
@@ -73,7 +78,6 @@ class CronRobotService
             'created_by' => $this->currentUserId(),
             'updated_by' => $this->currentUserId(),
         ]);
-        $robot->save();
 
         return $this->present($robot->getAttributes());
     }
@@ -105,8 +109,7 @@ class CronRobotService
             $data['secret'] = $this->normalizeSecret($secret);
         }
 
-        $robot->setData($data);
-        $robot->save();
+        $this->robotRepository->save($robot->setData($data));
 
         return $this->present($robot->getAttributes());
     }
@@ -122,11 +125,10 @@ class CronRobotService
             throw CronTaskException::throw('status 只能为 0 或 1', 422);
         }
         $robot = $this->requireRobot($dto->getId());
-        $robot->setData([
+        $this->robotRepository->save($robot->setData([
             'status' => $status,
             'updated_by' => $this->currentUserId(),
-        ]);
-        $robot->save();
+        ]));
 
         return $this->present($robot->getAttributes());
     }
@@ -136,13 +138,11 @@ class CronRobotService
         $this->assertSuperUser();
         $id = $dto->getId();
         $robot = $this->requireRobot($id);
-        $used = (int) CronAgentNodeGroupEntity::query()->where('robot_id', $id)->count();
+        $used = $this->nodeGroupRepository->countByRobotId($id);
         if ($used > 0) {
             throw CronTaskException::throw('该机器人被 ' . $used . ' 个节点组使用，请先在节点组中解除', 409);
         }
-        $robot->delete();
-
-        return $id;
+        return $this->robotRepository->delete($robot);
     }
 
     /**
@@ -175,13 +175,12 @@ class CronRobotService
             $error = RobotWebhookMask::sanitizeError($e->getMessage(), $config->webhookUrl, $config->secret);
         }
 
-        $robot->setData([
+        $this->robotRepository->save($robot->setData([
             'last_test_at' => date('Y-m-d H:i:s'),
             'last_test_ok' => $ok ? 1 : 0,
             'last_test_error' => $error,
             'updated_by' => $this->currentUserId(),
-        ]);
-        $robot->save();
+        ]));
 
         return ['ok' => $ok, 'error' => $error];
     }
@@ -191,7 +190,7 @@ class CronRobotService
         if ($robotId <= 0) {
             throw CronTaskException::throw('机器人不存在或未启用', 422);
         }
-        $robot = (new CronRobotEntity())->loadById($robotId);
+        $robot = $this->robotRepository->findById($robotId);
         if ($robot === null) {
             throw CronTaskException::throw('机器人不存在或未启用', 422);
         }
@@ -215,7 +214,7 @@ class CronRobotService
         if ($id <= 0) {
             throw CronTaskException::throw('id不能为空', -1);
         }
-        $robot = (new CronRobotEntity())->loadById($id);
+        $robot = $this->robotRepository->findById($id);
         if ($robot === null) {
             throw CronTaskException::throw('机器人不存在', -1);
         }
@@ -238,11 +237,7 @@ class CronRobotService
 
     private function assertNameUnique(string $name, ?int $exceptId): void
     {
-        $qb = CronRobotEntity::query()->where('name', $name);
-        if ($exceptId !== null && $exceptId > 0) {
-            $qb->where('id', '<>', $exceptId);
-        }
-        if ($qb->find()) {
+        if ($this->robotRepository->existsByName($name, $exceptId)) {
             throw CronTaskException::throw('机器人名称已存在', 422);
         }
     }
