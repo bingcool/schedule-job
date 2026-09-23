@@ -23,6 +23,10 @@ class TaskLogsResponse extends BasePageResultResponse
         return $this->data;
     }
 
+    /**
+     * @param TaskLogsPageResult $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof TaskLogsPageResult) {

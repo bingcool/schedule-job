@@ -24,6 +24,10 @@ class BatchStatusResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param BatchStatusResultDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof BatchStatusResultDto) {

@@ -23,6 +23,10 @@ class ListTasksResponse extends BasePageResultResponse
         return $this->data;
     }
 
+    /**
+     * @param ListTasksPageResult $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof ListTasksPageResult) {

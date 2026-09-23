@@ -29,6 +29,10 @@ class CronRobotListResponse extends BaseListResponse
         return $this->data;
     }
 
+    /**
+     * @param CronRobotListDataDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof CronRobotListDataDto) {

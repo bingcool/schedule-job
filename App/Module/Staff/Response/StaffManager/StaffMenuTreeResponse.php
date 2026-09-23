@@ -29,6 +29,10 @@ class StaffMenuTreeResponse extends BaseListResponse
         return $this->data;
     }
 
+    /**
+     * @param StaffMenuTreeListDataDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof StaffMenuTreeListDataDto) {

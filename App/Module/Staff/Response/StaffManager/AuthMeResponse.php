@@ -24,6 +24,10 @@ class AuthMeResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param AuthMeProfileDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof AuthMeProfileDto) {

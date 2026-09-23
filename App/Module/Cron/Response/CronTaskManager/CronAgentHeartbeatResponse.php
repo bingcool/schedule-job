@@ -24,6 +24,10 @@ class CronAgentHeartbeatResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param AgentHeartbeatResultDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof AgentHeartbeatResultDto) {

@@ -26,6 +26,10 @@ class CronNodeRowResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param CronAgentNodeRowDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof CronAgentNodeRowDto) {

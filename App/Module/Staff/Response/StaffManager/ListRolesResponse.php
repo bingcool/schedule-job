@@ -23,6 +23,10 @@ class ListRolesResponse extends BasePageResultResponse
         return $this->data;
     }
 
+    /**
+     * @param ListRolesPageResult $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof ListRolesPageResult) {

@@ -29,6 +29,10 @@ class RoleOptionsResponse extends BaseListResponse
         return $this->data;
     }
 
+    /**
+     * @param RoleOptionsListDataDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof RoleOptionsListDataDto) {

@@ -26,6 +26,10 @@ class CronNodeGroupRowResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param CronAgentNodeGroupRowDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof CronAgentNodeGroupRowDto) {

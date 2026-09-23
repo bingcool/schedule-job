@@ -24,6 +24,10 @@ class ChangePasswordAckResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param ChangePasswordAckDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof ChangePasswordAckDto) {

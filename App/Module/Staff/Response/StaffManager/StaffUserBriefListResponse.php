@@ -29,6 +29,10 @@ class StaffUserBriefListResponse extends BaseListResponse
         return $this->data;
     }
 
+    /**
+     * @param StaffUserBriefListDataDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof StaffUserBriefListDataDto) {

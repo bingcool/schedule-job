@@ -24,6 +24,10 @@ class ExecutionCancelResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param ExecutionCancelResultDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof ExecutionCancelResultDto) {

@@ -24,6 +24,10 @@ class StaffDeleteAckResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param DeleteAckDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof DeleteAckDto) {

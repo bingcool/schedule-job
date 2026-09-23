@@ -27,6 +27,10 @@ class StaffMenuSortAckResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param StaffMenuSortAckDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof StaffMenuSortAckDto) {

@@ -24,6 +24,10 @@ class RunOnceQueuedResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param RunOnceQueuedDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof RunOnceQueuedDto) {

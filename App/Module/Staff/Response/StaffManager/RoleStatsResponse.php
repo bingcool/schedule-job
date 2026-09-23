@@ -24,6 +24,10 @@ class RoleStatsResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param RoleStatsDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof RoleStatsDto) {

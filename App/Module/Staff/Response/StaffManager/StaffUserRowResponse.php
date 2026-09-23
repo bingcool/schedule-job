@@ -26,6 +26,10 @@ class StaffUserRowResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param StaffUserRowDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof StaffUserRowDto) {

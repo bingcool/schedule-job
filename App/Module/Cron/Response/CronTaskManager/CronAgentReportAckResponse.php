@@ -24,6 +24,10 @@ class CronAgentReportAckResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param AgentReportAckDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof AgentReportAckDto) {

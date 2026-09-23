@@ -24,6 +24,10 @@ class RuntimeOverviewResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param RuntimeOverviewDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof RuntimeOverviewDto) {

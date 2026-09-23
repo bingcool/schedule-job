@@ -26,6 +26,10 @@ class StaffMenuRowResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param StaffMenuRowDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof StaffMenuRowDto) {

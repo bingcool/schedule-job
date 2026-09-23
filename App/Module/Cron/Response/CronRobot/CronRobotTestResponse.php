@@ -24,6 +24,10 @@ class CronRobotTestResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param CronRobotTestResultDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof CronRobotTestResultDto) {

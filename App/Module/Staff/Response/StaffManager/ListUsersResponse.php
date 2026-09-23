@@ -23,6 +23,10 @@ class ListUsersResponse extends BasePageResultResponse
         return $this->data;
     }
 
+    /**
+     * @param ListUsersPageResult $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof ListUsersPageResult) {

@@ -24,6 +24,10 @@ class StaffRoleStatusAckResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param StatusSwitchAckDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof StatusSwitchAckDto) {

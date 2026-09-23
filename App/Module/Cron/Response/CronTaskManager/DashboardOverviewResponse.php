@@ -24,6 +24,10 @@ class DashboardOverviewResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param DashboardOverviewDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof DashboardOverviewDto) {

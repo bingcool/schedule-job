@@ -26,6 +26,10 @@ class CronTaskRowResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param CronTaskRowDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof CronTaskRowDto) {

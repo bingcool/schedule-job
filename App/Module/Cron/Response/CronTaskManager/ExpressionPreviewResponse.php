@@ -24,6 +24,10 @@ class ExpressionPreviewResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param ExpressionPreviewResultDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof ExpressionPreviewResultDto) {

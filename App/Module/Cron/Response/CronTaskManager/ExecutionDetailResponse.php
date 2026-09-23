@@ -24,6 +24,10 @@ class ExecutionDetailResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param ExecutionDetailDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof ExecutionDetailDto) {

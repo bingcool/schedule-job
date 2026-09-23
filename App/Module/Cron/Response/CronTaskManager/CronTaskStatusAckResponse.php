@@ -24,6 +24,10 @@ class CronTaskStatusAckResponse extends BaseResponse
         return $this->data;
     }
 
+    /**
+     * @param TaskStatusAckDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof TaskStatusAckDto) {

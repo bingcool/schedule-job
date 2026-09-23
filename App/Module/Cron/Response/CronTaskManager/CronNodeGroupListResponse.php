@@ -29,6 +29,10 @@ class CronNodeGroupListResponse extends BaseListResponse
         return $this->data;
     }
 
+    /**
+     * @param CronNodeGroupListDataDto $data
+     * @return $this
+     */
     public function setData($data): static
     {
         if (!$data instanceof CronNodeGroupListDataDto) {
