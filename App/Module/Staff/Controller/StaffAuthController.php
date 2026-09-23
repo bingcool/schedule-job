@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Controller;
 
-use App\Module\Staff\Dto\StaffManager\ChangePasswordDto;
-use App\Module\Staff\Dto\StaffManager\LoginDto;
-use App\Module\Staff\Dto\StaffManager\RegisterDto;
-use App\Module\Staff\Dto\StaffManager\UpdateProfileDto;
+use App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
+use App\Module\Staff\Dto\StaffAuth\LoginDto;
+use App\Module\Staff\Dto\StaffAuth\RegisterDto;
+use App\Module\Staff\Dto\StaffAuth\UpdateProfileDto;
 use App\Module\Staff\Request\StaffManager\ChangePasswordRequest;
 use App\Module\Staff\Request\StaffManager\LoginRequest;
 use App\Module\Staff\Request\StaffManager\RegisterRequest;

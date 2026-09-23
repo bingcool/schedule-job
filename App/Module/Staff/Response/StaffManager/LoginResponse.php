@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
-use App\Module\Staff\Dto\StaffManager\AuthSessionDto;
+use App\Module\Staff\Dto\StaffAuth\AuthSessionDto;
 use Swoolefy\Http\BaseResponse;
 
 /**

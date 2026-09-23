@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Dto\CronTaskManager;
 
+use App\Module\Cron\Dto\Common\CronTaskPayloadDto;
 use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Core\Dto\AbstractDto;
 

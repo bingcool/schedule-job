@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Service;
 
-use App\Module\Cron\Entity\CronAgentNodeEntity;
-use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
-use App\Module\Cron\Entity\CronRobotAlertLogEntity;
+use App\Module\Cron\Repository\CronAgentNodeGroupRepository;
+use App\Module\Cron\Repository\CronAgentNodeRepository;
 use App\Module\Cron\Entity\CronRobotEntity;
+use App\Module\Cron\Repository\CronRobotAlertLogRepository;
 use App\Module\Cron\FailureReason;
 use App\Module\Cron\Robot\RobotAlertMessage;
 use App\Module\Cron\Robot\RobotConfig;
@@ -23,6 +23,18 @@ use Swoolefy\Worker\Cron\ExecutionStatus;
  */
 class CronAlertService
 {
+    private CronAgentNodeRepository $nodeRepository {
+        get => $this->nodeRepository ??= new CronAgentNodeRepository();
+    }
+
+    private CronAgentNodeGroupRepository $nodeGroupRepository {
+        get => $this->nodeGroupRepository ??= new CronAgentNodeGroupRepository();
+    }
+
+    private CronRobotAlertLogRepository $alertLogRepository {
+        get => $this->alertLogRepository ??= new CronRobotAlertLogRepository();
+    }
+
     private const SKIP_DISABLED = 'robot_disabled';
 
     private const SKIP_NOT_FOUND = 'robot_not_found';
@@ -108,21 +120,19 @@ class CronAlertService
         if ($nodeId <= 0) {
             return $empty;
         }
-        $node = CronAgentNodeEntity::withoutTrashed()->where('id', $nodeId)->find();
-        if (!$node) {
+        $nodeRow = $this->nodeRepository->findRowByIdNotTrashed($nodeId);
+        if ($nodeRow === null) {
             return $empty;
         }
-        $nodeRow = is_array($node) ? $node : $node->toArray();
         $groupId = (int) ($nodeRow['group_id'] ?? 0);
         $empty['node_name'] = (string) ($nodeRow['node_name'] ?? '');
         if ($groupId <= 0) {
             return $empty;
         }
-        $group = CronAgentNodeGroupEntity::query()->where('id', $groupId)->find();
-        if (!$group) {
+        $groupRow = $this->nodeGroupRepository->findRowById($groupId);
+        if ($groupRow === null) {
             return $empty;
         }
-        $groupRow = is_array($group) ? $group : $group->toArray();
 
         return [
             'robot_id' => (int) ($groupRow['robot_id'] ?? 0),
@@ -242,14 +252,7 @@ class CronAlertService
             'error_message' => $errorMessage,
             'sent_at' => $now,
         ];
-        try {
-            CronRobotAlertLogEntity::query()->insert($row);
-        } catch (\Throwable $e) {
-            if ($this->isDuplicateKey($e)) {
-                return;
-            }
-            throw $e;
-        }
+        $this->alertLogRepository->insertIgnoringDuplicateKey($row);
     }
 
     /**
@@ -262,21 +265,4 @@ class CronAlertService
         return $deleted !== null && $deleted !== '' && $deleted !== '0000-00-00 00:00:00';
     }
 
-    private function isDuplicateKey(\Throwable $e): bool
-    {
-        $code = $e->getCode();
-        if ($code === 23000 || $code === '23000' || (int) $code === 1062) {
-            return true;
-        }
-        $msg = $e->getMessage();
-        if (str_contains($msg, '1062') || str_contains($msg, 'uk_execution_id') || str_contains($msg, 'Duplicate')) {
-            return true;
-        }
-        $prev = $e->getPrevious();
-        if ($prev instanceof \PDOException) {
-            return (int) ($prev->errorInfo[1] ?? 0) === 1062;
-        }
-
-        return false;
-    }
 }

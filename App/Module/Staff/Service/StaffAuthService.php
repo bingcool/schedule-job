@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Service;
 
-use App\Module\Staff\Dto\StaffManager\AuthSessionDto;
-use App\Module\Staff\Dto\StaffManager\ChangePasswordDto;
-use App\Module\Staff\Dto\StaffManager\LoginDto;
-use App\Module\Staff\Dto\StaffManager\RegisterDto;
-use App\Module\Staff\Dto\StaffManager\UpdateProfileDto;
+use App\Module\Staff\Dto\StaffAuth\AuthSessionDto;
+use App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
+use App\Module\Staff\Dto\StaffAuth\LoginDto;
+use App\Module\Staff\Dto\StaffAuth\RegisterDto;
+use App\Module\Staff\Dto\StaffAuth\UpdateProfileDto;
 use App\Module\Staff\Entity\StaffUserEntity;
 use App\Module\Staff\Exception\StaffException;
 use App\Module\Staff\Repository\StaffUserRepository;

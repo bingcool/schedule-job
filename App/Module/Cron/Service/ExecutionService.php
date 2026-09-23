@@ -6,7 +6,7 @@ namespace App\Module\Cron\Service;
 
 use App\Module\Cron\CronTaskLogMessageConfig;
 use App\Module\Cron\Dto\CronTaskManager\ExecutionCancelResultDto;
-use App\Module\Cron\Entity\CronTaskLogEntity;
+use App\Module\Cron\Repository\CronTaskLogRepository;
 use App\Module\Cron\ExecutionLeaseConfig;
 use App\Module\Cron\ExecutionRecoveryResult;
 use App\Module\Cron\ExecutionWorkerIdentity;
@@ -28,6 +28,10 @@ use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
  */
 class ExecutionService
 {
+    private CronTaskLogRepository $logRepository {
+        get => $this->logRepository ??= new CronTaskLogRepository();
+    }
+
     /**
      * Agent Worker 启动：生成 boot_id，回收过期 RUNNING，启动看护 Tick。
      */
@@ -87,7 +91,7 @@ class ExecutionService
 
         if ($execBatchId === '') {
             $row['message'] = $this->formatLogLine($message);
-            CronTaskLogEntity::query()->insert($row);
+            $this->logRepository->insert($row);
 
             return;
         }
@@ -120,9 +124,7 @@ class ExecutionService
         if ($merged === (string) ($row['message'] ?? '')) {
             return true;
         }
-        $n = CronTaskLogEntity::query()
-            ->where('id', $logId)
-            ->update(['message' => $merged]);
+        $n = $this->logRepository->updateMessage($logId, $merged);
 
         return $this->affected($n) || $n === 0;
     }
@@ -174,9 +176,7 @@ class ExecutionService
             return true;
         }
 
-        $n = CronTaskLogEntity::query()
-            ->where('id', $logId)
-            ->update(['task_item' => $taskItem]);
+        $n = $this->logRepository->updateTaskItem($logId, $taskItem);
 
         return $this->affected($n) || $n === 0;
     }
@@ -253,12 +253,7 @@ class ExecutionService
         if ($id <= 0) {
             return null;
         }
-        $row = CronTaskLogEntity::query()->where('id', $id)->find();
-        if (!$row) {
-            return null;
-        }
-
-        return is_array($row) ? $row : $row->toArray();
+        return $this->logRepository->findRowById($id);
     }
 
     public function heartbeat(int $logId, string $owner): bool
@@ -266,14 +261,10 @@ class ExecutionService
         $seconds = $this->leaseDuration();
         $until = date('Y-m-d H:i:s', time() + $seconds);
         $now = date('Y-m-d H:i:s');
-        $n = CronTaskLogEntity::query()
-            ->where('id', $logId)
-            ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
-            ->where('lease_owner', $owner)
-            ->update([
-                'heartbeat_at' => $now,
-                'lease_until' => $until,
-            ]);
+        $n = $this->logRepository->casHeartbeat($logId, $owner, [
+            'heartbeat_at' => $now,
+            'lease_until' => $until,
+        ]);
 
         return $this->affected($n);
     }
@@ -314,14 +305,7 @@ class ExecutionService
     public function recoverExpiredLeases(int $limit = 100): int
     {
         $now = date('Y-m-d H:i:s');
-        $rows = CronTaskLogEntity::query()
-            ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
-            ->whereNotNull('lease_until')
-            ->where('lease_until', '<', $now)
-            ->order('id', 'asc')
-            ->limit($limit)
-            ->select()
-            ->toArray();
+        $rows = $this->logRepository->listExpiredLeaseRows($limit, $now);
         $closed = 0;
         foreach ($rows as $row) {
             if ($this->recoverLease($row, FailureReason::WORKER_CRASH, $now)->recovered) {
@@ -371,10 +355,7 @@ class ExecutionService
         if ($this->isTerminal($toStatus) && empty($data['finished_at'])) {
             $data['finished_at'] = date('Y-m-d H:i:s');
         }
-        $n = CronTaskLogEntity::query()
-            ->where('id', $id)
-            ->where('status', $fromStatus)
-            ->update($data);
+        $n = $this->logRepository->casTransition($id, $fromStatus, $data);
 
         $ok = $this->affected($n);
         if ($ok) {
@@ -482,13 +463,14 @@ class ExecutionService
         if ($this->isTerminal($toStatus) && empty($data['finished_at'])) {
             $data['finished_at'] = $recoveryNow;
         }
-        $n = CronTaskLogEntity::query()
-            ->where('id', $id)
-            ->where('status', $fromStatus)
-            ->where('lease_owner', $oldOwner)
-            ->where('lease_until', $oldLeaseUntil)
-            ->where('lease_until', '<', $recoveryNow)
-            ->update($data);
+        $n = $this->logRepository->casRecoverLease(
+            $id,
+            $fromStatus,
+            $oldOwner,
+            $oldLeaseUntil,
+            $recoveryNow,
+            $data,
+        );
 
         $ok = $this->affected($n);
         if ($ok) {
@@ -540,7 +522,7 @@ class ExecutionService
             $this->applyLease($row, $execution, $scheduleTask);
         }
         try {
-            CronTaskLogEntity::query()->insert($row);
+            $this->logRepository->insert($row);
         } catch (\Throwable $e) {
             $requestId = (int) ($row['request_id'] ?? 0);
             if ($requestId > 0 && $this->isDuplicateKey($e)) {
@@ -604,10 +586,7 @@ class ExecutionService
             if ($row === []) {
                 return;
             }
-            $n = CronTaskLogEntity::query()
-                ->where('id', $id)
-                ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
-                ->update($row);
+            $n = $this->logRepository->updateWhileRunningOrCancel($id, $row);
             if (!$this->affected($n)) {
                 $this->persistMessageIfChanged($id, $existing, $row, $pid);
             }
@@ -624,7 +603,7 @@ class ExecutionService
             }
             unset($row['status']);
             if ($row !== []) {
-                CronTaskLogEntity::query()->where('id', $id)->where('status', $from)->update($row);
+                $this->logRepository->updateByIdAndStatus($id, $from, $row);
             }
             if ($pid > 0) {
                 ExecutionRuntimeGuard::touchPid($id, $pid);
@@ -668,7 +647,7 @@ class ExecutionService
         if ($tail === []) {
             return;
         }
-        CronTaskLogEntity::query()->where('id', $id)->update($tail);
+        $this->logRepository->updateById($id, $tail);
     }
 
     /**
@@ -716,18 +695,7 @@ class ExecutionService
         if ($cronId <= 0 || $execBatchId === '') {
             return null;
         }
-        $row = CronTaskLogEntity::query()
-            ->where([
-                'cron_id' => $cronId,
-                'exec_batch_id' => $execBatchId,
-            ])
-            ->order('id', 'asc')
-            ->find();
-        if (!$row) {
-            return null;
-        }
-
-        return is_array($row) ? $row : $row->toArray();
+        return $this->logRepository->findRowByBatch($cronId, $execBatchId);
     }
 
     /**
@@ -781,15 +749,7 @@ class ExecutionService
      */
     private function findLatestByRequestId(int $requestId): ?array
     {
-        $row = CronTaskLogEntity::query()
-            ->where('request_id', $requestId)
-            ->order('id', 'desc')
-            ->find();
-        if (!$row) {
-            return null;
-        }
-
-        return is_array($row) ? $row : $row->toArray();
+        return $this->logRepository->findLatestRowByRequestId($requestId);
     }
 
     /**

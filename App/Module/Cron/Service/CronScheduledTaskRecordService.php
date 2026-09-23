@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Service;
 
-use App\Module\Cron\Entity\CronScheduledTaskRecordEntity;
-use App\Module\Cron\Entity\CronTaskEntity;
+use App\Module\Cron\Repository\CronScheduledTaskRecordRepository;
+use App\Module\Cron\Repository\CronTaskRepository;
 use Swoolefy\Worker\Cron\CronScheduleSlotClaimConst;
 
 /**
@@ -19,6 +19,14 @@ use Swoolefy\Worker\Cron\CronScheduleSlotClaimConst;
  */
 class CronScheduledTaskRecordService
 {
+    private CronTaskRepository $taskRepository {
+        get => $this->taskRepository ??= new CronTaskRepository();
+    }
+
+    private CronScheduledTaskRecordRepository $scheduleRecordRepository {
+        get => $this->scheduleRecordRepository ??= new CronScheduledTaskRecordRepository();
+    }
+
     /**
      * 抢占一个调度点。非法参数直接 FAILED，不打库。
      *
@@ -41,14 +49,7 @@ class CronScheduledTaskRecordService
      */
     public function bindExecution(int $cronId, string $scheduledAt, int $executionId): void
     {
-        if ($cronId <= 0 || $scheduledAt === '' || $executionId <= 0) {
-            return;
-        }
-        CronScheduledTaskRecordEntity::query()
-            ->where('cron_id', $cronId)
-            ->where('scheduled_at', $scheduledAt)
-            ->where('execution_id', 0)
-            ->update(['execution_id' => $executionId]);
+        $this->scheduleRecordRepository->bindExecution($cronId, $scheduledAt, $executionId);
     }
 
     /**
@@ -67,32 +68,23 @@ class CronScheduledTaskRecordService
         $from = date('Y-m-d H:i:s', $plannedAt - CronScheduleSlotClaimConst::SKEW_SECONDS);
         $to = date('Y-m-d H:i:s', $plannedAt + CronScheduleSlotClaimConst::SKEW_SECONDS);
 
-        $conn = (new CronTaskEntity())->getConnection();
+        $conn = $this->taskRepository->getConnection();
         $conn->beginTransaction();
         try {
-            $task = CronTaskEntity::query()
-                ->where('id', $cronId)
-                ->setOption('lock', true)
-                ->find();
+            $task = $this->taskRepository->findByIdForUpdate($cronId);
             if (!$task) {
                 $conn->rollback();
 
                 return CronScheduleSlotClaimConst::FAILED;
             }
 
-            $exists = CronScheduledTaskRecordEntity::query()
-                ->where('cron_id', $cronId)
-                ->where('scheduled_at', '>=', $from)
-                ->where('scheduled_at', '<=', $to)
-                ->field('id')
-                ->find();
-            if ($exists) {
+            if ($this->scheduleRecordRepository->existsInSkewWindow($cronId, $from, $to)) {
                 $conn->rollback();
 
                 return CronScheduleSlotClaimConst::DUPLICATE;
             }
 
-            CronScheduledTaskRecordEntity::query()->insert([
+            $this->scheduleRecordRepository->insert([
                 'cron_id' => $cronId,
                 'scheduled_at' => $scheduledAt,
                 'execution_id' => 0,
@@ -105,27 +97,11 @@ class CronScheduledTaskRecordService
                 $conn->rollback();
             } catch (\Throwable) {
             }
-            if ($this->isDuplicateKey($e)) {
+            if ($this->scheduleRecordRepository->isDuplicateKey($e)) {
                 return CronScheduleSlotClaimConst::DUPLICATE;
             }
 
             return CronScheduleSlotClaimConst::FAILED;
         }
-    }
-
-    /**
-     * MySQL UNIQUE 冲突：errno 1062 或文案 Duplicate entry。
-     */
-    private function isDuplicateKey(\Throwable $e): bool
-    {
-        if ($e instanceof \PDOException) {
-            $driver = (int) ($e->errorInfo[1] ?? 0);
-            if ($driver === 1062) {
-                return true;
-            }
-        }
-        $msg = $e->getMessage();
-
-        return str_contains($msg, '1062') || str_contains($msg, 'Duplicate entry');
     }
 }

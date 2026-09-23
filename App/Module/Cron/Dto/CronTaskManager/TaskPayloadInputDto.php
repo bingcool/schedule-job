@@ -17,7 +17,7 @@ use Swoolefy\Core\Dto\AbstractDto;
  *
  * **消费者**：{@see \App\Module\Cron\Service\CronTaskManagerService::createTask} 与
  * {@see \App\Module\Cron\Service\CronTaskManagerService::updateTask} 取出数组后交给
- * {@see \App\Module\Cron\Service\CronTaskPayloadBuilder} 校验并转为 {@see CronTaskPayloadDto}。
+ * {@see \App\Module\Cron\Service\CronTaskPayloadBuilder} 校验并转为 {@see \App\Module\Cron\Dto\Common\CronTaskPayloadDto}。
  *
  * **关键字段语义**：payload 键名与数据库列对齐（name、expression、command、exec_type、node_id 等），
  * 具体校验规则由 PayloadBuilder 按创建/更新态分别处理。

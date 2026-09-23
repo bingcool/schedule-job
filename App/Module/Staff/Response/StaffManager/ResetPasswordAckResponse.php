@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
-use App\Module\Staff\Dto\StaffManager\ResetPasswordAckDto;
+use App\Module\Staff\Dto\StaffUser\ResetPasswordAckDto;
 use Swoolefy\Http\BaseResponse;
 
 /** 确认重置响应。mailSent=false 时前端提示邮件失败或未绑定邮箱。 */

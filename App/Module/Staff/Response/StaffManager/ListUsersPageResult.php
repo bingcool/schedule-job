@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
-use App\Module\Staff\Dto\StaffManager\StaffUserRowDto;
+use App\Module\Staff\Dto\StaffUser\StaffUserRowDto;
 use InvalidArgumentException;
 use Swoolefy\Annotation\ArrayList;
 use Swoolefy\Core\Dto\ArrayDto;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
-use App\Module\Staff\Dto\StaffManager\StaffMenuRowDto;
+use App\Module\Staff\Dto\StaffRole\StaffMenuRowDto;
 use Swoolefy\Http\BaseResponse;
 
 class StaffMenuTreeResponse extends BaseResponse

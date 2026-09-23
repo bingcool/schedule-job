@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Controller;
 
-use App\Module\Staff\Dto\StaffManager\GrantRolePagesDto;
-use App\Module\Staff\Dto\StaffManager\CreateMenuDto;
-use App\Module\Staff\Dto\StaffManager\CreateRoleDto;
-use App\Module\Staff\Dto\StaffManager\ListRolesQueryDto;
-use App\Module\Staff\Dto\StaffManager\MenuIdDto;
-use App\Module\Staff\Dto\StaffManager\RoleIdDto;
-use App\Module\Staff\Dto\StaffManager\SortMenusDto;
-use App\Module\Staff\Dto\StaffManager\SwitchMenuStatusDto;
-use App\Module\Staff\Dto\StaffManager\SwitchRoleStatusDto;
-use App\Module\Staff\Dto\StaffManager\UpdateMenuDto;
-use App\Module\Staff\Dto\StaffManager\UpdateRoleDto;
+use App\Module\Staff\Dto\StaffRole\GrantRolePagesDto;
+use App\Module\Staff\Dto\StaffRole\CreateMenuDto;
+use App\Module\Staff\Dto\StaffRole\CreateRoleDto;
+use App\Module\Staff\Dto\StaffRole\ListRolesQueryDto;
+use App\Module\Staff\Dto\StaffRole\MenuIdDto;
+use App\Module\Staff\Dto\StaffRole\RoleIdDto;
+use App\Module\Staff\Dto\StaffRole\SortMenusDto;
+use App\Module\Staff\Dto\StaffRole\SwitchMenuStatusDto;
+use App\Module\Staff\Dto\StaffRole\SwitchRoleStatusDto;
+use App\Module\Staff\Dto\StaffRole\UpdateMenuDto;
+use App\Module\Staff\Dto\StaffRole\UpdateRoleDto;
 use App\Module\Staff\Request\StaffManager\ListRolesRequest;
 use App\Module\Staff\Request\StaffManager\StaffMenuCreateRequest;
 use App\Module\Staff\Request\StaffManager\StaffMenuIdRequest;

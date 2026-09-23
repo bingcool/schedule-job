@@ -18,6 +18,18 @@ class CronAgentNodeGroupRepository
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listAdminRows(): array
+    {
+        return CronAgentNodeGroupEntity::query()
+            ->field(['id', 'group_name', 'robot_id', 'remark', 'created_at', 'updated_at'])
+            ->order('id', 'desc')
+            ->select()
+            ->toArray();
+    }
+
+    /**
      * @param array<int, int> $ids
      * @return array<int, array{id:int,groupName:string}>
      */
@@ -42,6 +54,28 @@ class CronAgentNodeGroupRepository
         return $map;
     }
 
+    /**
+     * @param array<int, int> $ids
+     * @return array<int, string>
+     */
+    public function groupNameMapByIds(array $ids): array
+    {
+        $names = [];
+        if ($ids === []) {
+            return $names;
+        }
+        $rows = CronAgentNodeGroupEntity::query()
+            ->whereIn('id', array_values($ids))
+            ->field(['id', 'group_name'])
+            ->select()
+            ->toArray();
+        foreach ($rows as $group) {
+            $names[(int) ($group['id'] ?? 0)] = (string) ($group['group_name'] ?? $group['groupName'] ?? '');
+        }
+
+        return $names;
+    }
+
     public function countExistingIds(array $ids): int
     {
         if ($ids === []) {
@@ -58,5 +92,49 @@ class CronAgentNodeGroupRepository
         }
 
         return (int) CronAgentNodeGroupEntity::query()->where('robot_id', $robotId)->count();
+    }
+
+    public function existsByGroupName(string $name, ?int $exceptId = null): bool
+    {
+        $qb = CronAgentNodeGroupEntity::query()->where('group_name', $name);
+        if ($exceptId !== null && $exceptId > 0) {
+            $qb->where('id', '<>', $exceptId);
+        }
+
+        return $qb->count() > 0;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public function insert(array $data): CronAgentNodeGroupEntity
+    {
+        $group = new CronAgentNodeGroupEntity();
+        $group->setData($data);
+        $group->save();
+
+        return $group;
+    }
+
+    public function save(CronAgentNodeGroupEntity $group): CronAgentNodeGroupEntity
+    {
+        $group->save();
+
+        return $group;
+    }
+
+    public function delete(CronAgentNodeGroupEntity $group): int
+    {
+        $id = (int) $group->id;
+        $group->delete();
+
+        return $id;
+    }
+
+    public function findRowById(int $id): ?array
+    {
+        $group = $this->findById($id);
+
+        return $group?->getAttributes();
     }
 }

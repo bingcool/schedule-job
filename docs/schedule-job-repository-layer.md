@@ -146,7 +146,7 @@ App/Module/{Module}/
 
 **与 Repository 方案的关系**：Repository 返回的 `XxxRowDto` / `XxxBriefDto` 仍遵守 §3.2 类型约定；**文件位置**按上表选 Controller 目录或 `Common`，不要在模块根下堆平铺 Dto。
 
-存量：`Staff` 部分 Dto 仍在 `Dto/StaffManager/`（历史合并命名）。补 Dto 与迁 Repository 时按控制器拆到 `StaffUser` / `StaffRole` / `StaffAuth`，共用类型迁入 `Dto/Common/`，避免继续往 `StaffManager` 追加。
+存量：`Staff` 已拆为 `Dto/StaffAuth/`、`Dto/StaffUser/`、`Dto/StaffRole/`（`Dto/StaffManager/` 已移除）。`Cron` 任务载荷等跨 Service 类型在 `Dto/Common/`（如 `CronTaskPayloadDto`）。新 Dto 仍按控制器目录或 `Common` 落盘，勿再使用 `StaffManager` 命名。
 
 聚合用专用 Dto（已有则复用）：
 
@@ -459,7 +459,7 @@ Service 可以持有多个 Repository。现有构造方式（`new XxxService()`�
 - 单条路径改为 `?Entity`
 - 列表改为 `array<int, XxxDto>`
 - 不改 API JSON 字段名（Dto `fromEntityRow` 已对齐 camelCase）
-- 新 Dto 按 §3.2.1 落盘；Staff 从 `Dto/StaffManager/` 逐步拆到各 Controller 目录 + `Common`
+- 新 Dto 按 §3.2.1 落盘（StaffAuth / StaffUser / StaffRole / CronTaskManager / CronRobot / Common）
 
 ---
 

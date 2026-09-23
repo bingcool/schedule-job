@@ -61,4 +61,20 @@ class CronRobotRepository
 
         return $id;
     }
+
+    /**
+     * @param list<int> $ids
+     * @return array<int, array<string, mixed>>
+     */
+    public function listRowsByIds(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        return CronRobotEntity::withoutTrashed()
+            ->whereIn('id', $ids)
+            ->select()
+            ->toArray();
+    }
 }

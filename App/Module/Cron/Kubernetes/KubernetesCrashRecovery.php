@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Kubernetes;
 
-use App\Module\Cron\Entity\CronTaskEntity;
+use App\Module\Cron\Repository\CronTaskRepository;
 use App\Module\Cron\FailureReason;
 use Swoolefy\Worker\Cron\CronProcess;
 use Swoolefy\Worker\Cron\ExecutionStatus;
@@ -191,13 +191,14 @@ final class KubernetesCrashRecovery
     {
         $taskItem = $this->taskItem($row);
         $cronId = (int) ($row['cron_id'] ?? 0);
-        $task = null;
+        $taskArr = [];
         try {
-            $task = $cronId > 0 ? CronTaskEntity::query()->where('id', $cronId)->find() : null;
+            if ($cronId > 0) {
+                $taskArr = (new CronTaskRepository())->findRowById($cronId) ?? [];
+            }
         } catch (\Throwable) {
-            $task = null;
+            $taskArr = [];
         }
-        $taskArr = is_object($task) && method_exists($task, 'toArray') ? $task->toArray() : (is_array($task) ? $task : []);
         $execType = (int) ($taskArr['exec_type'] ?? 0);
         $k8sSpec = $taskArr['k8s_spec'] ?? [];
         if (is_string($k8sSpec)) {

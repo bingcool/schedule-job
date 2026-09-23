@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Request\CronTaskManager;
 
-use App\Module\Cron\Dto\CronTaskManager\CronTimeRangeDto;
+use App\Module\Cron\Dto\Common\CronTimeRangeDto;
 use InvalidArgumentException;
 use stdClass;
 use Swoolefy\Annotation\ApiProperty;

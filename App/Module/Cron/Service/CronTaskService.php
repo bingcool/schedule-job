@@ -6,8 +6,8 @@ use Swoolefy\Core\Schedule\ScheduleEvent;
 use Swoolefy\Worker\Cron\CronNodeLiveness;
 use Swoolefy\Worker\Cron\CronProcess;
 use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
-use App\Module\Cron\Entity\CronAgentNodeEntity;
-use App\Module\Cron\Entity\CronTaskEntity;
+use App\Module\Cron\Repository\CronAgentNodeRepository;
+use App\Module\Cron\Repository\CronTaskRepository;
 
 /**
  * Cron Worker 侧任务拉取与运行日志写入。
@@ -21,6 +21,14 @@ use App\Module\Cron\Entity\CronTaskEntity;
  */
 class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
 {
+    private CronTaskRepository $taskRepository {
+        get => $this->taskRepository ??= new CronTaskRepository();
+    }
+
+    private CronAgentNodeRepository $nodeRepository {
+        get => $this->nodeRepository ??= new CronAgentNodeRepository();
+    }
+
     /**
      * 按执行类型与节点拉取启用中的定时任务，并转为 Worker 可消费的元数据列表。
      *
@@ -48,10 +56,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
 
         // 文档查询范围：node_id + 未软删。status 交给 Runtime Diff 做 ENABLE/DISABLE，
         // 不可在此处只取启用任务，否则 DISABLE 会被误当成 DELETE。
-        $list = CronTaskEntity::query()->field('*')->where([
-            'node_id' => $nodeId,
-            'exec_type' => $execType,
-        ])->select()->toArray();
+        $list = $this->taskRepository->listFullRowsByNodeIdAndExecType($nodeIdInt, $execType);
         $pendingByTaskId = $this->listPendingRunOnceIdsByCronTaskIds(
             array_map(static fn (array $item): int => (int) ($item['id'] ?? 0), $list)
         );
@@ -336,7 +341,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
         if ($apiKey === '') {
             throw new \InvalidArgumentException('apiKey不能为空');
         }
-        $node = (new CronAgentNodeEntity())->loadById($nodeId);
+        $node = (new CronAgentNodeRepository())->findById($nodeId);
         if (!$node) {
             throw new \InvalidArgumentException('节点不存在或凭证无效');
         }
@@ -361,20 +366,17 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
         }
         $interval = CronNodeLiveness::normalizeInterval($heartbeatInterval);
         $now = date('Y-m-d H:i:s');
-        $node = (new CronAgentNodeEntity())->loadById($id);
+        $node = $this->nodeRepository->findById($id);
         if ($node) {
-            $node->last_heartbeat_at = $now;
-            $node->heartbeat_interval = $interval;
-            $node->save();
+            $this->nodeRepository->updateHeartbeatFields($node, $now, $interval);
 
             return;
         }
         // 已软删节点不再自动插入，避免 DELETE /nodes 后被心跳「复活」
-        $trashed = CronAgentNodeEntity::withoutTrashed()->where('id', $id)->limit(1)->find();
-        if (is_array($trashed) && $trashed !== []) {
+        if ($this->nodeRepository->existsAnyById($id)) {
             return;
         }
-        CronAgentNodeEntity::query()->insert([
+        $this->nodeRepository->insertRaw([
             'id' => $id,
             'node_name' => 'node-' . $id,
             'node_ip' => '',

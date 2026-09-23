@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Controller;
 
-use App\Module\Staff\Dto\StaffManager\CreateUserDto;
-use App\Module\Staff\Dto\StaffManager\GrantUserNodeGroupsDto;
-use App\Module\Staff\Dto\StaffManager\GrantUserRolesDto;
-use App\Module\Staff\Dto\StaffManager\ListUsersQueryDto;
-use App\Module\Staff\Dto\StaffManager\ResetUserPasswordDto;
-use App\Module\Staff\Dto\StaffManager\SwitchUserStatusDto;
-use App\Module\Staff\Dto\StaffManager\UpdateUserDto;
-use App\Module\Staff\Dto\StaffManager\UserIdDto;
+use App\Module\Staff\Dto\StaffUser\CreateUserDto;
+use App\Module\Staff\Dto\StaffUser\GrantUserNodeGroupsDto;
+use App\Module\Staff\Dto\StaffUser\GrantUserRolesDto;
+use App\Module\Staff\Dto\StaffUser\ListUsersQueryDto;
+use App\Module\Staff\Dto\StaffUser\ResetUserPasswordDto;
+use App\Module\Staff\Dto\StaffUser\SwitchUserStatusDto;
+use App\Module\Staff\Dto\StaffUser\UpdateUserDto;
+use App\Module\Staff\Dto\StaffUser\UserIdDto;
 use App\Module\Staff\Request\StaffManager\ListUsersRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserByNodeGroupRequest;
 use App\Module\Staff\Request\StaffManager\StaffUserCreateRequest;

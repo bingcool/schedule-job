@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Repository;
 
-use App\Module\Staff\Dto\StaffManager\ListUsersQueryDto;
+use App\Module\Staff\Dto\StaffUser\ListUsersQueryDto;
 use App\Module\Staff\Entity\StaffUserEntity;
 use Swoolefy\Library\Db\Query;
 
