@@ -7,7 +7,7 @@ namespace App\Module\Staff\Repository;
 use App\Module\Staff\Dto\StaffRole\ListRolesQueryDto;
 use App\Module\Staff\Entity\StaffRoleEntity;
 use App\Module\Staff\StaffApp;
-use App\Module\Repository\Concerns\HydratesEntityRows;
+use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 
 class StaffRoleRepository

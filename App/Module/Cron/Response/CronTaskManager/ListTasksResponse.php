@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-
 namespace App\Module\Cron\Response\CronTaskManager;
 
-use App\Module\Cron\Response\CronTaskManager\ListTasksPageResult;
+use InvalidArgumentException;
+use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BasePageResultResponse;
 
 class ListTasksResponse extends BasePageResultResponse
 {
+    #[ApiProperty(description: '分页 data')]
     protected ListTasksPageResult $data;
 
     public function __construct(ListTasksPageResult $data)
@@ -17,24 +18,18 @@ class ListTasksResponse extends BasePageResultResponse
         $this->data = $data;
     }
 
-    public function getData(): array
+    public function getData(): ListTasksPageResult
     {
-        $items = [];
-        foreach ($this->data->getList() as $row) {
-            $item = $row->toDeepArray();
-            $item['nodeId'] = $row->getNodeId();
-            $item['nodeName'] = $row->getNodeName();
-            $item['groupId'] = $row->getGroupId();
-            $item['groupName'] = $row->getGroupName();
-            $items[] = $item;
-        }
+        return $this->data;
+    }
 
-        return [
-            'items' => $items,
-            'list' => $items,
-            'page' => $this->data->getPage(),
-            'pageSize' => $this->data->getPageSize(),
-            'total' => $this->data->getTotal(),
-        ];
+    public function setData($data): static
+    {
+        if (!$data instanceof ListTasksPageResult) {
+            throw new InvalidArgumentException('data must be ListTasksPageResult');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

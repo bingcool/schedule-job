@@ -4,52 +4,33 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Response\CronTaskManager;
 
+use App\Module\Cron\Dto\CronTaskManager\TaskStatusAckDto;
+use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BaseResponse;
 
 class CronTaskStatusAckResponse extends BaseResponse
 {
-    #[ApiProperty(description: '任务 ID')]
-    protected int $id;
-
-    #[ApiProperty(description: '状态：0 禁用，1 启用')]
-    protected int $status;
+    #[ApiProperty(description: '任务状态确认 data')]
+    protected TaskStatusAckDto $data;
 
     public function __construct(int $id, int $status)
     {
-        $this->setId($id);
-        $this->setStatus($status);
+        $this->data = TaskStatusAckDto::of($id, $status);
     }
 
-    public function getId(): int
+    public function getData(): TaskStatusAckDto
     {
-        return $this->id;
+        return $this->data;
     }
 
-    public function setId(int $id): static
+    public function setData($data): static
     {
-        $this->id = $id;
+        if (!$data instanceof TaskStatusAckDto) {
+            throw new InvalidArgumentException('data must be TaskStatusAckDto');
+        }
+        $this->data = $data;
 
         return $this;
-    }
-
-    public function getStatus(): int
-    {
-        return $this->status;
-    }
-
-    public function setStatus(int $status): static
-    {
-        $this->status = $status;
-
-        return $this;
-    }
-
-    public function getData(): array
-    {
-        return [
-            'id' => $this->getId(),
-            'status' => $this->getStatus(),
-        ];
     }
 }

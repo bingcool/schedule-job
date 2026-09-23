@@ -6,7 +6,7 @@ namespace App\Module\Cron\Repository;
 
 use App\Module\Cron\Dto\CronTaskManager\ListTasksQueryDto;
 use App\Module\Cron\Entity\CronTaskEntity;
-use App\Module\Repository\Concerns\HydratesEntityRows;
+use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 use Swoolefy\Library\Db\Raw;
 

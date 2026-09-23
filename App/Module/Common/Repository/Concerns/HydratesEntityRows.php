@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Module\Repository\Concerns;
+namespace App\Module\Common\Repository\Concerns;
 
 /**
- * 将 ORM select 结果 hydrate 为 Entity 列表（与 {@see CronRobotRepository} 约定一致）。
+ * 将 ORM select 结果 hydrate 为 Entity 列表（与 {@see \App\Module\Cron\Repository\CronRobotRepository} 约定一致）。
  */
 trait HydratesEntityRows
 {

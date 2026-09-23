@@ -15,6 +15,9 @@ class ResetPasswordAckDto extends AbstractDto
     #[ApiProperty(description: '用户 ID')]
     protected int $id = 0;
 
+    #[ApiProperty(description: '密码是否已更新')]
+    protected bool $changed = true;
+
     #[ApiProperty(description: '是否已发邮件')]
     protected bool $mailSent = false;
 

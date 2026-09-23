@@ -4,20 +4,33 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Response\CronTaskManager;
 
-use Swoolefy\Http\BaseResponse;
 use App\Module\Cron\Dto\CronTaskManager\RunOnceQueuedDto;
+use InvalidArgumentException;
+use Swoolefy\Annotation\ApiProperty;
+use Swoolefy\Http\BaseResponse;
 
 class RunOnceQueuedResponse extends BaseResponse
 {
-    protected RunOnceQueuedDto $result;
+    #[ApiProperty(description: 'RunOnce 入队结果 data')]
+    protected RunOnceQueuedDto $data;
 
     public function __construct(RunOnceQueuedDto $result)
     {
-        $this->result = $result;
+        $this->data = $result;
     }
 
-    public function getData(): array
+    public function getData(): RunOnceQueuedDto
     {
-        return $this->result->toDeepArray();
+        return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof RunOnceQueuedDto) {
+            throw new InvalidArgumentException('data must be RunOnceQueuedDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

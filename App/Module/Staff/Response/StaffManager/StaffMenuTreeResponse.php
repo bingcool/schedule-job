@@ -4,40 +4,38 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
-use App\Module\Staff\Dto\StaffRole\StaffMenuRowDto;
-use Swoolefy\Http\BaseResponse;
+use App\Module\Common\Http\BaseListResponse;
+use App\Module\Staff\Dto\StaffRole\StaffMenuTreeListDataDto;
+use InvalidArgumentException;
+use Swoolefy\Annotation\ApiProperty;
 
-class StaffMenuTreeResponse extends BaseResponse
+class StaffMenuTreeResponse extends BaseListResponse
 {
-    /**
-     * @var array<int, StaffMenuRowDto>
-     */
-    protected array $list = [];
+    #[ApiProperty(description: '菜单树 data')]
+    protected StaffMenuTreeListDataDto $data;
 
     /**
-     * @param array<int, array<string, mixed>|StaffMenuRowDto> $list
+     * @param StaffMenuTreeListDataDto|list<\App\Module\Staff\Dto\StaffRole\StaffMenuRowDto|array<string, mixed>> $list
      */
-    public function __construct(array $list)
+    public function __construct(StaffMenuTreeListDataDto|array $list)
     {
-        foreach ($list as $row) {
-            if ($row instanceof StaffMenuRowDto) {
-                $this->list[] = $row;
-            } elseif (is_array($row)) {
-                $this->list[] = StaffMenuRowDto::fromEntityRow($row);
-            }
-        }
+        $this->data = $list instanceof StaffMenuTreeListDataDto
+            ? $list
+            : StaffMenuTreeListDataDto::fromItems($list);
     }
 
-    public function getData(): array
+    public function getData(): StaffMenuTreeListDataDto
     {
-        $rows = [];
-        foreach ($this->list as $dto) {
-            $rows[] = $dto->toDeepArray();
-        }
+        return $this->data;
+    }
 
-        return [
-            'total' => count($rows),
-            'list' => $rows,
-        ];
+    public function setData($data): static
+    {
+        if (!$data instanceof StaffMenuTreeListDataDto) {
+            throw new InvalidArgumentException('data must be StaffMenuTreeListDataDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

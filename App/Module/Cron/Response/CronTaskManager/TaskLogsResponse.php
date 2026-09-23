@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-
 namespace App\Module\Cron\Response\CronTaskManager;
 
-use App\Module\Cron\Response\CronTaskManager\TaskLogsPageResult;
+use InvalidArgumentException;
+use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BasePageResultResponse;
 
 class TaskLogsResponse extends BasePageResultResponse
 {
+    #[ApiProperty(description: '分页 data')]
     protected TaskLogsPageResult $data;
 
     public function __construct(TaskLogsPageResult $data)
@@ -20,5 +21,15 @@ class TaskLogsResponse extends BasePageResultResponse
     public function getData(): TaskLogsPageResult
     {
         return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof TaskLogsPageResult) {
+            throw new InvalidArgumentException('data must be TaskLogsPageResult');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

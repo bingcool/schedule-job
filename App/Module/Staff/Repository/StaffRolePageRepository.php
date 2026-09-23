@@ -6,7 +6,7 @@ namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Entity\StaffRolePageEntity;
 use App\Module\Staff\StaffApp;
-use App\Module\Repository\Concerns\HydratesEntityRows;
+use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 
 class StaffRolePageRepository
 {

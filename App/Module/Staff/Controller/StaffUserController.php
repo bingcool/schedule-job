@@ -25,7 +25,7 @@ use App\Module\Staff\Request\StaffManager\StaffUserUpdateRequest;
 use App\Module\Staff\Response\StaffManager\GenerateResetPasswordResponse;
 use App\Module\Staff\Response\StaffManager\ListUsersResponse;
 use App\Module\Staff\Response\StaffManager\ResetPasswordAckResponse;
-use App\Module\Staff\Response\StaffManager\RoleOptionsResponse;
+use App\Module\Staff\Response\StaffManager\StaffUserBriefListResponse;
 use App\Module\Staff\Response\StaffManager\StaffDeleteAckResponse;
 use App\Module\Staff\Response\StaffManager\StaffUserRowResponse;
 use App\Module\Staff\Response\StaffManager\StaffUserStatusAckResponse;
@@ -228,9 +228,9 @@ class StaffUserController extends BController
      * Route: GET /api/v1/users/by-node-group?nodeGroupId=
      */
     #[ApiOperation('按节点分组查询可授权用户')]
-    public function listUsersByNodeGroup(StaffUserByNodeGroupRequest $request): RoleOptionsResponse
+    public function listUsersByNodeGroup(StaffUserByNodeGroupRequest $request): StaffUserBriefListResponse
     {
-        return new RoleOptionsResponse(
+        return new StaffUserBriefListResponse(
             $this->staffUserService->listUsersByNodeGroup($request->getNodeGroupId())
         );
     }

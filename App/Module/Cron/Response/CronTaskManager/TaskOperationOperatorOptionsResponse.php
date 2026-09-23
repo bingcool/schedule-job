@@ -4,55 +4,42 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Response\CronTaskManager;
 
-use App\Module\Cron\Dto\CronTaskManager\TaskOperationOperatorOptionDto;
+use App\Module\Common\Http\BaseListResponse;
+use App\Module\Cron\Dto\CronTaskManager\TaskOperationOperatorOptionsListDataDto;
 use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
-use Swoolefy\Annotation\ArrayList;
-use Swoolefy\Http\BaseResponse;
 
-class TaskOperationOperatorOptionsResponse extends BaseResponse
+class TaskOperationOperatorOptionsResponse extends BaseListResponse
 {
-    /**
-     * @var array<int, TaskOperationOperatorOptionDto>
-     */
-    #[ApiProperty(description: '操作人下拉选项')]
-    #[ArrayList(
-        itemClass: TaskOperationOperatorOptionDto::class
-    )]
-    protected array $list = [];
+    #[ApiProperty(description: '操作人选项 data')]
+    protected TaskOperationOperatorOptionsListDataDto $data;
 
     /**
-     * @param array<int, TaskOperationOperatorOptionDto> $list
+     * @param TaskOperationOperatorOptionsListDataDto|list<\App\Module\Cron\Dto\CronTaskManager\TaskOperationOperatorOptionDto> $list
      */
-    public function __construct(array $list)
+    public function __construct(TaskOperationOperatorOptionsListDataDto|array $list)
     {
-        foreach ($list as $item) {
-            $this->addListItem($item);
-        }
+        $this->data = $list instanceof TaskOperationOperatorOptionsListDataDto
+            ? $list
+            : TaskOperationOperatorOptionsListDataDto::fromItems($list);
     }
 
-    public function addListItem(TaskOperationOperatorOptionDto $item): static
+    public function getData(): TaskOperationOperatorOptionsListDataDto
     {
-        $this->list[] = $item;
+        return $this->data;
+    }
+
+    /**
+     * @param TaskOperationOperatorOptionsListDataDto $data
+     * @return $this
+     */
+    public function setData($data): static
+    {
+        if (!$data instanceof TaskOperationOperatorOptionsListDataDto) {
+            throw new InvalidArgumentException('data must be TaskOperationOperatorOptionsListDataDto');
+        }
+        $this->data = $data;
 
         return $this;
-    }
-
-    public function getTotal(): int
-    {
-        return count($this->list);
-    }
-
-    public function getData(): array
-    {
-        $rows = [];
-        foreach ($this->list as $dto) {
-            $rows[] = $dto->toDeepArray();
-        }
-
-        return [
-            'total' => $this->getTotal(),
-            'list' => $rows,
-        ];
     }
 }

@@ -960,6 +960,7 @@ class CronTaskManagerService
         $result = new AgentHeartbeatResultDto();
         $result->setNodeId($nodeId);
         $result->setServerTime(date('Y-m-d H:i:s'));
+        $result->setAlive(true);
 
         return $result;
     }

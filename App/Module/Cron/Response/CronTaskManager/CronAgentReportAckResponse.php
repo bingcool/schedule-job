@@ -4,52 +4,33 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Response\CronTaskManager;
 
+use App\Module\Cron\Dto\CronTaskManager\AgentReportAckDto;
+use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BaseResponse;
 
 class CronAgentReportAckResponse extends BaseResponse
 {
-    #[ApiProperty(description: '是否已保存')]
-    protected bool $saved;
-
-    #[ApiProperty(description: 'Cron 任务 ID')]
-    protected int $cronId;
+    #[ApiProperty(description: 'Agent 上报确认 data')]
+    protected AgentReportAckDto $data;
 
     public function __construct(int $cronId, bool $saved = true)
     {
-        $this->setCronId($cronId);
-        $this->setSaved($saved);
+        $this->data = AgentReportAckDto::of($cronId, $saved);
     }
 
-    public function getSaved(): bool
+    public function getData(): AgentReportAckDto
     {
-        return $this->saved;
+        return $this->data;
     }
 
-    public function setSaved(bool $saved): static
+    public function setData($data): static
     {
-        $this->saved = $saved;
+        if (!$data instanceof AgentReportAckDto) {
+            throw new InvalidArgumentException('data must be AgentReportAckDto');
+        }
+        $this->data = $data;
 
         return $this;
-    }
-
-    public function getCronId(): int
-    {
-        return $this->cronId;
-    }
-
-    public function setCronId(int $cronId): static
-    {
-        $this->cronId = $cronId;
-
-        return $this;
-    }
-
-    public function getData(): array
-    {
-        return [
-            'saved' => $this->getSaved(),
-            'cronId' => $this->getCronId(),
-        ];
     }
 }

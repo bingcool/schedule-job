@@ -30,6 +30,9 @@ class AgentHeartbeatResultDto extends AbstractDto
     #[ApiProperty(description: '服务端当前时间（Y-m-d H:i:s）')]
     protected string $serverTime = '';
 
+    #[ApiProperty(description: '是否存活')]
+    protected bool $alive = true;
+
     /** 获取节点 ID */
     public function getNodeId(): int
     {
@@ -54,6 +57,18 @@ class AgentHeartbeatResultDto extends AbstractDto
     public function setServerTime(string $serverTime): static
     {
         $this->serverTime = $serverTime;
+
+        return $this;
+    }
+
+    public function getAlive(): bool
+    {
+        return $this->alive;
+    }
+
+    public function setAlive(bool $alive): static
+    {
+        $this->alive = $alive;
 
         return $this;
     }

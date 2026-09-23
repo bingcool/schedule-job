@@ -4,76 +4,38 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Response\CronTaskManager;
 
-use App\Module\Cron\Dto\CronTaskManager\TaskCreatorOptionDto;
+use App\Module\Common\Http\BaseListResponse;
+use App\Module\Cron\Dto\CronTaskManager\TaskCreatorOptionsListDataDto;
 use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
-use Swoolefy\Annotation\ArrayList;
-use Swoolefy\Http\BaseResponse;
 
-class TaskCreatorOptionsResponse extends BaseResponse
+class TaskCreatorOptionsResponse extends BaseListResponse
 {
-    /**
-     * @var array<int, TaskCreatorOptionDto>
-     */
-    #[ApiProperty(description: '创建人下拉选项')]
-    #[ArrayList(
-        itemClass: TaskCreatorOptionDto::class
-    )]
-    protected array $list = [];
+    #[ApiProperty(description: '创建人选项 data')]
+    protected TaskCreatorOptionsListDataDto $data;
 
     /**
-     * @param array<int, TaskCreatorOptionDto> $list
+     * @param TaskCreatorOptionsListDataDto|list<\App\Module\Cron\Dto\CronTaskManager\TaskCreatorOptionDto> $list
      */
-    public function __construct(array $list)
+    public function __construct(TaskCreatorOptionsListDataDto|array $list)
     {
-        foreach ($list as $item) {
-            $this->addListItem($item);
+        $this->data = $list instanceof TaskCreatorOptionsListDataDto
+            ? $list
+            : TaskCreatorOptionsListDataDto::fromItems($list);
+    }
+
+    public function getData(): TaskCreatorOptionsListDataDto
+    {
+        return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof TaskCreatorOptionsListDataDto) {
+            throw new InvalidArgumentException('data must be TaskCreatorOptionsListDataDto');
         }
-    }
-
-    /**
-     * @return array<int, TaskCreatorOptionDto>
-     */
-    public function getList(): array
-    {
-        return $this->list;
-    }
-
-    public function addListItem(TaskCreatorOptionDto $item): static
-    {
-        $this->list[] = $item;
+        $this->data = $data;
 
         return $this;
-    }
-
-    /**
-     * @param array<int, TaskCreatorOptionDto> $list
-     */
-    public function setList(array $list): static
-    {
-        if ($list !== [] && !($list[0] instanceof TaskCreatorOptionDto)) {
-            throw new InvalidArgumentException('list items must be instances of TaskCreatorOptionDto');
-        }
-        $this->list = $list;
-
-        return $this;
-    }
-
-    public function getTotal(): int
-    {
-        return count($this->list);
-    }
-
-    public function getData(): array
-    {
-        $rows = [];
-        foreach ($this->list as $dto) {
-            $rows[] = $dto->toDeepArray();
-        }
-
-        return [
-            'total' => $this->getTotal(),
-            'list' => $rows,
-        ];
     }
 }

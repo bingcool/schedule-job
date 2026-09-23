@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Module\Staff\Response\StaffManager;
 
 use App\Module\Staff\Dto\StaffAuth\AuthSessionDto;
+use InvalidArgumentException;
+use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BaseResponse;
 
 /**
@@ -12,22 +14,26 @@ use Swoolefy\Http\BaseResponse;
  */
 class LoginResponse extends BaseResponse
 {
-    protected AuthSessionDto $session;
+    #[ApiProperty(description: '登录会话 data')]
+    protected AuthSessionDto $data;
 
     public function __construct(AuthSessionDto $session)
     {
-        $this->session = $session;
+        $this->data = $session;
     }
 
-    public function getData(): array
+    public function getData(): AuthSessionDto
     {
-        return [
-            'token' => $this->session->getToken(),
-            'tokenType' => $this->session->getTokenType(),
-            'expiresIn' => $this->session->getExpiresIn(),
-            'user' => $this->session->getUser()->toDeepArray(),
-            'loginMode' => $this->session->getLoginMode(),
-            'tempPasswordExpiresAt' => $this->session->getTempPasswordExpiresAt(),
-        ];
+        return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof AuthSessionDto) {
+            throw new InvalidArgumentException('data must be AuthSessionDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

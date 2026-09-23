@@ -471,20 +471,7 @@ class CronTaskManagerController extends BController
             ->setExecType($request->getExecType());
         $result = $this->cronTaskManagerService->agentTasks($query);
 
-        if ($result->isSingleExecType()) {
-            return CronAgentTasksResponse::forExecType(
-                $result->getNodeId(),
-                (int)$result->getExecType(),
-                $result->getList() ?? [],
-            );
-        }
-
-        return CronAgentTasksResponse::forAllTypes(
-            $result->getNodeId(),
-            $result->getShellTasks() ?? [],
-            $result->getHttpTasks() ?? [],
-            $result->getK8sTasks() ?? [],
-        );
+        return new CronAgentTasksResponse($result);
     }
 
     /**
@@ -506,7 +493,7 @@ class CronTaskManagerController extends BController
     {
         $result = $this->cronTaskManagerService->agentHeartbeat(AgentHeartbeatDto::of($request->getNodeId()));
 
-        return new CronAgentHeartbeatResponse($result->getNodeId(), $result->getServerTime());
+        return new CronAgentHeartbeatResponse($result);
     }
 
     /**

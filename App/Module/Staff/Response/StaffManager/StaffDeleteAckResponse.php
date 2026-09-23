@@ -4,28 +4,33 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
+use App\Module\Common\Dto\DeleteAckDto;
+use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BaseResponse;
 
 class StaffDeleteAckResponse extends BaseResponse
 {
-    #[ApiProperty(description: '记录 ID')]
-    protected int $id;
-
-    #[ApiProperty(description: '是否已删除')]
-    protected bool $deleted;
+    #[ApiProperty(description: '删除确认 data')]
+    protected DeleteAckDto $data;
 
     public function __construct(int $id, bool $deleted = true)
     {
-        $this->id = $id;
-        $this->deleted = $deleted;
+        $this->data = DeleteAckDto::of($id, $deleted);
     }
 
-    public function getData(): array
+    public function getData(): DeleteAckDto
     {
-        return [
-            'id' => $this->id,
-            'deleted' => $this->deleted,
-        ];
+        return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof DeleteAckDto) {
+            throw new InvalidArgumentException('data must be DeleteAckDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

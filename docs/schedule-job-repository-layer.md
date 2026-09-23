@@ -87,7 +87,7 @@ public function findByAccount(string $account): ?StaffUserEntity
 实现统一走 Trait：
 
 ```text
-App/Module/Repository/Concerns/HydratesEntityRows.php
+App/Module/Common/Repository/Concerns/HydratesEntityRows.php
     protected function selectRowsToEntities(iterable $rows, string $entityClass): array
 ```
 

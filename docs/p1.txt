@@ -1,0 +1,155 @@
+1、列表响应(不是分页响应)需要按照一定的格式返回，因为需要生成SDk的：
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "total": 1,
+        "list": [
+            {
+                "id": 1,
+                "name": "php测试",
+                "platform": 3,
+                "webhookUrl": "https:\/\/open.larkoffice.com",
+                "secretConfigured": false,
+                "status": 0,
+                "lastTestAt": "2026-09-23 22:44:34",
+                "lastTestOk": 0,
+                "lastTestError": "Webhook HTTP 404",
+                "createdAt": "2026-09-23 22:43:52",
+                "updatedAt": "2026-09-23 22:44:34"
+            }
+        ]
+    }
+}
+
+那么定义的Response类，例如CronNodeListResponse
+class CronNodeListResponse extends BaseResponse
+{
+     #[ApiProperty(description: '节点列表data')]
+     protected CronNodeListDataDto $data;
+
+     public function getData(): CronNodeListDataDto
+     {
+         return $this->data;
+     }
+
+     public function setData(CronNodeListDataDto $data): void
+     {
+         $this->data = $data;
+     }
+ }
+
+ class CronNodeListDataDto extends BaseResponse
+ {
+     #[ApiProperty(description: '总条数')]
+     protected int $total = 0;
+
+     /** @var array<int, CronAgentNodeRowDto> */
+     #[ApiProperty(description: '节点列表')]
+     #[ArrayList(itemClass: CronAgentNodeRowDto::class)]
+     protected array $list = [];
+
+     public function getTotal(): int
+     {
+         return count($this->list);
+     }
+
+     public function setTotal(int $total): void
+     {
+         $this->total = $total;
+     }
+
+     public function getList(): array
+     {
+         return $this->list;
+     }
+
+     public function setList(array $list): void
+     {
+         // todo 需要判断元素是否是CronAgentNodeRowDto
+         $this->list = $list;
+     }
+
+     public function addListItem(CronAgentNodeRowDto $item): void
+     {
+         $this->list[] = $item;
+     }
+
+     public function getListItem(int $index): CronAgentNodeRowDto
+     {
+         return $this->list[$index];
+     }
+ }
+
+
+
+2、分页响应继承Swoolefy\Http\BasePageResultResponse，可以参考List的BaseResponse。分页响应的total只能通过setTotal方法设置进来
+
+
+3、单个对象响应,例如：
+{
+    "code": 0,
+    "msg": "success",
+    "data": {
+        "id": 1,
+        "name": "php测试",
+        "platform": 3,
+        "webhookUrl": "https:\/\/open.larkoffice.com",
+        "secretConfigured": false,
+        "status": 0,
+        "lastTestAt": "2026-09-23 22:44:34",
+        "lastTestOk": 0,
+        "lastTestError": "Webhook HTTP 404",
+        "createdAt": "2026-09-23 22:43:52",
+        "updatedAt": "2026-09-23 22:44:34"
+    }
+}
+
+class CronNodeResponse extends BaseResponse
+{
+     #[ApiProperty(description: '节点详情数据')]
+     protected CronNodeDataDto $data;
+}
+
+class CronNodeDataDto extends AbstractDto
+{
+     #[ApiProperty(description: '节点ID')]
+     protected int $id = 0;
+
+     #[ApiProperty(description: '节点名称')]
+     protected string $name = '';
+
+     #[ApiProperty(description: '节点平台')]
+     protected int $platform = 0;
+
+     #[ApiProperty(description: 'Webhook地址')]
+     protected string $webhookUrl = '';
+
+     #[ApiProperty(description: '是否配置了密钥')]
+     protected bool $secretConfigured = false;
+
+     #[ApiProperty(description: '状态')]
+     protected int $status = 0;
+
+     #[ApiProperty(description: '最后测试时间')]
+     protected string $lastTestAt = '';
+
+     #[ApiProperty(description: '最后测试是否成功')]
+     protected int $lastTestOk = 0;
+
+     #[ApiProperty(description: '最后测试错误信息')]
+     protected string $lastTestError = '';
+
+     #[ApiProperty(description: '创建时间')]
+     protected string $createdAt = '';
+
+     #[ApiProperty(description: '更新时间')]
+     protected string $updatedAt = '';
+}
+
+要求如下：
+1、单个对象响应，如果能够复用列表的CronAgentNodeRowDto就复用，不能够复用的就新增一个Dto。
+
+2、看抽象一个BaseListResponse出来，和 Swoolefy\Http\BasePageResultResponse那样。所以List类继承于BaseListResponse。这样更好点。
+
+3、请按照这个规范全面修复Response类，这样才能符合生成SDK固定响应结体的API。

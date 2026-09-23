@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
+use InvalidArgumentException;
+use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BasePageResultResponse;
 
 class ListRolesResponse extends BasePageResultResponse
 {
+    #[ApiProperty(description: '分页 data')]
     protected ListRolesPageResult $data;
 
     public function __construct(ListRolesPageResult $data)
@@ -15,19 +18,18 @@ class ListRolesResponse extends BasePageResultResponse
         $this->data = $data;
     }
 
-    public function getData(): array
+    public function getData(): ListRolesPageResult
     {
-        $items = [];
-        foreach ($this->data->getList() as $row) {
-            $items[] = $row->toDeepArray();
-        }
+        return $this->data;
+    }
 
-        return [
-            'items' => $items,
-            'list' => $items,
-            'page' => $this->data->getPage(),
-            'pageSize' => $this->data->getPageSize(),
-            'total' => $this->data->getTotal(),
-        ];
+    public function setData($data): static
+    {
+        if (!$data instanceof ListRolesPageResult) {
+            throw new InvalidArgumentException('data must be ListRolesPageResult');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

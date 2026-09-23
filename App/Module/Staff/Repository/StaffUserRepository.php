@@ -6,7 +6,7 @@ namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Dto\StaffUser\ListUsersQueryDto;
 use App\Module\Staff\Entity\StaffUserEntity;
-use App\Module\Repository\Concerns\HydratesEntityRows;
+use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 
 class StaffUserRepository

@@ -4,52 +4,33 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Response\CronTaskManager;
 
+use App\Module\Common\Dto\DeleteAckDto;
+use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BaseResponse;
 
 class CronDeleteAckResponse extends BaseResponse
 {
-    #[ApiProperty(description: '记录 ID')]
-    protected int $id;
-
-    #[ApiProperty(description: '是否已删除')]
-    protected bool $deleted;
+    #[ApiProperty(description: '删除确认 data')]
+    protected DeleteAckDto $data;
 
     public function __construct(int $id, bool $deleted = true)
     {
-        $this->setId($id);
-        $this->setDeleted($deleted);
+        $this->data = DeleteAckDto::of($id, $deleted);
     }
 
-    public function getId(): int
+    public function getData(): DeleteAckDto
     {
-        return $this->id;
+        return $this->data;
     }
 
-    public function setId(int $id): static
+    public function setData($data): static
     {
-        $this->id = $id;
+        if (!$data instanceof DeleteAckDto) {
+            throw new InvalidArgumentException('data must be DeleteAckDto');
+        }
+        $this->data = $data;
 
         return $this;
-    }
-
-    public function getDeleted(): bool
-    {
-        return $this->deleted;
-    }
-
-    public function setDeleted(bool $deleted): static
-    {
-        $this->deleted = $deleted;
-
-        return $this;
-    }
-
-    public function getData(): array
-    {
-        return [
-            'id' => $this->getId(),
-            'deleted' => $this->getDeleted(),
-        ];
     }
 }

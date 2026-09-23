@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Entity\StaffUserRelateNodeGroupEntity;
-use App\Module\Repository\Concerns\HydratesEntityRows;
+use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 
 class StaffUserRelateNodeGroupRepository
 {

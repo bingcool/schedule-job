@@ -15,8 +15,8 @@ use Swoolefy\Core\Dto\AbstractDto;
  * **生产者**：{@see \App\Module\Cron\Service\CronTaskManagerService::agentTasks} 根据
  * execType 调用 {@see static::forExecType} 或 {@see static::forAllTypes} 构造。
  *
- * **消费者**：{@see \App\Module\Cron\Controller\CronTaskManagerController::agentTasks} 通过
- * {@see isSingleExecType} 判断形态后组装 {@see \App\Module\Cron\Response\CronTaskManager\CronAgentTasksResponse}。
+ * **消费者**：{@see \App\Module\Cron\Controller\CronTaskManagerController::agentTasks} 将本 DTO
+ * 作为 {@see \App\Module\Cron\Response\CronTaskManager\CronAgentTasksResponse} 的 data 返回。
  *
  * **关键字段语义**（互斥填充）：
  * - 指定 execType（1 / 2 / 3）时：list 有值，shellTasks / httpTasks / k8sTasks 为 null
@@ -55,6 +55,9 @@ class AgentTasksResultDto extends AbstractDto
     #[ApiProperty(description: '全类型模式下的 kubernetes 任务列表')]
     protected ?array $k8sTasks = null;
 
+    #[ApiProperty(description: '任务总条数')]
+    protected int $total = 0;
+
     /**
      * 构造单执行类型查询结果。
      *
@@ -71,6 +74,7 @@ class AgentTasksResultDto extends AbstractDto
         $dto->nodeId = $nodeId;
         $dto->execType = $execType;
         $dto->list = $list;
+        $dto->total = count($list);
 
         return $dto;
     }
@@ -93,6 +97,7 @@ class AgentTasksResultDto extends AbstractDto
         $dto->shellTasks = $shellTasks;
         $dto->httpTasks = $httpTasks;
         $dto->k8sTasks = $k8sTasks;
+        $dto->total = count($shellTasks) + count($httpTasks) + count($k8sTasks);
 
         return $dto;
     }
@@ -155,5 +160,10 @@ class AgentTasksResultDto extends AbstractDto
     public function isSingleExecType(): bool
     {
         return $this->list !== null;
+    }
+
+    public function getTotal(): int
+    {
+        return $this->total;
     }
 }

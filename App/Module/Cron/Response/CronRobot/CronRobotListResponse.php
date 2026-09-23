@@ -4,42 +4,38 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Response\CronRobot;
 
-use App\Module\Cron\Dto\CronRobot\CronRobotRowDto;
+use App\Module\Common\Http\BaseListResponse;
+use App\Module\Cron\Dto\CronRobot\CronRobotListDataDto;
+use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
-use Swoolefy\Annotation\ArrayList;
-use Swoolefy\Http\BaseResponse;
 
-class CronRobotListResponse extends BaseResponse
+class CronRobotListResponse extends BaseListResponse
 {
-    /**
-     * @var array<int, CronRobotRowDto>
-     */
-    #[ApiProperty(description: '机器人列表')]
-    #[ArrayList(itemClass: CronRobotRowDto::class)]
-    protected array $list = [];
+    #[ApiProperty(description: '机器人列表 data')]
+    protected CronRobotListDataDto $data;
 
     /**
-     * @param list<CronRobotRowDto|array<string, mixed>> $list
+     * @param CronRobotListDataDto|list<\App\Module\Cron\Dto\CronRobot\CronRobotRowDto|array<string, mixed>> $list
      */
-    public function __construct(array $list)
+    public function __construct(CronRobotListDataDto|array $list)
     {
-        foreach ($list as $row) {
-            $this->list[] = $row instanceof CronRobotRowDto
-                ? $row
-                : CronRobotRowDto::fromEntityRow($row);
-        }
+        $this->data = $list instanceof CronRobotListDataDto
+            ? $list
+            : CronRobotListDataDto::fromItems($list);
     }
 
-    public function getData(): array
+    public function getData(): CronRobotListDataDto
     {
-        $rows = [];
-        foreach ($this->list as $dto) {
-            $rows[] = $dto->toDeepArray();
-        }
+        return $this->data;
+    }
 
-        return [
-            'total' => count($rows),
-            'list' => $rows,
-        ];
+    public function setData($data): static
+    {
+        if (!$data instanceof CronRobotListDataDto) {
+            throw new InvalidArgumentException('data must be CronRobotListDataDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

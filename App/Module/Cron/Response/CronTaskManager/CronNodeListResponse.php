@@ -2,81 +2,40 @@
 
 declare(strict_types=1);
 
-
 namespace App\Module\Cron\Response\CronTaskManager;
 
-use App\Module\Cron\Dto\CronTaskManager\CronAgentNodeRowDto;
+use App\Module\Common\Http\BaseListResponse;
+use App\Module\Cron\Dto\CronTaskManager\CronNodeListDataDto;
 use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
-use Swoolefy\Annotation\ArrayList;
-use Swoolefy\Http\BaseResponse;
 
-class CronNodeListResponse extends BaseResponse
+class CronNodeListResponse extends BaseListResponse
 {
-    /**
-     * @var array<int, CronAgentNodeRowDto>
-     */
-    #[ApiProperty(description: '节点列表')]
-    #[ArrayList(
-        itemClass: CronAgentNodeRowDto::class
-    )]
-    protected array $list = [];
+    #[ApiProperty(description: '节点列表 data')]
+    protected CronNodeListDataDto $data;
 
     /**
-     * @param list<CronAgentNodeRowDto|array<string, mixed>> $list
+     * @param CronNodeListDataDto|list<\App\Module\Cron\Dto\CronTaskManager\CronAgentNodeRowDto|array<string, mixed>> $list
      */
-    public function __construct(array $list)
+    public function __construct(CronNodeListDataDto|array $list)
     {
-        foreach ($list as $row) {
-            $this->addListItem($row instanceof CronAgentNodeRowDto
-                ? $row
-                : CronAgentNodeRowDto::fromEntityRow($row));
-        }
+        $this->data = $list instanceof CronNodeListDataDto
+            ? $list
+            : CronNodeListDataDto::fromItems($list);
     }
 
-    /**
-     * @return array<int, CronAgentNodeRowDto>
-     */
-    public function getList(): array
+    public function getData(): CronNodeListDataDto
     {
-        return $this->list;
+        return $this->data;
     }
 
-    /**
-     * @param array<int, CronAgentNodeRowDto> $list
-     */
-    public function setList(array $list): static
+    public function setData($data): static
     {
-        if ($list !== [] && !($list[0] instanceof CronAgentNodeRowDto)) {
-            throw new InvalidArgumentException('list items must be instances of CronAgentNodeRowDto');
+        if (!$data instanceof CronNodeListDataDto) {
+            throw new InvalidArgumentException('data must be CronNodeListDataDto');
         }
-        $this->list = $list;
+        $this->data = $data;
 
         return $this;
-    }
-
-    public function addListItem(CronAgentNodeRowDto $item): static
-    {
-        $this->list[] = $item;
-
-        return $this;
-    }
-
-    public function getTotal(): int
-    {
-        return count($this->getList());
-    }
-
-    public function getData(): array
-    {
-        $rows = [];
-        foreach ($this->list as $dto) {
-            $rows[] = $dto->toDeepArray();
-        }
-
-        return [
-            'total' => $this->getTotal(),
-            'list' => $rows,
-        ];
     }
 }

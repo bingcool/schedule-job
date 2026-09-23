@@ -4,20 +4,33 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Response\CronTaskManager;
 
-use Swoolefy\Http\BaseResponse;
 use App\Module\Cron\Dto\CronTaskManager\ExpressionPreviewResultDto;
+use InvalidArgumentException;
+use Swoolefy\Annotation\ApiProperty;
+use Swoolefy\Http\BaseResponse;
 
 class ExpressionPreviewResponse extends BaseResponse
 {
-    protected ExpressionPreviewResultDto $result;
+    #[ApiProperty(description: '表达式预览 data')]
+    protected ExpressionPreviewResultDto $data;
 
     public function __construct(ExpressionPreviewResultDto $result)
     {
-        $this->result = $result;
+        $this->data = $result;
     }
 
-    public function getData(): array
+    public function getData(): ExpressionPreviewResultDto
     {
-        return $this->result->toDeepArray();
+        return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof ExpressionPreviewResultDto) {
+            throw new InvalidArgumentException('data must be ExpressionPreviewResultDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

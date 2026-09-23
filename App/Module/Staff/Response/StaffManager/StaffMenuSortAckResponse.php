@@ -4,34 +4,36 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
+use App\Module\Staff\Dto\StaffRole\StaffMenuSortAckDto;
+use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BaseResponse;
 
 class StaffMenuSortAckResponse extends BaseResponse
 {
-    #[ApiProperty(description: '父菜单 ID')]
-    protected int $parentId;
-
-    /**
-     * @var array<int, int>
-     */
-    #[ApiProperty(description: '已保存的菜单 ID 顺序')]
-    protected array $ids;
+    #[ApiProperty(description: '菜单排序确认 data')]
+    protected StaffMenuSortAckDto $data;
 
     /**
      * @param array<int, int> $ids
      */
     public function __construct(int $parentId, array $ids)
     {
-        $this->parentId = $parentId;
-        $this->ids = $ids;
+        $this->data = StaffMenuSortAckDto::of($parentId, $ids);
     }
 
-    public function getData(): array
+    public function getData(): StaffMenuSortAckDto
     {
-        return [
-            'parentId' => $this->parentId,
-            'ids' => $this->ids,
-        ];
+        return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof StaffMenuSortAckDto) {
+            throw new InvalidArgumentException('data must be StaffMenuSortAckDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Cron\Repository;
 
 use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
-use App\Module\Repository\Concerns\HydratesEntityRows;
+use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 
 class CronAgentNodeGroupRepository
 {

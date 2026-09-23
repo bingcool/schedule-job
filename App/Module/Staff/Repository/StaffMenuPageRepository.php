@@ -6,7 +6,7 @@ namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Entity\StaffMenuPageEntity;
 use App\Module\Staff\StaffApp;
-use App\Module\Repository\Concerns\HydratesEntityRows;
+use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 
 class StaffMenuPageRepository

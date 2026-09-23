@@ -13,13 +13,15 @@ class CronNodeCreateResponse extends CronNodeRowResponse
 {
     public function __construct(CronAgentNodeRowDto|array $attributes)
     {
-        parent::__construct($attributes);
         if ($attributes instanceof CronAgentNodeRowDto) {
+            parent::__construct($attributes);
+
             return;
         }
+        parent::__construct($attributes);
         $apiKey = (string) ($attributes['api_key'] ?? '');
         if ($apiKey !== '') {
-            $this->data->setApiKey($apiKey);
+            $this->getData()->setApiKey($apiKey);
         }
     }
 }

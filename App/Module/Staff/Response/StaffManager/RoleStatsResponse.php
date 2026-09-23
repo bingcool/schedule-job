@@ -5,19 +5,32 @@ declare(strict_types=1);
 namespace App\Module\Staff\Response\StaffManager;
 
 use App\Module\Staff\Dto\StaffRole\RoleStatsDto;
+use InvalidArgumentException;
+use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BaseResponse;
 
 class RoleStatsResponse extends BaseResponse
 {
-    protected RoleStatsDto $stats;
+    #[ApiProperty(description: '角色统计 data')]
+    protected RoleStatsDto $data;
 
     public function __construct(RoleStatsDto $stats)
     {
-        $this->stats = $stats;
+        $this->data = $stats;
     }
 
-    public function getData(): array
+    public function getData(): RoleStatsDto
     {
-        return $this->stats->toDeepArray();
+        return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof RoleStatsDto) {
+            throw new InvalidArgumentException('data must be RoleStatsDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }

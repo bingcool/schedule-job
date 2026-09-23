@@ -4,24 +4,33 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
+use App\Module\Staff\Dto\StaffAuth\ChangePasswordAckDto;
+use InvalidArgumentException;
 use Swoolefy\Annotation\ApiProperty;
 use Swoolefy\Http\BaseResponse;
 
 class ChangePasswordAckResponse extends BaseResponse
 {
-    #[ApiProperty(description: '用户 ID')]
-    protected int $id;
+    #[ApiProperty(description: '修改密码确认 data')]
+    protected ChangePasswordAckDto $data;
 
     public function __construct(int $id)
     {
-        $this->id = $id;
+        $this->data = ChangePasswordAckDto::of($id);
     }
 
-    public function getData(): array
+    public function getData(): ChangePasswordAckDto
     {
-        return [
-            'id' => $this->id,
-            'changed' => true,
-        ];
+        return $this->data;
+    }
+
+    public function setData($data): static
+    {
+        if (!$data instanceof ChangePasswordAckDto) {
+            throw new InvalidArgumentException('data must be ChangePasswordAckDto');
+        }
+        $this->data = $data;
+
+        return $this;
     }
 }
