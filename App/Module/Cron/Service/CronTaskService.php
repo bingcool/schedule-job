@@ -89,8 +89,9 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
     {
         $newTaskList = [];
         foreach ($taskList as $item) {
-            $cronForkTask = ScheduleEvent::load($item);
-            $cronForkTask->cron_task_id = $item['id'];
+            $cronForkTask = new ScheduleEvent();
+            $cronForkTask->copyProperty($item);
+            $cronForkTask->cron_task_id = (int) ($item['id'] ?? 0);
             $cronForkTask->cron_db_log_class = static::class;
             $cronForkTask->cron_meta_origin = ScheduleEvent::CRON_META_ORIGIN_DB;
             $taskName = (string)($item['cron_name'] ?? $item['name'] ?? '');
@@ -104,7 +105,6 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             $cronForkTask->status = (int) ($item['status'] ?? 0);
             $cronForkTask->with_block_lapping = (int) ($item['with_block_lapping'] ?? 0);
             $cronForkTask->retry = max(0, (int) ($item['retry'] ?? 0));
-            $cronForkTask->node_id = $item['node_id'] ?? null;
             $cronForkTask->cron_between = $item['cron_between'] ?? [];
             $cronForkTask->cron_skip = $item['cron_skip'] ?? [];
 
@@ -127,6 +127,8 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             }
 
             $arr = $cronForkTask->toArray();
+            $arr['exec_type'] = CronProcess::EXEC_FORK_TYPE;
+            $arr['node_id'] = $item['node_id'] ?? null;
             $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
             $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
             $arr['run_once_request_ids'] = $pendingIds;
@@ -158,8 +160,9 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
     {
         $newTaskList = [];
         foreach ($taskList as $item) {
-            $cronK8sTask = ScheduleEvent::load($item);
-            $cronK8sTask->cron_task_id = $item['id'];
+            $cronK8sTask = new ScheduleEvent();
+            $cronK8sTask->copyProperty($item);
+            $cronK8sTask->cron_task_id = (int) ($item['id'] ?? 0);
             $cronK8sTask->cron_db_log_class = static::class;
             $cronK8sTask->cron_meta_origin = ScheduleEvent::CRON_META_ORIGIN_DB;
             $taskName = (string)($item['cron_name'] ?? $item['name'] ?? '');
@@ -173,7 +176,6 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             $cronK8sTask->status = (int) ($item['status'] ?? 0);
             $cronK8sTask->with_block_lapping = (int) ($item['with_block_lapping'] ?? 0);
             $cronK8sTask->retry = max(0, (int) ($item['retry'] ?? 0));
-            $cronK8sTask->node_id = $item['node_id'] ?? null;
             $cronK8sTask->cron_between = $item['cron_between'] ?? [];
             $cronK8sTask->cron_skip = $item['cron_skip'] ?? [];
             $cronK8sTask->command = (string) ($item['command'] ?? '');
@@ -183,6 +185,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
 
             $arr = $cronK8sTask->toArray();
             $arr['exec_type'] = CronProcess::EXEC_K8S_TYPE;
+            $arr['node_id'] = $item['node_id'] ?? null;
             $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
             $arr['k8s_spec'] = self::normalizeK8sSpec($item['k8s_spec'] ?? []);
             $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
@@ -221,13 +224,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             if (!empty($item['expression'])) {
                 $cronHttpTask->cron_expression = $item['expression'];
             }
-            $cronHttpTask->status = (int) ($item['status'] ?? 0);
-            $cronHttpTask->with_block_lapping = (int) ($item['with_block_lapping'] ?? 0);
             $cronHttpTask->retry = max(0, (int) ($item['retry'] ?? 0));
-            $cronHttpTask->node_id = $item['node_id'] ?? null;
-            $cronHttpTask->cron_between = $item['cron_between'] ?? [];
-            $cronHttpTask->cron_skip = $item['cron_skip'] ?? [];
-            $cronHttpTask->command = $item['command'] ?? $cronHttpTask->url;
 
             if (!empty($item['command'])) {
                 $cronHttpTask->url = $item['command'];
@@ -252,6 +249,13 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             $cronHttpTask->request_time_out = $configuredTimeout > 0 ? $configuredTimeout : 120;
 
             $arr = $cronHttpTask->toArray();
+            $arr['exec_type'] = CronProcess::EXEC_URL_TYPE;
+            $arr['status'] = (int) ($item['status'] ?? 0);
+            $arr['with_block_lapping'] = (int) ($item['with_block_lapping'] ?? 0);
+            $arr['node_id'] = $item['node_id'] ?? null;
+            $arr['cron_between'] = $item['cron_between'] ?? [];
+            $arr['cron_skip'] = $item['cron_skip'] ?? [];
+            $arr['command'] = (string) ($item['command'] ?? $arr['url'] ?? '');
             $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
             $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
             $arr['run_once_request_ids'] = $pendingIds;
