@@ -11,12 +11,11 @@ class CronNodeGroupRowResponse extends BaseResponse
 {
     protected CronAgentNodeGroupRowDto $data;
 
-    /**
-     * @param array<string, mixed> $attributes
-     */
-    public function __construct(array $attributes)
+    public function __construct(CronAgentNodeGroupRowDto|array $attributes)
     {
-        $this->data = CronAgentNodeGroupRowDto::fromEntityRow($attributes);
+        $this->data = $attributes instanceof CronAgentNodeGroupRowDto
+            ? $attributes
+            : CronAgentNodeGroupRowDto::fromEntityRow($attributes);
     }
 
     public function getData(): CronAgentNodeGroupRowDto

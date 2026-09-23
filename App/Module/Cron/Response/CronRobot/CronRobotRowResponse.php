@@ -11,12 +11,11 @@ class CronRobotRowResponse extends BaseResponse
 {
     protected CronRobotRowDto $data;
 
-    /**
-     * @param array<string, mixed> $attributes
-     */
-    public function __construct(array $attributes)
+    public function __construct(CronRobotRowDto|array $attributes)
     {
-        $this->data = CronRobotRowDto::fromEntityRow($attributes);
+        $this->data = $attributes instanceof CronRobotRowDto
+            ? $attributes
+            : CronRobotRowDto::fromEntityRow($attributes);
     }
 
     public function getData(): CronRobotRowDto

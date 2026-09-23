@@ -168,7 +168,7 @@ class StaffMenuPermissionService
         }
 
         $pageIds = array_values(array_unique(array_map(
-            static fn (array $row): int => (int) $row['page_id'],
+            static fn (\App\Module\Staff\Entity\StaffRolePageEntity $row): int => (int) $row->page_id,
             $this->rolePageRepository->listRowsByRoleIds($roleIds),
         )));
         if ($pageIds === []) {
@@ -178,8 +178,8 @@ class StaffMenuPermissionService
         $rows = $this->menuRepository->listEnabledVisibleRowsByIds($pageIds);
 
         $uris = [];
-        foreach ($rows as $row) {
-            $uri = $this->normalizeMenuUri((string) ($row['uri'] ?? ''));
+        foreach ($rows as $menu) {
+            $uri = $this->normalizeMenuUri((string) ($menu->uri ?? ''));
             if ($uri === '' || in_array($uri, self::GROUP_PLACEHOLDER_URIS, true)) {
                 continue;
             }
@@ -193,7 +193,7 @@ class StaffMenuPermissionService
     {
         $roles = $this->staffRoleService->rolesGroupedByUserIds([$userId])[$userId] ?? [];
         foreach ($roles as $role) {
-            if (!empty($role['isSuperRole'])) {
+            if ($role->getIsSuperRole()) {
                 return true;
             }
         }

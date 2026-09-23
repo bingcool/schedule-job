@@ -22,11 +22,8 @@ class AuthSessionDto extends AbstractDto
     #[ApiProperty(description: '过期秒数')]
     protected int $expiresIn = 3600;
 
-    /**
-     * @var array<string, mixed>
-     */
     #[ApiProperty(description: '当前用户')]
-    protected array $user = [];
+    protected AuthMeProfileDto $user;
 
     #[ApiProperty(description: '登录方式：temp=临时重置密码，normal=正常密码')]
     protected string $loginMode = 'normal';
@@ -34,13 +31,10 @@ class AuthSessionDto extends AbstractDto
     #[ApiProperty(description: '临时重置密码到期时间，正常登录为空')]
     protected string $tempPasswordExpiresAt = '';
 
-    /**
-     * @param array<string, mixed> $user
-     */
     public static function of(
         string $token,
         int $expiresIn,
-        array $user,
+        AuthMeProfileDto $user,
         string $loginMode = 'normal',
         string $tempPasswordExpiresAt = '',
     ): self {
@@ -69,10 +63,7 @@ class AuthSessionDto extends AbstractDto
         return $this->expiresIn;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function getUser(): array
+    public function getUser(): AuthMeProfileDto
     {
         return $this->user;
     }

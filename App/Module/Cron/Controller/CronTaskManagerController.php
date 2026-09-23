@@ -812,8 +812,8 @@ class CronTaskManagerController extends BController
     #[ApiOperation('变更任务权限所属人')]
     public function transferTaskOwner(TaskTransferOwnerRequest $request): CronTaskRowResponse
     {
-        $row = $this->cronTaskManagerService->transferTaskOwner($request->getId(), $request->getUserId());
-
-        return new CronTaskRowResponse(CronTaskRowDto::fromEntityRow($row));
+        return new CronTaskRowResponse(
+            $this->cronTaskManagerService->transferTaskOwner($request->getId(), $request->getUserId()),
+        );
     }
 }

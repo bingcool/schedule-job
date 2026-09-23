@@ -307,7 +307,8 @@ class ExecutionService
         $now = date('Y-m-d H:i:s');
         $rows = $this->logRepository->listExpiredLeaseRows($limit, $now);
         $closed = 0;
-        foreach ($rows as $row) {
+        foreach ($rows as $log) {
+            $row = $log->getAttributes();
             if ($this->recoverLease($row, FailureReason::WORKER_CRASH, $now)->recovered) {
                 $closed++;
             }

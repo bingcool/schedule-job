@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Module\Cron\Repository;
 
 use App\Module\Cron\Entity\CronAgentNodeGroupEntity;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 
 class CronAgentNodeGroupRepository
 {
+    use HydratesEntityRows;
     public function findById(int $id): ?CronAgentNodeGroupEntity
     {
         if ($id <= 0) {
@@ -18,15 +20,17 @@ class CronAgentNodeGroupRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<CronAgentNodeGroupEntity>
      */
     public function listAdminRows(): array
     {
-        return CronAgentNodeGroupEntity::query()
-            ->field(['id', 'group_name', 'robot_id', 'remark', 'created_at', 'updated_at'])
-            ->order('id', 'desc')
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            CronAgentNodeGroupEntity::query()
+                ->field(['id', 'group_name', 'robot_id', 'remark', 'created_at', 'updated_at'])
+                ->order('id', 'desc')
+                ->select(),
+            CronAgentNodeGroupEntity::class,
+        );
     }
 
     /**

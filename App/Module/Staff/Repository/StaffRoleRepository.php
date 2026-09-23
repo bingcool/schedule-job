@@ -7,10 +7,12 @@ namespace App\Module\Staff\Repository;
 use App\Module\Staff\Dto\StaffRole\ListRolesQueryDto;
 use App\Module\Staff\Entity\StaffRoleEntity;
 use App\Module\Staff\StaffApp;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 
 class StaffRoleRepository
 {
+    use HydratesEntityRows;
     public function findById(int $id): ?StaffRoleEntity
     {
         if ($id <= 0) {
@@ -31,41 +33,48 @@ class StaffRoleRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffRoleEntity>
      */
     public function listRowsByListQuery(ListRolesQueryDto $query): array
     {
-        return $this->listQueryBuilder($query)
-            ->order('id', 'desc')
-            ->limit($query->getOffset(), $query->getPageSize())
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            $this->listQueryBuilder($query)
+                ->order('id', 'desc')
+                ->limit($query->getOffset(), $query->getPageSize())
+                ->select(),
+            StaffRoleEntity::class,
+        );
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffRoleEntity>
      */
     public function listAllRowsForApp(): array
     {
-        return StaffRoleEntity::query()->where('app_id', StaffApp::appId())->select()->toArray();
+        return $this->selectRowsToEntities(
+            StaffRoleEntity::query()->where('app_id', StaffApp::appId())->select(),
+            StaffRoleEntity::class,
+        );
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffRoleEntity>
      */
     public function listEnabledOptionRows(): array
     {
-        return StaffRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->where('status', 1)
-            ->order('id', 'asc')
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffRoleEntity::query()
+                ->where('app_id', StaffApp::appId())
+                ->where('status', 1)
+                ->order('id', 'asc')
+                ->select(),
+            StaffRoleEntity::class,
+        );
     }
 
     /**
      * @param array<int, int> $roleIds
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffRoleEntity>
      */
     public function listRowsByIdsForApp(array $roleIds): array
     {
@@ -73,16 +82,18 @@ class StaffRoleRepository
             return [];
         }
 
-        return StaffRoleEntity::query()
-            ->whereIn('id', $roleIds)
-            ->where('app_id', StaffApp::appId())
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffRoleEntity::query()
+                ->whereIn('id', $roleIds)
+                ->where('app_id', StaffApp::appId())
+                ->select(),
+            StaffRoleEntity::class,
+        );
     }
 
     /**
      * @param array<int, int> $roleIds
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffRoleEntity>
      */
     public function listEnabledRowsByIds(array $roleIds): array
     {
@@ -90,12 +101,14 @@ class StaffRoleRepository
             return [];
         }
 
-        return StaffRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('id', $roleIds)
-            ->where('status', 1)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffRoleEntity::query()
+                ->where('app_id', StaffApp::appId())
+                ->whereIn('id', $roleIds)
+                ->where('status', 1)
+                ->select(),
+            StaffRoleEntity::class,
+        );
     }
 
     /**

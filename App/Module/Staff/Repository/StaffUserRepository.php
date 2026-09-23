@@ -6,10 +6,12 @@ namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Dto\StaffUser\ListUsersQueryDto;
 use App\Module\Staff\Entity\StaffUserEntity;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 
 class StaffUserRepository
 {
+    use HydratesEntityRows;
     public function findById(int $id): ?StaffUserEntity
     {
         if ($id <= 0) {
@@ -64,20 +66,22 @@ class StaffUserRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffUserEntity>
      */
     public function listRowsByListQuery(ListUsersQueryDto $query): array
     {
-        return $this->listQueryBuilder($query)
-            ->order('id', 'desc')
-            ->limit($query->getOffset(), $query->getPageSize())
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            $this->listQueryBuilder($query)
+                ->order('id', 'desc')
+                ->limit($query->getOffset(), $query->getPageSize())
+                ->select(),
+            StaffUserEntity::class,
+        );
     }
 
     /**
      * @param array<int, int> $ids
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffUserEntity>
      */
     public function listBriefRowsByIds(array $ids): array
     {
@@ -85,16 +89,18 @@ class StaffUserRepository
             return [];
         }
 
-        return StaffUserEntity::query()
-            ->whereIn('id', array_values($ids))
-            ->field(['id', 'account', 'user_name'])
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffUserEntity::query()
+                ->whereIn('id', array_values($ids))
+                ->field(['id', 'account', 'user_name'])
+                ->select(),
+            StaffUserEntity::class,
+        );
     }
 
     /**
      * @param array<int, int> $ids
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffUserEntity>
      */
     public function listActiveBriefRowsByIds(array $ids): array
     {
@@ -102,13 +108,15 @@ class StaffUserRepository
             return [];
         }
 
-        return StaffUserEntity::query()
-            ->whereIn('id', array_values($ids))
-            ->where('status', 1)
-            ->field(['id', 'account', 'user_name'])
-            ->order('id', 'desc')
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffUserEntity::query()
+                ->whereIn('id', array_values($ids))
+                ->where('status', 1)
+                ->field(['id', 'account', 'user_name'])
+                ->order('id', 'desc')
+                ->select(),
+            StaffUserEntity::class,
+        );
     }
 
     /**

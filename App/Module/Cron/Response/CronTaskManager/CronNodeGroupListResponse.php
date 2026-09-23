@@ -22,14 +22,14 @@ class CronNodeGroupListResponse extends BaseResponse
     protected array $list = [];
 
     /**
-     * @param array<int, array<string, mixed>> $list
+     * @param list<CronAgentNodeGroupRowDto|array<string, mixed>> $list
      */
     public function __construct(array $list)
     {
         foreach ($list as $row) {
-            if (is_array($row)) {
-                $this->addListItem(CronAgentNodeGroupRowDto::fromEntityRow($row));
-            }
+            $this->addListItem($row instanceof CronAgentNodeGroupRowDto
+                ? $row
+                : CronAgentNodeGroupRowDto::fromEntityRow($row));
         }
     }
 

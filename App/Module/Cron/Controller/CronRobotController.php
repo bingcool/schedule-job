@@ -109,6 +109,6 @@ class CronRobotController extends BController
     {
         $result = $this->cronRobotService->testRobot(RobotIdDto::of($request->getId()));
 
-        return new CronRobotTestResponse($result['ok'], $result['error']);
+        return new CronRobotTestResponse($result->isOk(), $result->getError());
     }
 }

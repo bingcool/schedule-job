@@ -59,6 +59,24 @@ class StaffRoleRowDto extends AbstractDto
     protected string $updatedAt = '';
 
     /**
+     * @var array<int, array<string, mixed>>
+     */
+    #[ApiProperty(description: '菜单树（详情）')]
+    protected array $menus = [];
+
+    /**
+     * @var array<int, array<string, mixed>>
+     */
+    #[ApiProperty(description: 'API 权限目录（详情）')]
+    protected array $apiPermissions = [];
+
+    /**
+     * @var array<int, array<string, mixed>>
+     */
+    #[ApiProperty(description: '任务权限目录（详情）')]
+    protected array $taskPermissions = [];
+
+    /**
      * @param array<string, mixed> $row
      */
     public static function fromEntityRow(array $row): self
@@ -78,7 +96,46 @@ class StaffRoleRowDto extends AbstractDto
         $dto->taskPerIds = array_values(array_map('intval', $row['task_per_ids'] ?? $row['taskPerIds'] ?? []));
         $dto->createdAt = (string) ($row['created_at'] ?? $row['createdAt'] ?? '');
         $dto->updatedAt = (string) ($row['updated_at'] ?? $row['updatedAt'] ?? '');
+        if (isset($row['menus']) && is_array($row['menus'])) {
+            $dto->menus = $row['menus'];
+        }
+        if (isset($row['apiPermissions']) && is_array($row['apiPermissions'])) {
+            $dto->apiPermissions = $row['apiPermissions'];
+        }
+        if (isset($row['taskPermissions']) && is_array($row['taskPermissions'])) {
+            $dto->taskPermissions = $row['taskPermissions'];
+        }
 
         return $dto;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $menus
+     */
+    public function setMenus(array $menus): static
+    {
+        $this->menus = $menus;
+
+        return $this;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $apiPermissions
+     */
+    public function setApiPermissions(array $apiPermissions): static
+    {
+        $this->apiPermissions = $apiPermissions;
+
+        return $this;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $taskPermissions
+     */
+    public function setTaskPermissions(array $taskPermissions): static
+    {
+        $this->taskPermissions = $taskPermissions;
+
+        return $this;
     }
 }

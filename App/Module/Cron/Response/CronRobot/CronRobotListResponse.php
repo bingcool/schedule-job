@@ -19,14 +19,14 @@ class CronRobotListResponse extends BaseResponse
     protected array $list = [];
 
     /**
-     * @param array<int, array<string, mixed>> $list
+     * @param list<CronRobotRowDto|array<string, mixed>> $list
      */
     public function __construct(array $list)
     {
         foreach ($list as $row) {
-            if (is_array($row)) {
-                $this->list[] = CronRobotRowDto::fromEntityRow($row);
-            }
+            $this->list[] = $row instanceof CronRobotRowDto
+                ? $row
+                : CronRobotRowDto::fromEntityRow($row);
         }
     }
 

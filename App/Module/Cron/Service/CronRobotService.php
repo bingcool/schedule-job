@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Module\Cron\Service;
 
 use App\Module\Cron\Dto\CronRobot\CreateRobotDto;
+use App\Module\Cron\Dto\CronRobot\CronRobotRowDto;
+use App\Module\Cron\Dto\CronRobot\CronRobotTestResultDto;
 use App\Module\Cron\Dto\CronRobot\RobotIdDto;
 use App\Module\Cron\Dto\CronRobot\SwitchRobotStatusDto;
 use App\Module\Cron\Dto\CronRobot\UpdateRobotDto;
@@ -40,27 +42,24 @@ class CronRobotService
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<CronRobotRowDto>
      */
     public function listRobots(): array
     {
-        $list = $this->robotRepository->listAllRows();
+        $list = [];
+        foreach ($this->robotRepository->listAllRows() as $robot) {
+            $list[] = $this->presentDto($robot->getAttributes());
+        }
 
-        return array_map(fn (array $row): array => $this->present($row), $list);
+        return $list;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function getRobot(RobotIdDto $dto): array
+    public function getRobot(RobotIdDto $dto): CronRobotRowDto
     {
-        return $this->present($this->requireRobot($dto->getId())->getAttributes());
+        return $this->presentDto($this->requireRobot($dto->getId())->getAttributes());
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function createRobot(CreateRobotDto $dto): array
+    public function createRobot(CreateRobotDto $dto): CronRobotRowDto
     {
         $this->assertSuperUser();
         $name = $this->assertName($dto->getName());
@@ -79,13 +78,10 @@ class CronRobotService
             'updated_by' => $this->currentUserId(),
         ]);
 
-        return $this->present($robot->getAttributes());
+        return $this->presentDto($robot->getAttributes());
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function updateRobot(UpdateRobotDto $dto): array
+    public function updateRobot(UpdateRobotDto $dto): CronRobotRowDto
     {
         $this->assertSuperUser();
         $robot = $this->requireRobot($dto->getId());
@@ -111,13 +107,10 @@ class CronRobotService
 
         $this->robotRepository->save($robot->setData($data));
 
-        return $this->present($robot->getAttributes());
+        return $this->presentDto($robot->getAttributes());
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function switchStatus(SwitchRobotStatusDto $dto): array
+    public function switchStatus(SwitchRobotStatusDto $dto): CronRobotRowDto
     {
         $this->assertSuperUser();
         $status = $dto->getStatus();
@@ -130,7 +123,7 @@ class CronRobotService
             'updated_by' => $this->currentUserId(),
         ]));
 
-        return $this->present($robot->getAttributes());
+        return $this->presentDto($robot->getAttributes());
     }
 
     public function deleteRobot(RobotIdDto $dto): int
@@ -145,10 +138,7 @@ class CronRobotService
         return $this->robotRepository->delete($robot);
     }
 
-    /**
-     * @return array{ok: bool, error: string}
-     */
-    public function testRobot(RobotIdDto $dto): array
+    public function testRobot(RobotIdDto $dto): CronRobotTestResultDto
     {
         $this->assertSuperUser();
         $robot = $this->requireRobot($dto->getId());
@@ -182,7 +172,7 @@ class CronRobotService
             'updated_by' => $this->currentUserId(),
         ]));
 
-        return ['ok' => $ok, 'error' => $error];
+        return CronRobotTestResultDto::of($ok, $error);
     }
 
     public function requireEnabledRobot(int $robotId): CronRobotEntity
@@ -288,15 +278,14 @@ class CronRobotService
 
     /**
      * @param array<string, mixed> $row
-     * @return array<string, mixed>
      */
-    private function present(array $row): array
+    private function presentDto(array $row): CronRobotRowDto
     {
         $row['webhook_url_masked'] = RobotWebhookMask::maskUrl((string) ($row['webhook_url'] ?? ''));
         $row['secret_configured'] = trim((string) ($row['secret'] ?? '')) !== '';
         unset($row['webhook_url'], $row['secret'], $row['config_json']);
 
-        return $row;
+        return CronRobotRowDto::fromEntityRow($row);
     }
 
     private function currentUserId(): int

@@ -20,6 +20,7 @@ use App\Module\Cron\Dto\CronTaskManager\BatchStatusDto;
 use App\Module\Cron\Dto\CronTaskManager\BatchStatusResultDto;
 use App\Module\Cron\Dto\CronTaskManager\CreateNodeDto;
 use App\Module\Cron\Dto\CronTaskManager\CreateNodeGroupDto;
+use App\Module\Cron\Dto\CronTaskManager\CronAgentNodeGroupRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CronAgentNodeRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskOperationLogRowDto;
 use App\Module\Cron\Dto\CronTaskManager\CronTaskLogRowDto;
@@ -197,8 +198,9 @@ class CronTaskManagerService
         }
 
         $total = $this->taskRepository->countByListQuery($query, $nodeIds);
-        $list = $this->taskRepository->listRowsByListQuery($query, $nodeIds);
-        $list = $this->attachTaskNodeGroupInfo($list);
+        $list = $this->attachTaskNodeGroupInfo($this->entityRows(
+            $this->taskRepository->listRowsByListQuery($query, $nodeIds),
+        ));
 
         $pageResult->setTotal($total);
         foreach ($list as $row) {
@@ -239,7 +241,7 @@ class CronTaskManagerService
         $users = $this->staffUserRepository->listBriefRowsByIds(array_values($userIds));
         $userMap = [];
         foreach ($users as $user) {
-            $id = (int) ($user['id'] ?? 0);
+            $id = (int) ($user->id ?? 0);
             if ($id > 0) {
                 $userMap[$id] = $user;
             }
@@ -250,8 +252,8 @@ class CronTaskManagerService
             $user = $userMap[$userId] ?? null;
             $list[] = TaskCreatorOptionDto::fromRow(
                 $userId,
-                (string) ($user['user_name'] ?? $user['userName'] ?? ''),
-                (string) ($user['account'] ?? ''),
+                (string) ($user?->user_name ?? ''),
+                (string) ($user?->account ?? ''),
             );
         }
 
@@ -273,7 +275,7 @@ class CronTaskManagerService
      *
      * @return array<string, mixed> 新建任务实体属性（snake_case），供 CronTaskRowResponse 包装
      */
-    public function createTask(TaskPayloadInputDto $input): array
+    public function createTask(TaskPayloadInputDto $input): CronTaskRowDto
     {
         $result = $this->payloadBuilder->build($input->toPayloadArray(), true);
         if ($result->hasError()) {
@@ -293,7 +295,7 @@ class CronTaskManagerService
 
         $task = $this->taskRepository->insert($entityData);
 
-        return $this->attachTaskNodeGroupInfo([$task->getAttributes()])[0];
+        return $this->toTaskRowDtoFromAttributes($task->getAttributes());
     }
 
     /**
@@ -304,7 +306,7 @@ class CronTaskManagerService
      *
      * @return array<string, mixed> 更新后实体属性
      */
-    public function updateTask(UpdateTaskCommandDto $command): array
+    public function updateTask(UpdateTaskCommandDto $command): CronTaskRowDto
     {
         $id = $command->getId();
         if ($id <= 0) {
@@ -343,7 +345,7 @@ class CronTaskManagerService
             $this->snapshotTaskForOperationLog($task),
         );
 
-        return $this->attachTaskNodeGroupInfo([$task->getAttributes()])[0];
+        return $this->toTaskRowDtoFromAttributes($task->getAttributes());
     }
 
     /**
@@ -351,7 +353,7 @@ class CronTaskManagerService
      *
      * @return array<string, mixed>
      */
-    public function transferTaskOwner(int $taskId, int $userId): array
+    public function transferTaskOwner(int $taskId, int $userId): CronTaskRowDto
     {
         $this->assertSuperViewer();
         $task = $this->requireTask($taskId);
@@ -373,7 +375,7 @@ class CronTaskManagerService
         $task->setData(['created_by' => $userId]);
         $this->taskRepository->save($task);
 
-        return $this->attachTaskNodeGroupInfo([$task->getAttributes()])[0];
+        return $this->toTaskRowDtoFromAttributes($task->getAttributes());
     }
 
     /**
@@ -446,10 +448,13 @@ class CronTaskManagerService
      *
      * @return list<array<string, mixed>> 节点实体行（snake_case），供 CronNodeListResponse 组装
      */
+    /**
+     * @return list<CronAgentNodeRowDto>
+     */
     public function listNodes(): array
     {
         $allowedGroups = $this->staffUserService->viewerAuthorizedNodeGroupIds();
-        $list = $this->nodeRepository->listRowsOrdered($allowedGroups);
+        $list = $this->entityRows($this->nodeRepository->listRowsOrdered($allowedGroups));
         if ($list === []) {
             return [];
         }
@@ -466,7 +471,7 @@ class CronTaskManagerService
         }
         unset($row);
 
-        return $this->attachNodeGroupInfo($list);
+        return $this->toNodeRowDtos($this->attachNodeGroupInfo($list));
     }
 
     /**
@@ -476,7 +481,7 @@ class CronTaskManagerService
      *
      * @return array<string, mixed> 新建节点实体属性
      */
-    public function createNode(CreateNodeDto $dto): array
+    public function createNode(CreateNodeDto $dto): CronAgentNodeRowDto
     {
         $nodeName = $dto->getNodeName();
         $nodeIp = $dto->getNodeIp();
@@ -499,7 +504,13 @@ class CronTaskManagerService
         $attrs['group_id'] = $groupId;
         $attrs['group_name'] = (string) $group->group_name;
 
-        return $attrs;
+        $rowDto = CronAgentNodeRowDto::fromEntityRow($attrs);
+        $apiKey = (string) ($attrs['api_key'] ?? '');
+        if ($apiKey !== '') {
+            $rowDto->setApiKey($apiKey);
+        }
+
+        return $rowDto;
     }
 
     /**
@@ -849,7 +860,7 @@ class CronTaskManagerService
         $users = $this->staffUserRepository->listBriefRowsByIds(array_values($operatorIds));
         $userMap = [];
         foreach ($users as $user) {
-            $id = (int) ($user['id'] ?? 0);
+            $id = (int) ($user->id ?? 0);
             if ($id > 0) {
                 $userMap[$id] = $user;
             }
@@ -860,8 +871,8 @@ class CronTaskManagerService
             $user = $userMap[$operatorId] ?? null;
             $list[] = TaskOperationOperatorOptionDto::fromRow(
                 $operatorId,
-                (string) ($user['user_name'] ?? $user['userName'] ?? ''),
-                (string) ($user['account'] ?? ''),
+                (string) ($user?->user_name ?? ''),
+                (string) ($user?->account ?? ''),
             );
         }
 
@@ -1188,12 +1199,12 @@ class CronTaskManagerService
      *
      * @return array<string, mixed>
      */
-    public function getTask(TaskIdDto $dto): array
+    public function getTask(TaskIdDto $dto): CronTaskRowDto
     {
         $task = $this->requireTask($dto->getId());
         $this->assertTaskVisible((int) $task->id);
 
-        return $this->attachTaskNodeGroupInfo([$task->getAttributes()])[0];
+        return $this->toTaskRowDtoFromAttributes($task->getAttributes());
     }
 
     /**
@@ -1468,13 +1479,13 @@ class CronTaskManagerService
      *
      * @return array<string, mixed>
      */
-    public function getNode(NodeIdDto $dto): array
+    public function getNode(NodeIdDto $dto): CronAgentNodeRowDto
     {
         $node = $this->requireNode($dto->getId());
         $attrs = $node->getAttributes();
         $attrs['task_count'] = $this->taskRepository->countByNodeId($dto->getId());
 
-        return $this->attachNodeGroupInfo([$attrs])[0];
+        return $this->toNodeRowDtoFromAttributes($attrs);
     }
 
     /**
@@ -1482,7 +1493,7 @@ class CronTaskManagerService
      *
      * @return array<string, mixed>
      */
-    public function updateNode(UpdateNodeDto $dto): array
+    public function updateNode(UpdateNodeDto $dto): CronAgentNodeRowDto
     {
         $node = $this->requireNode($dto->getId());
         $data = [];
@@ -1509,7 +1520,7 @@ class CronTaskManagerService
         $attrs = $node->getAttributes();
         $attrs['task_count'] = $this->taskRepository->countByNodeId($dto->getId());
 
-        return $this->attachNodeGroupInfo([$attrs])[0];
+        return $this->toNodeRowDtoFromAttributes($attrs);
     }
 
     /**
@@ -1528,14 +1539,12 @@ class CronTaskManagerService
         try {
             $existsRows = $this->taskRepository->listRowsByIds($ids);
             $exists = [];
-            foreach ($existsRows as $row) {
-                $taskId = (int) ($row['id'] ?? 0);
+            foreach ($existsRows as $task) {
+                $taskId = (int) ($task->id ?? 0);
                 if ($taskId <= 0) {
                     continue;
                 }
                 $exists[$taskId] = true;
-                $task = new CronTaskEntity();
-                $task->setData(is_array($row) ? $row : $row->getAttributes());
                 $this->assertTaskManageAllowed($task);
             }
             foreach ($ids as $id) {
@@ -1552,15 +1561,14 @@ class CronTaskManagerService
             throw $e;
         }
 
-        foreach ($existsRows as $row) {
-            $task = new CronTaskEntity();
-            $task->setData(is_array($row) ? $row : $row->getAttributes());
+        foreach ($existsRows as $task) {
+            $attrs = $task->getAttributes();
             $this->recordTaskOperationLog(
                 $task,
                 $status === 1 ? CronTaskOperationType::ENABLE : CronTaskOperationType::DISABLE,
-                $this->snapshotTaskAttributes(is_array($row) ? $row : $row->getAttributes()),
+                $this->snapshotTaskAttributes($attrs),
                 array_merge(
-                    $this->snapshotTaskAttributes(is_array($row) ? $row : $row->getAttributes()),
+                    $this->snapshotTaskAttributes($attrs),
                     ['status' => $status],
                 ),
             );
@@ -1574,7 +1582,7 @@ class CronTaskManagerService
      *
      * @return array<string, mixed>
      */
-    public function duplicateTask(TaskIdDto $dto): array
+    public function duplicateTask(TaskIdDto $dto): CronTaskRowDto
     {
         $task = $this->requireTask($dto->getId());
         $attrs = $task->getAttributes();
@@ -1598,7 +1606,7 @@ class CronTaskManagerService
         }
         $copy = $this->taskRepository->insert($attrs);
 
-        return $this->attachTaskNodeGroupInfo([$copy->getAttributes()])[0];
+        return $this->toTaskRowDtoFromAttributes($copy->getAttributes());
     }
 
     /**
@@ -1705,10 +1713,10 @@ class CronTaskManagerService
         $online = 0;
         $offline = 0;
         foreach ($nodes as $node) {
-            $interval = CronNodeLiveness::normalizeInterval((int)($node['heartbeat_interval'] ?? 0));
+            $interval = CronNodeLiveness::normalizeInterval((int) ($node->heartbeat_interval ?? 0));
             $status = CronNodeLiveness::status(
                 $now,
-                CronNodeLiveness::parseHeartbeatAt($node['last_heartbeat_at'] ?? null),
+                CronNodeLiveness::parseHeartbeatAt($node->last_heartbeat_at ?? null),
                 $interval,
             );
             if ($status === CronNodeLiveness::STATUS_ONLINE) {
@@ -1843,14 +1851,15 @@ class CronTaskManagerService
         if ($nodeIds !== []) {
             $nodes = $this->nodeRepository->listMetaRowsByIds(array_values($nodeIds));
             foreach ($nodes as $node) {
-                $id = (int) ($node['id'] ?? 0);
+                $attrs = $node->getAttributes();
+                $id = (int) ($attrs['id'] ?? 0);
                 $nodeMeta[$id] = [
-                    'group_id' => self::rowInt($node, 'group_id', 'groupId'),
-                    'node_name' => (string) ($node['node_name'] ?? $node['nodeName'] ?? ''),
+                    'group_id' => self::rowInt($attrs, 'group_id', 'groupId'),
+                    'node_name' => (string) ($attrs['node_name'] ?? $attrs['nodeName'] ?? ''),
                     'node_status' => CronAgentNodeRowDto::deriveHeartbeatStatus(
-                        (string) ($node['last_heartbeat_at'] ?? ''),
+                        (string) ($attrs['last_heartbeat_at'] ?? ''),
                         time(),
-                        (int) ($node['heartbeat_interval'] ?? 0),
+                        (int) ($attrs['heartbeat_interval'] ?? 0),
                     ),
                 ];
             }
@@ -1897,13 +1906,13 @@ class CronTaskManagerService
         if ($userIds !== []) {
             $rows = $this->staffUserRepository->listBriefRowsByIds(array_values($userIds));
             foreach ($rows as $user) {
-                $id = (int) ($user['id'] ?? 0);
+                $id = (int) ($user->id ?? 0);
                 if ($id <= 0) {
                     continue;
                 }
                 $users[$id] = [
-                    'account' => (string) ($user['account'] ?? ''),
-                    'user_name' => (string) ($user['user_name'] ?? $user['userName'] ?? ''),
+                    'account' => (string) ($user->account ?? ''),
+                    'user_name' => (string) ($user->user_name ?? ''),
                 ];
             }
         }
@@ -1944,7 +1953,7 @@ class CronTaskManagerService
             throw CronTaskException::throw('节点已下线，无法执行', -1);
         }
 
-        $attrs = $metaRows[0];
+        $attrs = $metaRows[0]->getAttributes();
         $status = CronAgentNodeRowDto::deriveHeartbeatStatus(
             (string) ($attrs['last_heartbeat_at'] ?? ''),
             time(),
@@ -2213,6 +2222,20 @@ class CronTaskManagerService
     }
 
     /**
+     * @param list<object> $entities
+     * @return list<array<string, mixed>>
+     */
+    protected function entityRows(array $entities): array
+    {
+        return array_map(
+            static fn (object $entity): array => method_exists($entity, 'getAttributes')
+                ? $entity->getAttributes()
+                : (array) $entity,
+            $entities,
+        );
+    }
+
+    /**
      * @param array<string, mixed> $row
      */
     protected static function rowInt(array $row, string $snake, string $camel): int
@@ -2245,9 +2268,12 @@ class CronTaskManagerService
      *
      * @return list<array<string, mixed>>
      */
+    /**
+     * @return list<CronAgentNodeGroupRowDto>
+     */
     public function listNodeGroups(): array
     {
-        $list = $this->nodeGroupRepository->listAdminRows();
+        $list = $this->entityRows($this->nodeGroupRepository->listAdminRows());
         if ($list === []) {
             return [];
         }
@@ -2264,13 +2290,10 @@ class CronTaskManagerService
         }
         unset($row);
 
-        return $this->attachRobotInfoToGroups($list);
+        return $this->toNodeGroupRowDtos($this->attachRobotInfoToGroups($list));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function createNodeGroup(CreateNodeGroupDto $dto): array
+    public function createNodeGroup(CreateNodeGroupDto $dto): CronAgentNodeGroupRowDto
     {
         $groupName = self::assertGroupName($dto->getGroupName());
         self::assertUniqueGroupName($this->groupNameExists($groupName, null));
@@ -2282,13 +2305,10 @@ class CronTaskManagerService
         $attrs = $group->getAttributes();
         $attrs['node_count'] = 0;
 
-        return $this->attachRobotInfoToGroups([$attrs])[0];
+        return $this->toNodeGroupRowDtoFromAttributes($attrs);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function updateNodeGroup(UpdateNodeGroupDto $dto): array
+    public function updateNodeGroup(UpdateNodeGroupDto $dto): CronAgentNodeGroupRowDto
     {
         $group = $this->requireNodeGroup($dto->getId());
         $groupName = self::assertGroupName($dto->getGroupName());
@@ -2314,19 +2334,16 @@ class CronTaskManagerService
         $attrs = $group->getAttributes();
         $attrs['node_count'] = $this->countActiveNodesInGroup($dto->getId());
 
-        return $this->attachRobotInfoToGroups([$attrs])[0];
+        return $this->toNodeGroupRowDtoFromAttributes($attrs);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function getNodeGroup(NodeGroupIdDto $dto): array
+    public function getNodeGroup(NodeGroupIdDto $dto): CronAgentNodeGroupRowDto
     {
         $group = $this->requireNodeGroup($dto->getId());
         $attrs = $group->getAttributes();
         $attrs['node_count'] = $this->countActiveNodesInGroup($dto->getId());
 
-        return $this->attachRobotInfoToGroups([$attrs])[0];
+        return $this->toNodeGroupRowDtoFromAttributes($attrs);
     }
 
     /**
@@ -2354,21 +2371,24 @@ class CronTaskManagerService
                 $robotIds[$robotId] = $robotId;
             }
         }
-        $robots = [];
+        $robotsById = [];
         if ($robotIds !== []) {
             foreach ($this->robotRepository->listRowsByIds(array_values($robotIds)) as $robot) {
-                $robots[(int) ($robot['id'] ?? 0)] = $robot;
+                $id = (int) ($robot->id ?? 0);
+                if ($id > 0) {
+                    $robotsById[$id] = $robot;
+                }
             }
         }
         foreach ($list as &$row) {
             $robotId = (int) ($row['robot_id'] ?? 0);
-            $robot = $robots[$robotId] ?? null;
-            $deleted = is_array($robot) && !empty($robot['deleted_at'])
-                && $robot['deleted_at'] !== '0000-00-00 00:00:00';
+            $robot = $robotsById[$robotId] ?? null;
+            $deletedAt = $robot?->deleted_at ?? null;
+            $deleted = $deletedAt !== null && $deletedAt !== '' && $deletedAt !== '0000-00-00 00:00:00';
             $row['robot_id'] = $robotId;
-            $row['robot_name'] = $robot && !$deleted ? (string) ($robot['name'] ?? '') : '';
-            $row['robot_platform'] = $robot && !$deleted ? (int) ($robot['platform'] ?? 0) : 0;
-            $row['robot_status'] = $robot && !$deleted ? (int) ($robot['status'] ?? 0) : 0;
+            $row['robot_name'] = $robot !== null && !$deleted ? (string) ($robot->name ?? '') : '';
+            $row['robot_platform'] = $robot !== null && !$deleted ? (int) ($robot->platform ?? 0) : 0;
+            $row['robot_status'] = $robot !== null && !$deleted ? (int) ($robot->status ?? 0) : 0;
         }
         unset($row);
 
@@ -2489,5 +2509,50 @@ class CronTaskManagerService
     private function mapTaskMetaByCronIds(array $cronIds): array
     {
         return $this->taskRepository->mapMetaByCronIds($cronIds);
+    }
+
+    protected function toTaskRowDtoFromAttributes(array $attrs): CronTaskRowDto
+    {
+        return CronTaskRowDto::fromEntityRow(
+            $this->attachTaskNodeGroupInfo([$attrs])[0],
+        );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<CronAgentNodeRowDto>
+     */
+    protected function toNodeRowDtos(array $rows): array
+    {
+        return array_map(
+            static fn (array $row): CronAgentNodeRowDto => CronAgentNodeRowDto::fromEntityRow($row),
+            $rows,
+        );
+    }
+
+    protected function toNodeRowDtoFromAttributes(array $attrs): CronAgentNodeRowDto
+    {
+        return CronAgentNodeRowDto::fromEntityRow(
+            $this->attachNodeGroupInfo([$attrs])[0],
+        );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<CronAgentNodeGroupRowDto>
+     */
+    protected function toNodeGroupRowDtos(array $rows): array
+    {
+        return array_map(
+            static fn (array $row): CronAgentNodeGroupRowDto => CronAgentNodeGroupRowDto::fromEntityRow($row),
+            $rows,
+        );
+    }
+
+    protected function toNodeGroupRowDtoFromAttributes(array $attrs): CronAgentNodeGroupRowDto
+    {
+        return CronAgentNodeGroupRowDto::fromEntityRow(
+            $this->attachRobotInfoToGroups([$attrs])[0],
+        );
     }
 }

@@ -25,7 +25,7 @@ class LoginResponse extends BaseResponse
             'token' => $this->session->getToken(),
             'tokenType' => $this->session->getTokenType(),
             'expiresIn' => $this->session->getExpiresIn(),
-            'user' => $this->session->getUser(),
+            'user' => $this->session->getUser()->toDeepArray(),
             'loginMode' => $this->session->getLoginMode(),
             'tempPasswordExpiresAt' => $this->session->getTempPasswordExpiresAt(),
         ];

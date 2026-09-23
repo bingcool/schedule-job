@@ -6,11 +6,13 @@ namespace App\Module\Cron\Repository;
 
 use App\Module\Cron\Dto\CronTaskManager\ListTasksQueryDto;
 use App\Module\Cron\Entity\CronTaskEntity;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 use Swoolefy\Library\Db\Raw;
 
 class CronTaskRepository
 {
+    use HydratesEntityRows;
     /** @var list<string> */
     private const LIST_TASK_FIELDS = [
         'id',
@@ -76,7 +78,7 @@ class CronTaskRepository
     /**
      * Agent 拉任务：node_id + exec_type，含全部列（含 status，供 Runtime Diff）。
      *
-     * @return list<array<string, mixed>>
+     * @return list<CronTaskEntity>
      */
     public function listFullRowsByNodeIdAndExecType(int $nodeId, int $execType): array
     {
@@ -84,10 +86,13 @@ class CronTaskRepository
             return [];
         }
 
-        return CronTaskEntity::query()->field('*')->where([
-            'node_id' => $nodeId,
-            'exec_type' => $execType,
-        ])->select()->toArray();
+        return $this->selectRowsToEntities(
+            CronTaskEntity::query()->field('*')->where([
+                'node_id' => $nodeId,
+                'exec_type' => $execType,
+            ])->select(),
+            CronTaskEntity::class,
+        );
     }
 
     public function countAll(): int
@@ -201,7 +206,7 @@ class CronTaskRepository
 
     /**
      * @param list<int> $ids
-     * @return array<int, array<string, mixed>>
+     * @return list<CronTaskEntity>
      */
     public function listRowsByIds(array $ids): array
     {
@@ -209,7 +214,10 @@ class CronTaskRepository
             return [];
         }
 
-        return CronTaskEntity::query()->whereIn('id', $ids)->select()->toArray();
+        return $this->selectRowsToEntities(
+            CronTaskEntity::query()->whereIn('id', $ids)->select(),
+            CronTaskEntity::class,
+        );
     }
 
     /**
@@ -236,15 +244,17 @@ class CronTaskRepository
 
     /**
      * @param list<int>|null $scopedNodeIds
-     * @return array<int, array<string, mixed>>
+     * @return list<CronTaskEntity>
      */
     public function listRowsByListQuery(ListTasksQueryDto $query, ?array $scopedNodeIds): array
     {
-        return $this->listTasksQueryBuilder($query, $scopedNodeIds)
-            ->order('id', 'desc')
-            ->limit($query->getOffset(), $query->getPageSize())
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            $this->listTasksQueryBuilder($query, $scopedNodeIds)
+                ->order('id', 'desc')
+                ->limit($query->getOffset(), $query->getPageSize())
+                ->select(),
+            CronTaskEntity::class,
+        );
     }
 
     /**

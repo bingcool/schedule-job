@@ -80,9 +80,64 @@ public function findByAccount(string $account): ?StaffUserEntity
 
 包含软删行的单条（机器人告警、心跳发现已删节点）用显式方法，例如 `findByIdIncludingDeleted()`，内部 `withoutTrashed()`，仍然返回 `?Entity`。
 
-### 3.2 非单条 → Dto / `array<int, XxxDto>`
+### 3.1.1 多行整行查询 → `list<Entity>`
 
-列表、分页、聚合、join 富化，**禁止** `list<array>` / `array<string, mixed>`：
+对「按条件或 id 集合取出多行、且 SELECT 覆盖 Entity 映射字段（或业务需要的整行子集）」的列表，Repository **返回实体列表**，禁止 `select()->toArray()` 再向上抛 `list<array>` / `array<string, mixed>`。
+
+实现统一走 Trait：
+
+```text
+App/Module/Repository/Concerns/HydratesEntityRows.php
+    protected function selectRowsToEntities(iterable $rows, string $entityClass): array
+```
+
+约定（与 `CronRobotRepository::listAllRows()` 一致）：
+
+| 项 | 规则 |
+|---|---|
+| 返回类型 | PHPDoc 写 `list<CronTaskEntity>` 等；顺序与 SQL 一致，**不做** `id => Entity` 索引 |
+| 方法命名 | 仍用 `listRowsByQuery` / `listRowsByIds` / `listAllRows` / `listAdminRows` 等；语义是「行列表」，只是元素类型为 Entity |
+| hydrate | `Entity::query()->…->select()` 的结果交给 `selectRowsToEntities($rows, XxxEntity::class)` |
+| Service 边界 | Service / Controller **不**长期持有 Entity 列表对外输出；在组装 Dto、Worker 载荷、OpenAPI 前用 `$entity->getAttributes()`，或 `XxxRowDto::fromEntityRow($entity->getAttributes())` / `fromEntity($entity)` |
+| 批量索引 | 若 Service 需要按 id 查找，自行 `foreach` 建 `array<int, Entity>`，Repository 不返回 map |
+
+示例：
+
+```php
+/** @return list<CronRobotEntity> */
+public function listAllRows(): array
+{
+    return $this->selectRowsToEntities(
+        CronRobotEntity::query()->order('id', 'desc')->select(),
+        CronRobotEntity::class,
+    );
+}
+```
+
+```php
+// Service：列表进 Dto / 数组协议
+$list = array_map(
+    static fn (CronTaskEntity $task): array => $task->getAttributes(),
+    $this->taskRepository->listRowsByListQuery($query, $scopedNodeIds),
+);
+foreach ($list as $row) {
+    $pageResult->addListItem(CronTaskRowDto::fromEntityRow($row));
+}
+```
+
+**不属于** `list<Entity>`、仍按 §3.3 / 下方 §3.2 处理的查询：
+
+- 只 SELECT 部分列的投影、聚合、`GROUP BY`、趋势桶（返回标量、id 列表或专用 Dto）
+- 单条但走 `query()->find()` 且需数组快照的 CAS / 日志行（如 `findRowByIdForUpdate` 返回 `?array`，仅限 Repository 内部或 Execution 路径）
+- 纯主键列表、`id => ids[]` 映射
+
+跨表富化（组名、创建人、任务数）仍在 **Service** 组合多个 Repository 的 Entity / 计数方法；Repository 列表方法只负责本表 Entity 列表。
+
+### 3.2 非单条 → Dto / `array<int, XxxDto>`（Service / 对外边界）
+
+分页列表项、Dashboard 桶、OpenAPI 行对象等在 **Service 层** 组装为 Dto；Repository 层整行列表用 §3.1.1 的 `list<Entity>`，**禁止** Repository 直接返回 `list<array>`。
+
+面向 Controller / Response 的列表、分页、聚合、join 富化产出类型：
 
 ```php
 /** @return array<int, CronTaskRowDto> */
@@ -101,6 +156,8 @@ return (new ListTasksPageResult())->setTotal($total)->setList($list)->setPage(..
 ```
 
 `*PageResult` 仍放在 Response 层（给 Controller / OpenAPI 用）。Repository 不返回 Response。
+
+**Service 层**：对 Controller / 其他 Service 暴露的「业务结果」优先返回 **Dto**（如 `CronTaskRowDto`、`StaffUserRowDto`、`AuthMeProfileDto`），禁止再返回 `array<string,mixed>` 裸行。纯 id 列表、`list<int>`、权限 URI 等 §3.3 例外仍可用标量/数组。Response 构造函数可接受 `XxxRowDto|array`（array 仅兼容过渡），序列化统一 `toDeepArray()`。
 
 ### 3.2.1 Dto 目录约定（与 Controller 对齐）
 
@@ -144,7 +201,7 @@ App/Module/{Module}/
 - 不提供 JSON API 的控制器（如 `CronAdminController` 静态页）**不**单独建 Dto 目录。
 - Worker / Agent 内部协议 Dto 若只被 `CronTaskService` 等 Service 使用、且不对 Admin Controller，可放在 `Dto/Common/` 或后续 `Dto/CronAgent/`（与 Agent 路由控制器对齐时再拆）。
 
-**与 Repository 方案的关系**：Repository 返回的 `XxxRowDto` / `XxxBriefDto` 仍遵守 §3.2 类型约定；**文件位置**按上表选 Controller 目录或 `Common`，不要在模块根下堆平铺 Dto。
+**与 Repository 方案的关系**：Repository 整行列表返回 `list<Entity>`（§3.1.1）；`XxxRowDto` / `XxxBriefDto` 在 Service 由 Entity 映射产出，并遵守 §3.2 类型约定。**文件位置**按上表选 Controller 目录或 `Common`，不要在模块根下堆平铺 Dto。
 
 存量：`Staff` 已拆为 `Dto/StaffAuth/`、`Dto/StaffUser/`、`Dto/StaffRole/`（`Dto/StaffManager/` 已移除）。`Cron` 任务载荷等跨 Service 类型在 `Dto/Common/`（如 `CronTaskPayloadDto`）。新 Dto 仍按控制器目录或 `Common` 落盘，勿再使用 `StaffManager` 命名。
 
@@ -295,7 +352,8 @@ StaffUserService
 | 含已删单条 | `findByIdIncludingDeleted` | `?Entity` |
 | 条件是否存在 | `existsByName` / `existsAccount` | `bool` |
 | 计数 | `countByQuery` / `countActiveInGroup` | `int` |
-| 记录列表 | `listByQuery` / `listByIds` / `listVisible` | `array<int, XxxDto>` |
+| 整行记录列表 | `listRowsByQuery` / `listRowsByIds` / `listAllRows` / `listVisibleRows` | `list<Entity>`（§3.1.1，`HydratesEntityRows`） |
+| 对外列表项 / 分页行 | Service 内 `fromEntityRow` / `fromEntity` | `array<int, XxxDto>` 或 `*PageResult` |
 | 纯 ID | `listIdsByCronTaskId` | `array<int, int>` |
 | 插入 | `insert` / `create` | `Entity` |
 | 保存已有实体 | `save` | `Entity` |
@@ -304,9 +362,9 @@ StaffUserService
 | 软删 | `softDelete` | `Entity` |
 | 硬删 / 清关联 | `deleteByUserId` / `purgeExpired` | `int` |
 
-列表方法内部完成 `fromEntityRow`（或新建 `fromEntity(Entity)`），Service 拿不到原始 row 数组。
+Repository 的 `listRows*` 只返回 `list<Entity>`；`fromEntityRow` / `fromEntity` 在 **Service**（或极少数 Response 组装处）完成，Service 不依赖 Repository 吐出的关联数组行。
 
-富化（节点组名、创建人、任务数）优先在**同一个 Repository 的 list 方法里用二次查询组装 Dto**，避免 Service 再扫数组补字段。跨表富化若依赖另一模块，Repository 只查本表，Service 组合两个 Repository 的 Dto。
+富化（节点组名、创建人、任务数）在 Service 组合多个 Repository：本表 `list<Entity>` + 对方 `findById` / `listBriefRowsByIds` / `count*`，再写入 Row Dto 或 `getAttributes()` 后的数组。不要把多表 join 塞进一个「万能」Repository 以返回 Dto。
 
 推荐：
 
@@ -457,7 +515,7 @@ Service 可以持有多个 Repository。现有构造方式（`new XxxService()`�
 每一步要求：
 
 - 单条路径改为 `?Entity`
-- 列表改为 `array<int, XxxDto>`
+- Repository 整行列表改为 `list<Entity>`（共用 `HydratesEntityRows`）；Service 再映射为 `array<int, XxxDto>` / `*PageResult`
 - 不改 API JSON 字段名（Dto `fromEntityRow` 已对齐 camelCase）
 - 新 Dto 按 §3.2.1 落盘（StaffAuth / StaffUser / StaffRole / CronTaskManager / CronRobot / Common）
 
@@ -475,8 +533,9 @@ Service 可以持有多个 Repository。现有构造方式（`new XxxService()`�
 ### 类型
 
 - 单条查询返回 `?Entity` 或 Service 层 `Entity`（require）
-- 记录列表返回 `array<int, XxxDto>`，PHPDoc 写明
-- 分页 `list` 字段是 Dto 数组，不是 `list<array>`
+- Repository 整行列表返回 `list<Entity>`（§3.1.1，`HydratesEntityRows`），禁止 `list<array>`
+- Service / Response 对外列表、分页 `list` 为 Dto 数组（§3.2），不是 `list<array>` 裸行
+- 投影 / 纯 id / 聚合仍按 §3.3 标量或 id 集合
 - 详情 / `me` 不再返回 `getAttributes()` 裸数组
 
 ### 行为不变

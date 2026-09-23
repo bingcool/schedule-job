@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Entity\StaffUserRelateNodeGroupEntity;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 
 class StaffUserRelateNodeGroupRepository
 {
+    use HydratesEntityRows;
     public function deleteByUserId(int $userId): int
     {
         return (int) StaffUserRelateNodeGroupEntity::query()->where('user_id', $userId)->delete();
@@ -60,9 +62,11 @@ class StaffUserRelateNodeGroupRepository
         if ($userIds === []) {
             return $grouped;
         }
-        $rows = StaffUserRelateNodeGroupEntity::query()->whereIn('user_id', $userIds)->select()->toArray();
-        foreach ($rows as $row) {
-            $grouped[(int) $row['user_id']][] = (int) $row['node_group_id'];
+        foreach ($this->selectRowsToEntities(
+            StaffUserRelateNodeGroupEntity::query()->whereIn('user_id', $userIds)->select(),
+            StaffUserRelateNodeGroupEntity::class,
+        ) as $row) {
+            $grouped[(int) $row->user_id][] = (int) $row->node_group_id;
         }
 
         return $grouped;

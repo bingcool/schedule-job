@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Response\StaffManager;
 
+use App\Module\Staff\Dto\StaffRole\StaffRoleOptionDto;
+use App\Module\Staff\Dto\StaffUser\StaffUserBriefDto;
+use Swoolefy\Core\Dto\AbstractDto;
 use Swoolefy\Http\BaseResponse;
 
 class RoleOptionsResponse extends BaseResponse
 {
     /**
-     * @var array<int, array<string, mixed>>
+     * @var list<StaffRoleOptionDto|StaffUserBriefDto|AbstractDto>
      */
     protected array $list;
 
     /**
-     * @param array<int, array<string, mixed>> $list
+     * @param list<StaffRoleOptionDto|StaffUserBriefDto|array<string, mixed>> $list
      */
     public function __construct(array $list)
     {
@@ -23,9 +26,14 @@ class RoleOptionsResponse extends BaseResponse
 
     public function getData(): array
     {
+        $rows = [];
+        foreach ($this->list as $item) {
+            $rows[] = $item instanceof AbstractDto ? $item->toDeepArray() : $item;
+        }
+
         return [
-            'list' => $this->list,
-            'total' => count($this->list),
+            'list' => $rows,
+            'total' => count($rows),
         ];
     }
 }

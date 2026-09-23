@@ -29,10 +29,9 @@ final class AlertDispatcher
             }
         };
 
-        if (extension_loaded('swoole') && function_exists('goApp') && \Swoole\Coroutine::getCid() >= 0) {
+        if (\Swoole\Coroutine::getCid() >= 0) {
             try {
                 goApp($run);
-
                 return;
             } catch (\Throwable $e) {
                 self::logError($e);

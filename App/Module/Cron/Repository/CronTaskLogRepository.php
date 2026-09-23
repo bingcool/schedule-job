@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Module\Cron\Repository;
 
 use App\Module\Cron\Entity\CronTaskLogEntity;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 
 class CronTaskLogRepository
 {
+    use HydratesEntityRows;
     public function newQuery(): Query
     {
         return CronTaskLogEntity::query();
@@ -212,17 +214,19 @@ class CronTaskLogRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<CronTaskLogEntity>
      */
     public function listExpiredLeaseRows(int $limit, string $now): array
     {
-        return CronTaskLogEntity::query()
-            ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
-            ->whereNotNull('lease_until')
-            ->where('lease_until', '<', $now)
-            ->order('id', 'asc')
-            ->limit($limit)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            CronTaskLogEntity::query()
+                ->whereIn('status', [ExecutionStatus::RUNNING, ExecutionStatus::CANCEL_REQUESTED])
+                ->whereNotNull('lease_until')
+                ->where('lease_until', '<', $now)
+                ->order('id', 'asc')
+                ->limit($limit)
+                ->select(),
+            CronTaskLogEntity::class,
+        );
     }
 }

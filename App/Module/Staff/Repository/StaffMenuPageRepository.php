@@ -6,10 +6,12 @@ namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Entity\StaffMenuPageEntity;
 use App\Module\Staff\StaffApp;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;
 
 class StaffMenuPageRepository
 {
+    use HydratesEntityRows;
     public function findById(int $id): ?StaffMenuPageEntity
     {
         if ($id <= 0) {
@@ -36,7 +38,7 @@ class StaffMenuPageRepository
 
     /**
      * @param array<int, int> $pageIds
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffMenuPageEntity>
      */
     public function listVisibleRowsByIds(array $pageIds): array
     {
@@ -44,15 +46,17 @@ class StaffMenuPageRepository
             return [];
         }
 
-        return StaffMenuPageEntity::queryVisible()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('id', $pageIds)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffMenuPageEntity::queryVisible()
+                ->where('app_id', StaffApp::appId())
+                ->whereIn('id', $pageIds)
+                ->select(),
+            StaffMenuPageEntity::class,
+        );
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffMenuPageEntity>
      */
     public function listVisibleRows(?int $status = null): array
     {
@@ -61,19 +65,24 @@ class StaffMenuPageRepository
             $qb->where('status', $status);
         }
 
-        return $qb->order('sort', 'desc')->order('id', 'asc')->select()->toArray();
+        return $this->selectRowsToEntities(
+            $qb->order('sort', 'desc')->order('id', 'asc')->select(),
+            StaffMenuPageEntity::class,
+        );
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffMenuPageEntity>
      */
     public function listSiblingRows(int $parentId): array
     {
-        return StaffMenuPageEntity::queryVisible()
-            ->where('app_id', StaffApp::appId())
-            ->where('parent_id', $parentId)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffMenuPageEntity::queryVisible()
+                ->where('app_id', StaffApp::appId())
+                ->where('parent_id', $parentId)
+                ->select(),
+            StaffMenuPageEntity::class,
+        );
     }
 
     public function hasVisibleChild(int $menuId): bool
@@ -103,7 +112,7 @@ class StaffMenuPageRepository
 
     /**
      * @param array<int, int> $pageIds
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffMenuPageEntity>
      */
     public function listEnabledVisibleRowsByIds(array $pageIds): array
     {
@@ -111,12 +120,14 @@ class StaffMenuPageRepository
             return [];
         }
 
-        return StaffMenuPageEntity::queryVisible()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('id', $pageIds)
-            ->where('status', StaffApp::MENU_STATUS_ENABLED)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffMenuPageEntity::queryVisible()
+                ->where('app_id', StaffApp::appId())
+                ->whereIn('id', $pageIds)
+                ->where('status', StaffApp::MENU_STATUS_ENABLED)
+                ->select(),
+            StaffMenuPageEntity::class,
+        );
     }
 
     /**

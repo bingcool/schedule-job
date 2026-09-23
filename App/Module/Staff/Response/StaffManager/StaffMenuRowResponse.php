@@ -11,12 +11,11 @@ class StaffMenuRowResponse extends BaseResponse
 {
     protected StaffMenuRowDto $row;
 
-    /**
-     * @param array<string, mixed> $attributes
-     */
-    public function __construct(array $attributes)
+    public function __construct(StaffMenuRowDto|array $attributes)
     {
-        $this->row = StaffMenuRowDto::fromEntityRow($attributes);
+        $this->row = $attributes instanceof StaffMenuRowDto
+            ? $attributes
+            : StaffMenuRowDto::fromEntityRow($attributes);
     }
 
     public function getData(): array

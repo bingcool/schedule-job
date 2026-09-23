@@ -6,9 +6,11 @@ namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Entity\StaffUserRoleEntity;
 use App\Module\Staff\StaffApp;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 
 class StaffUserRoleRepository
 {
+    use HydratesEntityRows;
     public function deleteByUserId(int $userId): int
     {
         return (int) StaffUserRoleEntity::query()
@@ -24,7 +26,7 @@ class StaffUserRoleRepository
 
     /**
      * @param array<int, int> $userIds
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffUserRoleEntity>
      */
     public function listRowsByUserIds(array $userIds): array
     {
@@ -32,11 +34,13 @@ class StaffUserRoleRepository
             return [];
         }
 
-        return StaffUserRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('user_id', $userIds)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffUserRoleEntity::query()
+                ->where('app_id', StaffApp::appId())
+                ->whereIn('user_id', $userIds)
+                ->select(),
+            StaffUserRoleEntity::class,
+        );
     }
 
     /**
@@ -49,13 +53,14 @@ class StaffUserRoleRepository
         if ($roleIds === []) {
             return $counts;
         }
-        $rows = StaffUserRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('role_id', $roleIds)
-            ->select()
-            ->toArray();
-        foreach ($rows as $row) {
-            $roleId = (int) $row['role_id'];
+        foreach ($this->selectRowsToEntities(
+            StaffUserRoleEntity::query()
+                ->where('app_id', StaffApp::appId())
+                ->whereIn('role_id', $roleIds)
+                ->select(),
+            StaffUserRoleEntity::class,
+        ) as $row) {
+            $roleId = (int) $row->role_id;
             $counts[$roleId] = ($counts[$roleId] ?? 0) + 1;
         }
 
@@ -84,14 +89,16 @@ class StaffUserRoleRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffUserRoleEntity>
      */
     public function listRowsByUserId(int $userId): array
     {
-        return StaffUserRoleEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->where('user_id', $userId)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffUserRoleEntity::query()
+                ->where('app_id', StaffApp::appId())
+                ->where('user_id', $userId)
+                ->select(),
+            StaffUserRoleEntity::class,
+        );
     }
 }

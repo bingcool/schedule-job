@@ -6,9 +6,11 @@ namespace App\Module\Staff\Repository;
 
 use App\Module\Staff\Entity\StaffRolePageEntity;
 use App\Module\Staff\StaffApp;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 
 class StaffRolePageRepository
 {
+    use HydratesEntityRows;
     public function deleteByRoleId(int $roleId): int
     {
         return (int) StaffRolePageEntity::query()->where('role_id', $roleId)->delete();
@@ -29,7 +31,7 @@ class StaffRolePageRepository
 
     /**
      * @param array<int, int> $roleIds
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffRolePageEntity>
      */
     public function listRowsByRoleIds(array $roleIds): array
     {
@@ -37,11 +39,13 @@ class StaffRolePageRepository
             return [];
         }
 
-        return StaffRolePageEntity::query()
-            ->where('app_id', StaffApp::appId())
-            ->whereIn('role_id', $roleIds)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            StaffRolePageEntity::query()
+                ->where('app_id', StaffApp::appId())
+                ->whereIn('role_id', $roleIds)
+                ->select(),
+            StaffRolePageEntity::class,
+        );
     }
 
     /**
@@ -69,7 +73,7 @@ class StaffRolePageRepository
             return $counts;
         }
         foreach ($this->listRowsByRoleIds($roleIds) as $row) {
-            $roleId = (int) $row['role_id'];
+            $roleId = (int) $row->role_id;
             $counts[$roleId] = ($counts[$roleId] ?? 0) + 1;
         }
 

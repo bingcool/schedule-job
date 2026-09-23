@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Service;
 
+use App\Module\Staff\Dto\StaffAuth\AuthMeProfileDto;
 use App\Module\Staff\Dto\StaffAuth\AuthSessionDto;
+use App\Module\Staff\Dto\StaffRole\StaffRoleBriefDto;
 use App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
 use App\Module\Staff\Dto\StaffAuth\LoginDto;
 use App\Module\Staff\Dto\StaffAuth\RegisterDto;
@@ -110,10 +112,7 @@ class StaffAuthService
         return $this->issueSession($user);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function me(): array
+    public function me(): AuthMeProfileDto
     {
         $authUser = FrameworkContext::userOrFail();
         $user = $this->staffUserService->requireUser((int) $authUser->userId);
@@ -156,10 +155,7 @@ class StaffAuthService
         return (int) $user->id;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function updateProfile(UpdateProfileDto $dto): array
+    public function updateProfile(UpdateProfileDto $dto): AuthMeProfileDto
     {
         $authUser = FrameworkContext::userOrFail();
         $current = $this->staffUserService->requireUser((int) $authUser->userId);
@@ -199,10 +195,10 @@ class StaffAuthService
         $profile = $this->profileOf($user);
         $this->assertHasMenuAccess($profile);
         $roleCodes = array_values(array_filter(array_map(
-            static fn (array $role): string => (string) ($role['code'] ?? ''),
-            $profile['roles'] ?? []
+            static fn (StaffRoleBriefDto $role): string => $role->getCode(),
+            $profile->getRoles(),
         )));
-        if (!empty($profile['isSuper']) && !in_array('admin', $roleCodes, true)) {
+        if ($profile->getIsSuper() && !in_array('admin', $roleCodes, true)) {
             $roleCodes[] = 'admin';
         }
 
@@ -219,42 +215,37 @@ class StaffAuthService
         return AuthSessionDto::of($token, $ttl, $profile, $loginMode, $tempPasswordExpiresAt);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function profileOf(StaffUserEntity $user): array
+    private function profileOf(StaffUserEntity $user): AuthMeProfileDto
     {
-        $roles = $this->staffRoleService->rolesGroupedByUserIds([(int) $user->id])[(int) $user->id] ?? [];
+        $userId = (int) $user->id;
+        $roles = $this->staffRoleService->rolesGroupedByUserIds([$userId])[$userId] ?? [];
         $isSuper = false;
         foreach ($roles as $role) {
-            if (!empty($role['isSuperRole'])) {
+            if ($role->getIsSuperRole()) {
                 $isSuper = true;
                 break;
             }
         }
 
-        return [
-            'id' => (int) $user->id,
-            'account' => (string) $user->account,
-            'email' => (string) ($user->email ?? ''),
-            'userName' => (string) $user->user_name,
-            'isSuper' => $isSuper,
-            'isEditorTaskGroup' => $this->staffUserService->isEditorTaskGroupUser((int) $user->id),
-            'roles' => $roles,
-            'nodeGroupIds' => $this->staffUserService->nodeGroupIdsOfUser((int) $user->id),
-            'menus' => $this->staffRoleService->menusForUser((int) $user->id, $isSuper),
-        ];
+        return AuthMeProfileDto::of(
+            $userId,
+            (string) $user->account,
+            (string) ($user->email ?? ''),
+            (string) $user->user_name,
+            $isSuper,
+            $this->staffUserService->isEditorTaskGroupUser($userId),
+            $roles,
+            $this->staffUserService->nodeGroupIdsOfUser($userId),
+            $this->staffRoleService->menusForUser($userId, $isSuper),
+        );
     }
 
-    /**
-     * @param array<string, mixed> $profile
-     */
-    private function assertHasMenuAccess(array $profile): void
+    private function assertHasMenuAccess(AuthMeProfileDto $profile): void
     {
-        if (!empty($profile['isSuper'])) {
+        if ($profile->getIsSuper()) {
             return;
         }
-        foreach ($profile['menus'] ?? [] as $group) {
+        foreach ($profile->getMenus() as $group) {
             if (!is_array($group)) {
                 continue;
             }

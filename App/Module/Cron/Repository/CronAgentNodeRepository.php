@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Module\Cron\Repository;
 
 use App\Module\Cron\Entity\CronAgentNodeEntity;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Raw;
 
 class CronAgentNodeRepository
 {
+    use HydratesEntityRows;
     public function findById(int $id): ?CronAgentNodeEntity
     {
         if ($id <= 0) {
@@ -36,7 +38,7 @@ class CronAgentNodeRepository
 
     /**
      * @param array<int, int>|null $allowedGroupIds null = 不限制
-     * @return array<int, array<string, mixed>>
+     * @return list<CronAgentNodeEntity>
      */
     public function listRowsOrdered(?array $allowedGroupIds = null): array
     {
@@ -48,12 +50,12 @@ class CronAgentNodeRepository
             $qb->whereIn('group_id', $allowedGroupIds);
         }
 
-        return $qb->select()->toArray();
+        return $this->selectRowsToEntities($qb->select(), CronAgentNodeEntity::class);
     }
 
     /**
      * @param array<int, int>|null $allowedGroupIds
-     * @return array<int, array<string, mixed>>
+     * @return list<CronAgentNodeEntity>
      */
     public function listHeartbeatRows(?array $allowedGroupIds = null): array
     {
@@ -65,7 +67,7 @@ class CronAgentNodeRepository
             $qb->whereIn('group_id', $allowedGroupIds);
         }
 
-        return $qb->select()->toArray();
+        return $this->selectRowsToEntities($qb->select(), CronAgentNodeEntity::class);
     }
 
     public function countByGroupId(int $groupId): int
@@ -171,7 +173,7 @@ class CronAgentNodeRepository
 
     /**
      * @param array<int, int> $nodeIds
-     * @return array<int, array<string, mixed>>
+     * @return list<CronAgentNodeEntity>
      */
     public function listMetaRowsByIds(array $nodeIds): array
     {
@@ -179,11 +181,13 @@ class CronAgentNodeRepository
             return [];
         }
 
-        return CronAgentNodeEntity::query()
-            ->whereIn('id', array_values($nodeIds))
-            ->field(['id', 'group_id', 'node_name', 'last_heartbeat_at', 'heartbeat_interval'])
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            CronAgentNodeEntity::query()
+                ->whereIn('id', array_values($nodeIds))
+                ->field(['id', 'group_id', 'node_name', 'last_heartbeat_at', 'heartbeat_interval'])
+                ->select(),
+            CronAgentNodeEntity::class,
+        );
     }
 
     /**

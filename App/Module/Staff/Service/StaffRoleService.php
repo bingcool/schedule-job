@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace App\Module\Staff\Service;
 
 use App\Module\Staff\Dto\StaffRole\GrantRolePagesDto;
+use App\Module\Staff\Dto\StaffRole\RoleStatsDto;
+use App\Module\Staff\Dto\StaffRole\StaffApiPermissionItemDto;
+use App\Module\Staff\Dto\StaffRole\StaffRoleBriefDto;
+use App\Module\Staff\Dto\StaffRole\StaffRoleOptionDto;
+use App\Module\Staff\Dto\StaffRole\StaffTaskPermissionItemDto;
 use App\Module\Staff\Dto\StaffRole\CreateMenuDto;
 use App\Module\Staff\Dto\StaffRole\CreateRoleDto;
 use App\Module\Staff\Dto\StaffRole\ListRolesQueryDto;
@@ -19,6 +24,8 @@ use App\Module\Staff\Dto\StaffRole\UpdateMenuDto;
 use App\Module\Staff\Dto\StaffRole\UpdateRoleDto;
 use App\Module\Staff\Entity\StaffMenuPageEntity;
 use App\Module\Staff\Entity\StaffRoleEntity;
+use App\Module\Staff\Entity\StaffRolePageEntity;
+use App\Module\Staff\Entity\StaffUserRoleEntity;
 use App\Module\Staff\Exception\StaffException;
 use App\Module\Staff\Repository\StaffMenuPageRepository;
 use App\Module\Staff\Repository\StaffRolePageRepository;
@@ -52,35 +59,19 @@ class StaffRoleService
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffApiPermissionItemDto>
      */
     public static function apiPermissionCatalog(): array
     {
-        return [
-            ['id' => 1, 'name' => '任务列表', 'method' => 'GET', 'path' => '/api/v1/tasks', 'group' => '任务管理'],
-            ['id' => 2, 'name' => '创建任务', 'method' => 'POST', 'path' => '/api/v1/tasks', 'group' => '任务管理'],
-            ['id' => 3, 'name' => '更新任务', 'method' => 'PUT', 'path' => '/api/v1/tasks', 'group' => '任务管理'],
-            ['id' => 4, 'name' => '删除任务', 'method' => 'DELETE', 'path' => '/api/v1/tasks', 'group' => '任务管理'],
-            ['id' => 5, 'name' => '任务启停', 'method' => 'PUT', 'path' => '/api/v1/tasks/status', 'group' => '任务管理'],
-            ['id' => 6, 'name' => '节点列表', 'method' => 'GET', 'path' => '/api/v1/nodes', 'group' => '节点管理'],
-            ['id' => 7, 'name' => '执行记录', 'method' => 'GET', 'path' => '/api/v1/tasks/logs', 'group' => '执行记录'],
-            ['id' => 8, 'name' => '用户管理', 'method' => 'GET', 'path' => '/api/v1/users', 'group' => '权限管理'],
-            ['id' => 9, 'name' => '角色管理', 'method' => 'GET', 'path' => '/api/v1/roles', 'group' => '权限管理'],
-            ['id' => 10, 'name' => '菜单管理', 'method' => 'GET', 'path' => '/api/v1/menus', 'group' => '权限管理'],
-        ];
+        return StaffApiPermissionItemDto::catalog();
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffTaskPermissionItemDto>
      */
     public static function taskPermissionCatalog(): array
     {
-        return [
-            ['id' => 1, 'name' => '立即执行', 'code' => 'cron:task:run_once', 'desc' => '手动触发任务执行'],
-            ['id' => 2, 'name' => '启用/禁用', 'code' => 'cron:task:switch', 'desc' => '切换任务启用状态'],
-            ['id' => 3, 'name' => '查看日志', 'code' => 'cron:task:logs', 'desc' => '查看任务执行日志'],
-            ['id' => 4, 'name' => '编辑 GLUE', 'code' => 'cron:task:glue_edit', 'desc' => '编辑 GLUE 脚本内容'],
-        ];
+        return StaffTaskPermissionItemDto::catalog();
     }
 
     public function listRoles(ListRolesQueryDto $query): ListRolesPageResult
@@ -102,11 +93,12 @@ class StaffRoleService
         $pageResult->setTotal($this->roleRepository->countByListQuery($query));
 
         $rows = $this->roleRepository->listRowsByListQuery($query);
-        $roleIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
+        $roleIds = array_map(static fn (StaffRoleEntity $role): int => (int) $role->id, $rows);
         $userCounts = $this->userRoleRepository->countUsersGroupedByRoleIds($roleIds);
         $menuCounts = $this->rolePageRepository->countPagesGroupedByRoleIds($roleIds);
 
-        foreach ($rows as $row) {
+        foreach ($rows as $role) {
+            $row = $role->getAttributes();
             $roleId = (int) $row['id'];
             $row['user_count'] = $userCounts[$roleId] ?? 0;
             $row['menu_count'] = $menuCounts[$roleId] ?? 0;
@@ -116,57 +108,39 @@ class StaffRoleService
         return $pageResult;
     }
 
-    /**
-     * @return array<string, int>
-     */
-    public function roleStats(): array
+    public function roleStats(): RoleStatsDto
     {
         $roles = $this->roleRepository->listAllRowsForApp();
         $enabled = 0;
         $super = 0;
         foreach ($roles as $role) {
-            if ((int) ($role['status'] ?? 0) === 1) {
+            if ((int) ($role->status ?? 0) === 1) {
                 $enabled++;
             }
-            if ((int) ($role['is_super_role'] ?? 0) === 1) {
+            if ((int) ($role->is_super_role ?? 0) === 1) {
                 $super++;
             }
         }
         $userCount = $this->userRoleRepository->countByApp();
+        $total = count($roles);
 
-        return [
-            'total' => count($roles),
-            'enabled' => $enabled,
-            'disabled' => count($roles) - $enabled,
-            'super' => $super,
-            'userCount' => $userCount,
-        ];
+        return RoleStatsDto::of($total, $enabled, $total - $enabled, $super, $userCount);
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffRoleOptionDto>
      */
     public function listRoleOptions(): array
     {
-        $rows = $this->roleRepository->listEnabledOptionRows();
-
         $list = [];
-        foreach ($rows as $row) {
-            $list[] = [
-                'id' => (int) $row['id'],
-                'name' => (string) $row['name'],
-                'code' => (string) $row['code'],
-                'isSuper' => (int) ($row['is_super_role'] ?? 0) === 1,
-            ];
+        foreach ($this->roleRepository->listEnabledOptionRows() as $role) {
+            $list[] = StaffRoleOptionDto::fromRoleEntity($role);
         }
 
         return $list;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function createRole(CreateRoleDto $dto): array
+    public function createRole(CreateRoleDto $dto): StaffRoleRowDto
     {
         $name = $dto->getName();
         $code = $dto->getCode();
@@ -193,10 +167,7 @@ class StaffRoleService
         return $this->getRole(RoleIdDto::of((int) $role->id));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function updateRole(UpdateRoleDto $dto): array
+    public function updateRole(UpdateRoleDto $dto): StaffRoleRowDto
     {
         $id = $dto->getId();
         $role = $this->requireRole($id);
@@ -220,9 +191,8 @@ class StaffRoleService
     /**
      * 独立配置角色的菜单页面权限（staff_role_page）。
      *
-     * @return array<string, mixed>
      */
-    public function grantRolePages(GrantRolePagesDto $dto): array
+    public function grantRolePages(GrantRolePagesDto $dto): StaffRoleRowDto
     {
         $role = $this->requireRole($dto->getId());
         if ($role->isSuperRole()) {
@@ -242,23 +212,21 @@ class StaffRoleService
         return $this->getRole(RoleIdDto::of($dto->getId()));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function getRole(RoleIdDto $dto): array
+    public function getRole(RoleIdDto $dto): StaffRoleRowDto
     {
         $role = $this->requireRole($dto->getId());
         $attrs = $role->getAttributes();
-        $attrs['page_ids'] = $this->pageIdsOfRole((int) $role->id);
+        $pageIds = $this->pageIdsOfRole((int) $role->id);
+        $attrs['page_ids'] = $pageIds;
         $attrs['api_per_ids'] = $this->permissionIdsOfRole((int) $role->id, StaffApp::PERMISSION_TYPE_API);
         $attrs['task_per_ids'] = $this->permissionIdsOfRole((int) $role->id, StaffApp::PERMISSION_TYPE_TASK);
         $attrs['user_count'] = $this->countUsersByRoleIds([(int) $role->id])[(int) $role->id] ?? 0;
-        $attrs['menu_count'] = count($attrs['page_ids']);
-        $attrs['menus'] = $this->menuTreeArrays();
-        $attrs['apiPermissions'] = self::apiPermissionCatalog();
-        $attrs['taskPermissions'] = self::taskPermissionCatalog();
+        $attrs['menu_count'] = count($pageIds);
 
-        return $attrs;
+        return StaffRoleRowDto::fromEntityRow($attrs)
+            ->setMenus($this->menuTreeArrays())
+            ->setApiPermissions($this->permissionCatalogToArray(self::apiPermissionCatalog()))
+            ->setTaskPermissions($this->permissionCatalogToArray(self::taskPermissionCatalog()));
     }
 
     public function deleteRole(RoleIdDto $dto): int
@@ -316,10 +284,7 @@ class StaffRoleService
         return $tree;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function createMenu(CreateMenuDto $dto): array
+    public function createMenu(CreateMenuDto $dto): StaffMenuRowDto
     {
         $uri = $this->normalizeMenuUri($dto->getUri(), $dto->getCode(), $dto->getParentId());
         $this->assertMenuPayload($dto->getName(), $dto->getCode(), $uri);
@@ -338,13 +303,10 @@ class StaffRoleService
             'status' => StaffApp::MENU_STATUS_ENABLED,
         ]);
 
-        return $menu->getAttributes();
+        return StaffMenuRowDto::fromEntityRow($menu->getAttributes());
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function updateMenu(UpdateMenuDto $dto): array
+    public function updateMenu(UpdateMenuDto $dto): StaffMenuRowDto
     {
         $menu = $this->requireMenu($dto->getId());
         $uri = $this->normalizeMenuUri($dto->getUri(), $dto->getCode(), $dto->getParentId());
@@ -365,7 +327,7 @@ class StaffRoleService
             'sort' => $dto->getSort(),
         ]));
 
-        return $menu->getAttributes();
+        return StaffMenuRowDto::fromEntityRow($menu->getAttributes());
     }
 
     public function switchMenuStatus(SwitchMenuStatusDto $dto): SwitchMenuStatusDto
@@ -392,7 +354,7 @@ class StaffRoleService
         }
 
         $rows = $this->menuRepository->listSiblingRows($parentId);
-        $siblingIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
+        $siblingIds = array_map(static fn (StaffMenuPageEntity $row): int => (int) $row->id, $rows);
         sort($siblingIds);
 
         foreach ($ids as $id) {
@@ -416,12 +378,9 @@ class StaffRoleService
         return $ids;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function getMenu(MenuIdDto $dto): array
+    public function getMenu(MenuIdDto $dto): StaffMenuRowDto
     {
-        return $this->requireMenu($dto->getId())->getAttributes();
+        return StaffMenuRowDto::fromEntityRow($this->requireMenu($dto->getId())->getAttributes());
     }
 
     public function deleteMenu(MenuIdDto $dto): int
@@ -487,7 +446,7 @@ class StaffRoleService
 
     /**
      * @param array<int, int> $userIds
-     * @return array<int, array<int, array<string, mixed>>>
+     * @return array<int, list<StaffRoleBriefDto>>
      */
     public function rolesGroupedByUserIds(array $userIds): array
     {
@@ -497,21 +456,19 @@ class StaffRoleService
         }
 
         $rels = $this->userRoleRepository->listRowsByUserIds($userIds);
-        $roleIds = array_values(array_unique(array_map(static fn (array $row): int => (int) $row['role_id'], $rels)));
+        $roleIds = array_values(array_unique(array_map(
+            static fn (StaffUserRoleEntity $row): int => (int) $row->role_id,
+            $rels,
+        )));
         $roles = [];
         if ($roleIds !== []) {
-            foreach ($this->roleRepository->listEnabledRowsByIds($roleIds) as $row) {
-                $roles[(int) $row['id']] = [
-                    'id' => (int) $row['id'],
-                    'name' => (string) $row['name'],
-                    'code' => (string) $row['code'],
-                    'isSuperRole' => (int) ($row['is_super_role'] ?? 0) === 1,
-                ];
+            foreach ($this->roleRepository->listEnabledRowsByIds($roleIds) as $role) {
+                $roles[(int) $role->id] = StaffRoleBriefDto::fromRoleEntity($role);
             }
         }
         foreach ($rels as $rel) {
-            $userId = (int) $rel['user_id'];
-            $roleId = (int) $rel['role_id'];
+            $userId = (int) $rel->user_id;
+            $roleId = (int) $rel->role_id;
             if (!isset($roles[$roleId])) {
                 continue;
             }
@@ -535,17 +492,17 @@ class StaffRoleService
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<StaffMenuRowDto>
      */
     public function menusForUser(int $userId, bool $isSuper): array
     {
         $all = $this->loadMenuRows(StaffApp::MENU_STATUS_ENABLED);
         if ($isSuper) {
-            return $this->menuDtosToArray($this->buildMenuTree($all));
+            return $this->buildMenuTree($all);
         }
 
         $roleIds = array_map(
-            static fn (array $row): int => (int) $row['role_id'],
+            static fn (StaffUserRoleEntity $row): int => (int) $row->role_id,
             $this->userRoleRepository->listRowsByUserId($userId),
         );
         $roleIds = $this->enabledRoleIds($roleIds);
@@ -554,7 +511,7 @@ class StaffRoleService
         }
 
         $pageIds = array_map(
-            static fn (array $row): int => (int) $row['page_id'],
+            static fn (StaffRolePageEntity $row): int => (int) $row->page_id,
             $this->rolePageRepository->listRowsByRoleIds($roleIds),
         );
         $byId = [];
@@ -579,7 +536,7 @@ class StaffRoleService
         }
         $allowed = array_values(array_filter($all, static fn (array $row): bool => isset($pageIdSet[(int) $row['id']])));
 
-        return $this->menuDtosToArray($this->buildMenuTree($allowed));
+        return $this->buildMenuTree($allowed);
     }
 
     /**
@@ -676,7 +633,12 @@ class StaffRoleService
      */
     private function loadMenuRows(?int $status = null): array
     {
-        return $this->menuRepository->listVisibleRows($status);
+        $rows = [];
+        foreach ($this->menuRepository->listVisibleRows($status) as $menu) {
+            $rows[] = $menu->getAttributes();
+        }
+
+        return $rows;
     }
 
     /**
@@ -741,7 +703,7 @@ class StaffRoleService
     public function enabledRoleIdsForUser(int $userId): array
     {
         $roleIds = array_map(
-            static fn (array $row): int => (int) $row['role_id'],
+            static fn (StaffUserRoleEntity $row): int => (int) $row->role_id,
             $this->userRoleRepository->listRowsByUserId($userId),
         );
 
@@ -758,7 +720,7 @@ class StaffRoleService
             return [];
         }
         return array_values(array_map(
-            static fn (array $row): int => (int) $row['id'],
+            static fn (StaffRoleEntity $role): int => (int) $role->id,
             $this->roleRepository->listEnabledRowsByIds($roleIds),
         ));
     }
@@ -906,5 +868,17 @@ class StaffRoleService
     private function isStatusLockedRole(StaffRoleEntity $role): bool
     {
         return $role->isSuperRole() || StaffRoleCode::isStatusLocked((string) $role->code);
+    }
+
+    /**
+     * @param list<StaffApiPermissionItemDto|StaffTaskPermissionItemDto> $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function permissionCatalogToArray(array $items): array
+    {
+        return array_map(
+            static fn (StaffApiPermissionItemDto|StaffTaskPermissionItemDto $item): array => $item->toDeepArray(),
+            $items,
+        );
     }
 }

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Module\Cron\Repository;
 
 use App\Module\Cron\Entity\CronRobotEntity;
+use App\Module\Repository\Concerns\HydratesEntityRows;
 
 class CronRobotRepository
 {
+    use HydratesEntityRows;
+
     public function findById(int $id): ?CronRobotEntity
     {
         if ($id <= 0) {
@@ -18,11 +21,14 @@ class CronRobotRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * @return list<CronRobotEntity> 按 id 倒序
      */
     public function listAllRows(): array
     {
-        return CronRobotEntity::query()->order('id', 'desc')->select()->toArray();
+        return $this->selectRowsToEntities(
+            CronRobotEntity::query()->order('id', 'desc')->select(),
+            CronRobotEntity::class,
+        );
     }
 
     public function existsByName(string $name, ?int $exceptId = null): bool
@@ -57,14 +63,19 @@ class CronRobotRepository
     public function delete(CronRobotEntity $robot): int
     {
         $id = (int) $robot->id;
+        if (empty($id)) {
+            throw new \InvalidArgumentException('Robot id is empty');
+        }
         $robot->delete();
 
         return $id;
     }
 
     /**
+     * 含已软删行（withoutTrashed），供节点组展示 robot 引用状态。
+     *
      * @param list<int> $ids
-     * @return array<int, array<string, mixed>>
+     * @return list<CronRobotEntity>
      */
     public function listRowsByIds(array $ids): array
     {
@@ -72,9 +83,11 @@ class CronRobotRepository
             return [];
         }
 
-        return CronRobotEntity::withoutTrashed()
-            ->whereIn('id', $ids)
-            ->select()
-            ->toArray();
+        return $this->selectRowsToEntities(
+            CronRobotEntity::withoutTrashed()
+                ->whereIn('id', $ids)
+                ->select(),
+            CronRobotEntity::class,
+        );
     }
 }

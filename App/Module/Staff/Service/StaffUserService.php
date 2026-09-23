@@ -12,6 +12,9 @@ use App\Module\Staff\Dto\StaffUser\GrantUserRolesDto;
 use App\Module\Staff\Dto\StaffUser\ListUsersQueryDto;
 use App\Module\Staff\Dto\StaffUser\ResetPasswordAckDto;
 use App\Module\Staff\Dto\StaffUser\ResetUserPasswordDto;
+use App\Module\Staff\Dto\StaffRole\StaffRoleBriefDto;
+use App\Module\Staff\Dto\StaffUser\StaffNodeGroupBriefDto;
+use App\Module\Staff\Dto\StaffUser\StaffUserBriefDto;
 use App\Module\Staff\Dto\StaffUser\StaffUserRowDto;
 use App\Module\Staff\Dto\StaffUser\SwitchUserStatusDto;
 use App\Module\Staff\Dto\StaffUser\UpdateUserDto;
@@ -84,7 +87,7 @@ class StaffUserService
         $pageResult->setTotal($this->userRepository->countByListQuery($query));
 
         $rows = $this->userRepository->listRowsByListQuery($query);
-        $userIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
+        $userIds = array_map(static fn (\App\Module\Staff\Entity\StaffUserEntity $row): int => (int) $row->id, $rows);
         $rolesMap = $this->staffRoleService->rolesGroupedByUserIds($userIds);
         $groupsMap = $this->nodeGroupIdsGroupedByUserIds($userIds);
         $allGroupIds = [];
@@ -95,14 +98,24 @@ class StaffUserService
         }
         $groupRows = $this->nodeGroupsByIds(array_values($allGroupIds));
 
-        foreach ($rows as $row) {
+        foreach ($rows as $user) {
+            $row = $user->getAttributes();
             $userId = (int) $row['id'];
             $roles = $rolesMap[$userId] ?? [];
             $groupIds = $groupsMap[$userId] ?? [];
-            $row['roles'] = $roles;
-            $row['role_ids'] = array_map(static fn (array $role): int => (int) $role['id'], $roles);
+            $row['roles'] = array_map(
+                static fn (StaffRoleBriefDto $role): array => $role->toDeepArray(),
+                $roles,
+            );
+            $row['role_ids'] = array_map(
+                static fn (StaffRoleBriefDto $role): int => $role->getId(),
+                $roles,
+            );
             $row['node_group_ids'] = $groupIds;
-            $row['node_groups'] = $this->nodeGroupsOfIds($groupIds, $groupRows);
+            $row['node_groups'] = array_map(
+                static fn (StaffNodeGroupBriefDto $group): array => $group->toDeepArray(),
+                $this->nodeGroupsOfIdsAsDto($groupIds, $groupRows),
+            );
             $row['is_super'] = $this->hasSuperRole($roles);
             $pageResult->addListItem(StaffUserRowDto::fromEntityRow($row));
         }
@@ -110,10 +123,7 @@ class StaffUserService
         return $pageResult;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function createUser(CreateUserDto $dto): array
+    public function createUser(CreateUserDto $dto): StaffUserRowDto
     {
         $this->assertAccountAndName($dto->getAccount(), $dto->getUserName());
         $this->assertPassword($dto->getPassword());
@@ -132,10 +142,7 @@ class StaffUserService
         return $this->getUser(UserIdDto::of((int) $user->id));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function updateUser(UpdateUserDto $dto): array
+    public function updateUser(UpdateUserDto $dto): StaffUserRowDto
     {
         $user = $this->requireUser($dto->getId());
         $currentAccount = (string) ($user->account ?? '');
@@ -175,28 +182,12 @@ class StaffUserService
         ]));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function getUser(UserIdDto $dto): array
+    public function getUser(UserIdDto $dto): StaffUserRowDto
     {
-        $user = $this->requireUser($dto->getId());
-        $attrs = $user->getAttributes();
-        unset($attrs['password']);
-        $roles = $this->staffRoleService->rolesGroupedByUserIds([(int) $user->id])[(int) $user->id] ?? [];
-        $attrs['roles'] = $roles;
-        $attrs['role_ids'] = array_map(static fn (array $role): int => (int) $role['id'], $roles);
-        $attrs['node_group_ids'] = $this->nodeGroupIdsGroupedByUserIds([(int) $user->id])[(int) $user->id] ?? [];
-        $attrs['node_groups'] = $this->nodeGroupsOfIds($attrs['node_group_ids']);
-        $attrs['is_super'] = $this->hasSuperRole($roles);
-
-        return $attrs;
+        return $this->buildUserRowDto($this->requireUser($dto->getId()));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function grantRoles(GrantUserRolesDto $dto): array
+    public function grantRoles(GrantUserRolesDto $dto): StaffUserRowDto
     {
         $user = $this->requireUser($dto->getId());
         $this->staffRoleService->assertRolesExist($dto->getRoleIds());
@@ -205,10 +196,7 @@ class StaffUserService
         return $this->getUser(UserIdDto::of((int) $user->id));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function grantNodeGroups(GrantUserNodeGroupsDto $dto): array
+    public function grantNodeGroups(GrantUserNodeGroupsDto $dto): StaffUserRowDto
     {
         $user = $this->requireUser($dto->getId());
         if ($this->isSuperUser((int) $user->id)) {
@@ -246,7 +234,7 @@ class StaffUserService
     }
 
     /**
-     * @return list<array{id:int,account:string,userName:string}>
+     * @return list<StaffUserBriefDto>
      */
     public function listUsersByNodeGroup(int $nodeGroupId): array
     {
@@ -265,11 +253,7 @@ class StaffUserService
 
         $list = [];
         foreach ($users as $user) {
-            $list[] = [
-                'id' => (int) ($user['id'] ?? 0),
-                'account' => (string) ($user['account'] ?? ''),
-                'userName' => (string) ($user['user_name'] ?? ''),
-            ];
+            $list[] = StaffUserBriefDto::fromUserEntity($user);
         }
 
         return $list;
@@ -289,7 +273,7 @@ class StaffUserService
         }
         $roles = $this->staffRoleService->rolesGroupedByUserIds([$userId])[$userId] ?? [];
         foreach ($roles as $role) {
-            if (($role['code'] ?? '') === $roleCode) {
+            if ($role->getCode() === $roleCode) {
                 return true;
             }
         }
@@ -647,17 +631,60 @@ class StaffUserService
     }
 
     /**
-     * @param array<int, array<string, mixed>> $roles
+     * @param list<StaffRoleBriefDto> $roles
      */
     private function hasSuperRole(array $roles): bool
     {
         foreach ($roles as $role) {
-            if (!empty($role['isSuperRole'])) {
+            if ($role->getIsSuperRole()) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function buildUserRowDto(StaffUserEntity $user): StaffUserRowDto
+    {
+        $attrs = $user->getAttributes();
+        unset($attrs['password']);
+        $userId = (int) $user->id;
+        $roles = $this->staffRoleService->rolesGroupedByUserIds([$userId])[$userId] ?? [];
+        $groupIds = $this->nodeGroupIdsGroupedByUserIds([$userId])[$userId] ?? [];
+        $attrs['roles'] = array_map(
+            static fn (StaffRoleBriefDto $role): array => $role->toDeepArray(),
+            $roles,
+        );
+        $attrs['role_ids'] = array_map(
+            static fn (StaffRoleBriefDto $role): int => $role->getId(),
+            $roles,
+        );
+        $attrs['node_group_ids'] = $groupIds;
+        $attrs['node_groups'] = array_map(
+            static fn (StaffNodeGroupBriefDto $group): array => $group->toDeepArray(),
+            $this->nodeGroupsOfIdsAsDto($groupIds),
+        );
+        $attrs['is_super'] = $this->hasSuperRole($roles);
+
+        return StaffUserRowDto::fromEntityRow($attrs);
+    }
+
+    /**
+     * @param array<int, int> $groupIds
+     * @param array<int, array{id:int,groupName:string}>|null $preloaded
+     * @return list<StaffNodeGroupBriefDto>
+     */
+    private function nodeGroupsOfIdsAsDto(array $groupIds, ?array $preloaded = null): array
+    {
+        $map = $preloaded ?? $this->nodeGroupsByIds($groupIds);
+        $list = [];
+        foreach ($groupIds as $groupId) {
+            if (isset($map[$groupId])) {
+                $list[] = StaffNodeGroupBriefDto::fromSlice($map[$groupId]);
+            }
+        }
+
+        return $list;
     }
 
     public static function isBuiltInAdminAccount(string $account): bool
