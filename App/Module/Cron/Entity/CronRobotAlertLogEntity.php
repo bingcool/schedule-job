@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Entity;
 
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 
 /**
  * @property int $id
@@ -22,7 +22,7 @@ use App\Model\ClientModel;
  * @property string $created_at
  * @property string $updated_at
  */
-class CronRobotAlertLogEntity extends ClientModel
+class CronRobotAlertLogEntity extends BaseModel
 {
     protected static $table = 'cron_robot_alert_log';
 

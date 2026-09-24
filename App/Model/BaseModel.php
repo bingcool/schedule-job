@@ -4,7 +4,7 @@ namespace App\Model;
 use App\Factory;
 use Swoolefy\Library\Db\Model;
 
-class ClientModel extends Model {
+class BaseModel extends Model {
     /**
      * @var int
      */

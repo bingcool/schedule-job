@@ -2,7 +2,7 @@
 
 namespace App\Module\Cron\Entity;
 
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 
 /**
  * @property int id
@@ -16,7 +16,7 @@ use App\Model\ClientModel;
  * @property array|null content_after 变更后任务内容
  * @property string created_at 操作时间
  */
-class CronTaskOperationLogEntity extends ClientModel
+class CronTaskOperationLogEntity extends BaseModel
 {
     protected static $table = 'cron_task_operation_log';
 

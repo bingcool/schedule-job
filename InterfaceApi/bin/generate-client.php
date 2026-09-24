@@ -8,7 +8,7 @@ declare(strict_types=1);
  * 每个带 #[RouteGroup] 且含 API 方法的 Interface 生成一个 Client（XxxApiInterface → XxxApi）。
  *
  * 用法（在 schedule-job 仓库根目录）：
- *   php bin/generate-client.php --service=ScheduleJob/App
+ *   php InterfaceApi/bin/generate-client.php --service=ScheduleJob/App
  */
 
 $binDir = __DIR__;
@@ -33,15 +33,9 @@ ProjectBootstrap::register($projectRoot, $interfaceApiRoot);
 $serviceKey = parseGenerateClientArgv($argv ?? []);
 
 try {
-    (new ClientGenerator(
-        $projectRoot,
-        $serviceKey,
-        static function (string $line): void {
-            fwrite(STDOUT, $line . PHP_EOL);
-        },
-    ))->run();
+    (new ClientGenerator($projectRoot, $serviceKey))->run();
 } catch (GeneratorException $e) {
-    fwrite(STDERR, $e->getMessage() . PHP_EOL);
+    fwrite(STDERR, PHP_EOL . 'Error: ' . $e->getMessage() . PHP_EOL . PHP_EOL);
     exit(1);
 }
 

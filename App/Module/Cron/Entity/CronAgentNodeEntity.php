@@ -2,7 +2,7 @@
 namespace App\Module\Cron\Entity;
 
 use Swoolefy\Library\Db\Concern\SoftDelete;
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 
 /**
  * @property int id
@@ -17,7 +17,7 @@ use App\Model\ClientModel;
  * @property string updated_at 修改时间
  * @property string|null deleted_at 删除时间
  */
-class CronAgentNodeEntity extends ClientModel
+class CronAgentNodeEntity extends BaseModel
 {
     use SoftDelete;
     /**

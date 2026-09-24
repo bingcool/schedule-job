@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Entity;
 
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 
 /**
  * @property int $id
@@ -15,7 +15,7 @@ use App\Model\ClientModel;
  * @property string $created_at
  * @property string $updated_at
  */
-class StaffRolePermissionEntity extends ClientModel
+class StaffRolePermissionEntity extends BaseModel
 {
     protected static $table = 'staff_role_permission';
 

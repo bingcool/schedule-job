@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Entity;
 
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 
 /**
  * 调度 Slot 抢占记录。UNIQUE(cron_id, scheduled_at) 保证同一调度点只有一个赢家。
@@ -20,7 +20,7 @@ use App\Model\ClientModel;
  * @property string $updated_at
  * @see \Swoolefy\Worker\Cron\CronScheduleSlotClaimConst
  */
-class CronScheduledTaskRecordEntity extends ClientModel
+class CronScheduledTaskRecordEntity extends BaseModel
 {
 
     protected static $table = 'cron_scheduled_task_record';

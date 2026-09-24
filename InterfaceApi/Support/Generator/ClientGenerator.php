@@ -11,55 +11,74 @@ use InterfaceApi\Support\RouteGroup;
  */
 final class ClientGenerator
 {
-    /** @var null|callable(string): void */
-    private $log;
-
     public function __construct(
         private string $projectRoot,
         private string $serviceKey,
-        ?callable $log = null,
+        private ?ConsoleReporter $console = null,
     ) {
-        $this->log = $log;
     }
 
     public function run(): void
     {
+        $started = microtime(true);
+        $console = $this->console ?? new ConsoleReporter($this->projectRoot);
+
         [$appRoot, $moduleRoot, $packageRoot] = $this->resolveServicePaths();
 
         $this->bootstrapAutoload();
 
+        $serviceName = $this->resolveServiceName($packageRoot);
+
+        $console->banner();
+        $console->meta('service', $this->serviceKey);
+        $console->meta('serviceName', $serviceName);
+        $console->meta('scan', $console->relPath($moduleRoot));
+
+        $console->section('Reference check (§2)');
         $violations = (new ReferenceChecker())->check($appRoot);
         if ($violations !== []) {
             foreach ($violations as [$file, $line, $fqcn]) {
-                $this->logLine("ERROR {$file}:{$line} {$fqcn}");
+                $console->error("{$console->relPath($file)}:{$line} {$fqcn}");
             }
             throw new GeneratorException(sprintf('Reference check failed (%d violation(s)).', count($violations)));
         }
-        $this->logLine('InterfaceApi reference check passed.');
+        $console->ok('passed');
 
-        $serviceName = $this->resolveServiceName($packageRoot);
         $interfaces = $this->discoverRouteGroupInterfaces($moduleRoot);
         if ($interfaces === []) {
             throw new GeneratorException('No #[RouteGroup] interfaces found under ' . $moduleRoot);
         }
 
+        $console->section('Discover #[RouteGroup] interfaces');
+        $console->info(sprintf('found %d interface(s)', count($interfaces)));
+
         $writer = new ClientWriter();
         $written = [];
+        $skipped = 0;
+        $console->section('Write Client classes');
         foreach ($interfaces as $fqcn) {
+            $ifaceShort = $console->shortInterfaceName($fqcn);
             if (!$writer->hasApiMethods($fqcn)) {
-                $this->logLine('Skipped (no API methods): ' . $fqcn);
+                ++$skipped;
+                $console->skip("{$ifaceShort} — no API methods");
                 continue;
             }
             $path = $writer->write($fqcn, $serviceName);
             $written[] = $path;
-            $this->logLine('Generated ' . $path);
+            $clientShort = preg_replace('/ApiInterface$/', 'Api', $ifaceShort) ?: ($ifaceShort . 'Api');
+            $console->ok("{$ifaceShort} → {$clientShort}", $console->relPath($path));
         }
         if ($written === []) {
             throw new GeneratorException('No Client generated (interfaces have no routable methods)');
         }
 
-        $this->purgeStaleGeneratedClients($moduleRoot, $written);
-        $this->logLine('InterfaceApi Client generation done (' . count($written) . ' file(s)).');
+        $removed = $this->purgeStaleGeneratedClients($moduleRoot, $written);
+        if ($removed > 0) {
+            $console->section('Cleanup stale @generated files');
+            $console->info("removed {$removed} file(s)");
+        }
+
+        $console->summary(microtime(true) - $started, count($written), $skipped, $removed);
     }
 
     /**
@@ -94,13 +113,6 @@ final class ClientGenerator
         $packageRoot = dirname($appRoot);
 
         return [$appRoot, $moduleRoot, $packageRoot];
-    }
-
-    private function logLine(string $message): void
-    {
-        if ($this->log !== null) {
-            ($this->log)($message);
-        }
     }
 
     private function bootstrapAutoload(): void
@@ -175,8 +187,9 @@ final class ClientGenerator
     /**
      * @param list<string> $writtenPaths
      */
-    private function purgeStaleGeneratedClients(string $scanRoot, array $writtenPaths): void
+    private function purgeStaleGeneratedClients(string $scanRoot, array $writtenPaths): int
     {
+        $removed = 0;
         $keep = array_map(static fn (string $p): string => realpath($p) ?: $p, $writtenPaths);
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($scanRoot));
         foreach ($iterator as $info) {
@@ -194,11 +207,13 @@ final class ClientGenerator
             $real = realpath($path) ?: $path;
             if (!in_array($real, $keep, true)) {
                 unlink($path);
-                $this->logLine('Removed stale ' . $path);
+                ++$removed;
             }
         }
 
         $this->removeEmptyLegacyInterfaceClientDirs($scanRoot);
+
+        return $removed;
     }
 
     private function removeEmptyLegacyInterfaceClientDirs(string $scanRoot): void
@@ -216,8 +231,8 @@ final class ClientGenerator
             if (!preg_match('#/Interface/Client$#', $normalized)) {
                 continue;
             }
-            if ($this->isDirEmpty($path) && @rmdir($path)) {
-                $this->logLine('Removed empty legacy directory ' . $path);
+            if ($this->isDirEmpty($path)) {
+                @rmdir($path);
             }
         }
     }

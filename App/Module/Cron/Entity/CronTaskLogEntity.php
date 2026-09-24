@@ -2,7 +2,7 @@
 namespace App\Module\Cron\Entity;
 
 use Swoolefy\Library\Db\Concern\SoftDelete;
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 
 // 生成的表【cron_task_log】的属性
 /**
@@ -33,7 +33,7 @@ use App\Model\ClientModel;
  * @property string deleted_at 删除时间
  */
 
-class CronTaskLogEntity extends ClientModel
+class CronTaskLogEntity extends BaseModel
 {
     use SoftDelete;
     use CronTaskEventTrait;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Entity;
 
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 use Swoolefy\Library\Db\Concern\SoftDelete;
 
 /**
@@ -19,7 +19,7 @@ use Swoolefy\Library\Db\Concern\SoftDelete;
  * @property string updated_at 修改时间
  * @property string deleted_at 删除时间
  */
-class CronTaskRunRequestEntity extends ClientModel
+class CronTaskRunRequestEntity extends BaseModel
 {
     use SoftDelete;
 

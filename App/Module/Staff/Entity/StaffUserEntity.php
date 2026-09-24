@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Entity;
 
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 use Swoolefy\Library\Db\Concern\SoftDelete;
 
 /**
@@ -20,7 +20,7 @@ use Swoolefy\Library\Db\Concern\SoftDelete;
  * @property string|null $enabled_at
  * @property string|null $disabled_at
  */
-class StaffUserEntity extends ClientModel
+class StaffUserEntity extends BaseModel
 {
     use SoftDelete;
 

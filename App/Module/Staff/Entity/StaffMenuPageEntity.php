@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Entity;
 
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 use App\Module\Staff\StaffApp;
 use Swoolefy\Library\Db\Concern\SoftDelete;
 use Swoolefy\Library\Db\Query;
@@ -24,7 +24,7 @@ use Swoolefy\Library\Db\Query;
  * @property string $updated_at
  * @property string|null $delete_at
  */
-class StaffMenuPageEntity extends ClientModel
+class StaffMenuPageEntity extends BaseModel
 {
     use SoftDelete;
 

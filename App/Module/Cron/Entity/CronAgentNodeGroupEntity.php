@@ -1,7 +1,7 @@
 <?php
 namespace App\Module\Cron\Entity;
 
-use App\Model\ClientModel;
+use App\Model\BaseModel;
 
 /**
  * 主键是 id。group_id 只存在于 cron_agent_node（节点所属分组），本表没有该列。
@@ -13,7 +13,7 @@ use App\Model\ClientModel;
  * @property string created_at 创建时间
  * @property string updated_at 修改时间
  */
-class CronAgentNodeGroupEntity extends ClientModel
+class CronAgentNodeGroupEntity extends BaseModel
 {
     /**
      * @var string
