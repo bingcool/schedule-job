@@ -196,7 +196,8 @@
         this.trendLoading = true;
         this.hoverIndex = -1;
         try {
-          this.trend = await common.api('/dashboard/execution-trend?range=' + this.range) || [];
+          var trendData = await common.api('/dashboard/execution-trend?range=' + this.range);
+          this.trend = common.extractListRows(trendData);
           var self = this;
           this.$nextTick(function () {
             self.syncChartWidth();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Repository;
 
-use App\Module\Staff\Dto\StaffRole\ListRolesQueryDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\ListRolesQueryDto;
 use App\Module\Staff\Entity\StaffRoleEntity;
 use App\Module\Staff\StaffApp;
 use App\Module\Common\Repository\Concerns\HydratesEntityRows;

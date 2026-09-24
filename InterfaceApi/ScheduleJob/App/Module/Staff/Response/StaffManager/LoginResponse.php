@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace InterfaceApi\ScheduleJob\App\Module\Staff\Response\StaffManager;
+
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\AuthSessionDto;
+use InvalidArgumentException;
+use InterfaceApi\Support\ApiProperty;
+use InterfaceApi\Support\BaseResponse;
+
+/**
+ * 登录响应。loginMode / tempPasswordExpiresAt 给前端按 user_id 缓存登录方式。
+ */
+class LoginResponse extends BaseResponse
+{
+    #[ApiProperty(description: '登录会话 data')]
+    protected AuthSessionDto $data;
+
+    public function __construct(AuthSessionDto $session)
+    {
+        $this->data = $session;
+    }
+
+    public function getData(): AuthSessionDto
+    {
+        return $this->data;
+    }
+
+    /**
+     * @param AuthSessionDto $data
+     * @return $this
+     */
+    public function setData($data): static
+    {
+        if (!$data instanceof AuthSessionDto) {
+            throw new InvalidArgumentException('data must be AuthSessionDto');
+        }
+        $this->data = $data;
+
+        return $this;
+    }
+}

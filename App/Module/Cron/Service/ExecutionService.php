@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Cron\Service;
 
 use App\Module\Cron\CronTaskLogMessageConfig;
-use App\Module\Cron\Dto\CronTaskManager\ExecutionCancelResultDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\ExecutionCancelResultDto;
 use App\Module\Cron\Repository\CronTaskLogRepository;
 use App\Module\Cron\ExecutionLeaseConfig;
 use App\Module\Cron\ExecutionRecoveryResult;

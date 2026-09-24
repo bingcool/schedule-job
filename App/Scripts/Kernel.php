@@ -12,6 +12,7 @@
 namespace App\Scripts;
 
 use Swoolefy\Script\AbstractKernel;
+use Swoolefy\Script\GenerateInterfaceApi;
 use Swoolefy\Script\GenerateMysql;
 use Swoolefy\Script\GeneratePg;
 use Swoolefy\Script\GenerateCronService;
@@ -37,6 +38,7 @@ class Kernel extends AbstractKernel
         GenerateApiDoc::command        => [GenerateApiDoc::class, 'handle'],
         GenerateSdk::command           => [GenerateSdk::class, 'handle'],
         TestScript::command            => [TestScript::class, 'handle'],
+        GenerateInterfaceApi::command  => [GenerateInterfaceApi::class, 'handle'],
     ];
 
     /**

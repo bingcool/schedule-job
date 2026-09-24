@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Repository;
 
-use App\Module\Staff\Dto\StaffUser\ListUsersQueryDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffUser\ListUsersQueryDto;
 use App\Module\Staff\Entity\StaffUserEntity;
 use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;

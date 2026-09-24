@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Controller;
 
-use App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
-use App\Module\Staff\Dto\StaffAuth\LoginDto;
-use App\Module\Staff\Dto\StaffAuth\RegisterDto;
-use App\Module\Staff\Dto\StaffAuth\UpdateProfileDto;
-use App\Module\Staff\Request\StaffManager\ChangePasswordRequest;
-use App\Module\Staff\Request\StaffManager\LoginRequest;
-use App\Module\Staff\Request\StaffManager\RegisterRequest;
-use App\Module\Staff\Request\StaffManager\UpdateProfileRequest;
-use App\Module\Staff\Response\StaffManager\AuthMeResponse;
-use App\Module\Staff\Response\StaffManager\ChangePasswordAckResponse;
-use App\Module\Staff\Response\StaffManager\LoginResponse;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\LoginDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\RegisterDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\UpdateProfileDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Request\StaffManager\ChangePasswordRequest;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Request\StaffManager\LoginRequest;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Request\StaffManager\RegisterRequest;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Request\StaffManager\UpdateProfileRequest;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Response\StaffManager\AuthMeResponse;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Response\StaffManager\ChangePasswordAckResponse;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Response\StaffManager\LoginResponse;
 use App\Module\Staff\Service\StaffAuthService;
 use Swoolefy\Annotation\ApiOperation;
 use Swoolefy\Core\Controller\BController;

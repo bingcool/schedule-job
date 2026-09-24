@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Repository;
 
-use App\Module\Cron\Dto\CronTaskManager\ListTasksQueryDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\ListTasksQueryDto;
 use App\Module\Cron\Entity\CronTaskEntity;
 use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Query;

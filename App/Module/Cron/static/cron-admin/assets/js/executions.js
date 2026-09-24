@@ -377,7 +377,8 @@
         this.chartLoading = true;
         this.hoverIndex = -1;
         try {
-          this.trend = await common.api('/tasks/logs/trend?' + this.buildLogsQuery({ includePage: true, includeStatus: false }).toString()) || [];
+          var trendData = await common.api('/tasks/logs/trend?' + this.buildLogsQuery({ includePage: true, includeStatus: false }).toString());
+          this.trend = common.extractListRows(trendData);
           var self = this;
           this.$nextTick(function () {
             self.syncChartWidth();

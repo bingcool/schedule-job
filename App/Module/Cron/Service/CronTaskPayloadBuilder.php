@@ -6,8 +6,8 @@ namespace App\Module\Cron\Service;
 
 use Swoolefy\Worker\Cron\ExpressionParser;
 use Swoolefy\Worker\Cron\KubernetesJobSpec;
-use App\Module\Cron\Dto\Common\CronTaskPayloadBuildResultDto;
-use App\Module\Cron\Dto\Common\CronTaskPayloadDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\Common\CronTaskPayloadBuildResultDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\Common\CronTaskPayloadDto;
 use App\Module\Cron\ShellCommandGuard;
 
 /**

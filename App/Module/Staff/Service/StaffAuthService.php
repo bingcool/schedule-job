@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Service;
 
-use App\Module\Staff\Dto\StaffAuth\AuthMeProfileDto;
-use App\Module\Staff\Dto\StaffAuth\AuthSessionDto;
-use App\Module\Staff\Dto\StaffRole\StaffRoleBriefDto;
-use App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
-use App\Module\Staff\Dto\StaffAuth\LoginDto;
-use App\Module\Staff\Dto\StaffAuth\RegisterDto;
-use App\Module\Staff\Dto\StaffAuth\UpdateProfileDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\AuthMeProfileDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\AuthSessionDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\StaffRoleBriefDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\LoginDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\RegisterDto;
+use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\UpdateProfileDto;
 use App\Module\Staff\Entity\StaffUserEntity;
 use App\Module\Staff\Exception\StaffException;
 use App\Module\Staff\Repository\StaffUserRepository;

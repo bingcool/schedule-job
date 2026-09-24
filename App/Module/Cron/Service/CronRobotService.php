@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Service;
 
-use App\Module\Cron\Dto\CronRobot\CreateRobotDto;
-use App\Module\Cron\Dto\CronRobot\CronRobotRowDto;
-use App\Module\Cron\Dto\CronRobot\CronRobotTestResultDto;
-use App\Module\Cron\Dto\CronRobot\RobotIdDto;
-use App\Module\Cron\Dto\CronRobot\SwitchRobotStatusDto;
-use App\Module\Cron\Dto\CronRobot\UpdateRobotDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CreateRobotDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotRowDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotTestResultDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\RobotIdDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\SwitchRobotStatusDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\UpdateRobotDto;
 use App\Module\Cron\Entity\CronRobotEntity;
 use App\Module\Cron\Repository\CronAgentNodeGroupRepository;
 use App\Module\Cron\Repository\CronRobotRepository;
