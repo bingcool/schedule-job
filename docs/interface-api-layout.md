@@ -47,7 +47,7 @@ python3 scripts/migrate_interface_api_contracts.py
 | Cron | `CronApiInterface`（extends 子接口，Client：`CronApi`） | `CronTaskManagerApiInterface` → `CronTaskManagerApi`，`CronRobotApiInterface` → `CronRobotApi` |
 | Staff | `StaffApiInterface`（文档汇总，无方法） | `StaffAuthApiInterface`、`StaffUserApiInterface`、`StaffRoleApiInterface` → 各生成 `StaffAuthApi`、`StaffUserApi`、`StaffRoleApi` |
 
-路径：契约接口 `InterfaceApi/ScheduleJob/App/Module/{Cron|Staff}/Interface/`；生成 Client `…/Module/{Cron|Staff}/Client/`（命名空间 `…\Module\{Cron|Staff}\Client`）。路由与 `App/Router/Module/*.php` 对齐，方法上标注 `#[Route]` / 接口上 `#[RouteGroup(prefix: '/api/v1', ...)]`。
+路径：契约接口 `InterfaceApi/ScheduleJob/App/Module/{Cron|Staff}/Interface/`；生成 Client `…/Module/{Cron|Staff}/Client/`（命名空间 `…\Module\{Cron|Staff}\Client`）。各 `Client/` 含 `README.md`，说明仅脚本生成、禁止 AI/Agent 直接改 `*.php`。路由与 `App/Router/Module/*.php` 对齐，方法上标注 `#[Route]` / 接口上 `#[RouteGroup(prefix: '/api/v1', ...)]`。
 
 Controller 实现对应子接口，例如 `CronTaskManagerController implements CronTaskManagerApiInterface`。
 

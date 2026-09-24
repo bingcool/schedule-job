@@ -42,16 +42,16 @@ final class ProjectBootstrap
         $composer = $projectRoot . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
         if (is_file($composer)) {
             require_once $composer;
-        }
+        } else {
+            $appAutoload = $projectRoot . DIRECTORY_SEPARATOR . 'App' . DIRECTORY_SEPARATOR . 'Autoloader.php';
+            if (is_file($appAutoload)) {
+                require_once $appAutoload;
+                if (class_exists(\App\Autoloader::class, false)) {
+                    \App\Autoloader::register();
+                    self::$registered = true;
 
-        $appAutoload = $projectRoot . DIRECTORY_SEPARATOR . 'App' . DIRECTORY_SEPARATOR . 'Autoloader.php';
-        if (is_file($appAutoload)) {
-            require_once $appAutoload;
-            if (class_exists(\App\Autoloader::class, false)) {
-                \App\Autoloader::register();
-                self::$registered = true;
-
-                return;
+                    return;
+                }
             }
         }
 

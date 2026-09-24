@@ -72,6 +72,8 @@ final class ClientGenerator
             throw new GeneratorException('No Client generated (interfaces have no routable methods)');
         }
 
+        ClientDirectoryReadme::syncForWrittenClients($written);
+
         $removed = $this->purgeStaleGeneratedClients($moduleRoot, $written);
         if ($removed > 0) {
             $console->section('Cleanup stale @generated files');
