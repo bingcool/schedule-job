@@ -1,0 +1,5 @@
+{
+  "ScheduleJob/App": {
+    "serviceName": "schedule-job"
+  }
+}

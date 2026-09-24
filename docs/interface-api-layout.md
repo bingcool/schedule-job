@@ -44,7 +44,7 @@ python3 scripts/migrate_interface_api_contracts.py
 | 模块 | 汇总接口 | 子接口（与 Controller 一一对应） |
 |---|---|---|
 | Cron | `InterfaceApi\ScheduleJob\App\Module\Cron\Interface\CronApiInterface` | `CronTaskManagerApiInterface`、`CronRobotApiInterface` |
-| Staff | `InterfaceApi\ScheduleJob\App\Module\Staff\Interface\StaffApiInterface` | `StaffAuthApiInterface`、`StaffUserApiInterface`、`StaffRoleApiInterface` |
+| Staff | `StaffApiInterface`（文档汇总，无 extends） | `StaffAuthApiInterface`、`StaffUserApiInterface`、`StaffRoleApiInterface` → Client：`StaffAuthApi`、`StaffUserApi`、`StaffRoleApi`（方法名冲突如 `switchStatus` 不可合并为单 Client） |
 
 路径：`InterfaceApi/ScheduleJob/App/Module/{Cron|Staff}/Interface/`。路由与 `App/Router/Module/*.php` 对齐，方法上标注 `#[Route]` / 接口上 `#[RouteGroup(prefix: '/api/v1', ...)]`。
 
@@ -56,6 +56,13 @@ Controller 实现对应子接口，例如 `CronTaskManagerController implements 
 
 ```bash
 python3 scripts/generate_api_interfaces.py
+```
+
+生成 HTTP Client（默认模块级：`CronApi` + 三个 Staff Client；`--all` 含各子接口 Client）：
+
+```bash
+php bin/generate-client.php
+php bin/generate-client.php --all
 ```
 
 ## 后续
