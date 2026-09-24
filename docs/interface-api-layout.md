@@ -50,6 +50,8 @@ python3 scripts/migrate_interface_api_contracts.py
 
 Controller 实现对应子接口，例如 `CronTaskManagerController implements CronTaskManagerApiInterface`。
 
+契约接口上：`#[ApiController]` / `#[ApiOperation]` 描述模块与方法（对齐 OpenAPI 文案）；具体 JSON 字段见 Request / Response / DTO 属性上的 `#[ApiProperty]`。
+
 从路由与 Controller 重新生成子接口：
 
 ```bash

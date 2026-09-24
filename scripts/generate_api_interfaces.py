@@ -31,6 +31,65 @@ ROUTE_GROUP_NAME = {
     "StaffRoleController": ("staff-role", "/api/v1"),
 }
 
+INTERFACE_CLASS_DESC: dict[str, str] = {
+    "CronTaskManagerController": "Cron 任务、节点、分组、日志、Dashboard 与 Agent 回调 API",
+    "CronRobotController": "告警机器人 Webhook 配置 API",
+    "StaffAuthController": "登录与会话、当前用户资料与密码",
+    "StaffUserController": "后台用户账号、角色与节点组授权",
+    "StaffRoleController": "角色、菜单与权限配置",
+}
+
+
+def php_single_quoted(s: str) -> str:
+    return s.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def parse_class_description(path: Path) -> str:
+    text = path.read_text(encoding="utf-8")
+    m = re.search(r"/\*\*\s*\n\s*\*\s*([^*\n@]+)", text)
+    if m:
+        line = m.group(1).strip()
+        if line and not line.startswith("Route:"):
+            return line
+    return INTERFACE_CLASS_DESC.get(path.stem.replace(".php", ""), "")
+
+
+def parse_api_operations(path: Path) -> dict[str, str]:
+    """Map action name -> human description (from ApiOperation or method docblock)."""
+    text = path.read_text(encoding="utf-8")
+    ops: dict[str, str] = {}
+    op_re = re.compile(
+        r"#\[\s*ApiOperation\s*\(\s*(?:\n\s*)?"
+        r"(?:\"([^\"]+)\"|'((?:\\'|[^'])*)')"
+        r"(?:\s*\n\s*)?\)\s*\]\s*public\s+function\s+(\w+)\s*\(",
+        re.MULTILINE,
+    )
+    for m in op_re.finditer(text):
+        desc = (m.group(1) or m.group(2) or "").replace("\\'", "'")
+        ops[m.group(3)] = desc.strip()
+    doc_re = re.compile(
+        r"/\*\*(?:(?!\*/).)*?\*/\s*"
+        r"(?:#\[\s*ApiOperation[^\]]+\]\s*)?"
+        r"public\s+function\s+(\w+)\s*\(",
+        re.DOTALL,
+    )
+    for m in doc_re.finditer(text):
+        name = m.group(1)
+        if name in ops:
+            continue
+        block = m.group(0)
+        for raw in block.split("\n"):
+            line = re.sub(r"^\s*\*\s?", "", raw).strip()
+            if not line or line in ("/**", "*/") or line.startswith("@") or line.startswith("Route:"):
+                continue
+            if line.startswith("```") or "curl " in line.lower():
+                continue
+            if line.startswith("Route:") or line in ("/", "*/"):
+                continue
+            ops[name] = line.rstrip("。").strip()
+            break
+    return ops
+
 
 def parse_router(path: Path) -> list[tuple[str, str, str, str]]:
     """Return list of (http_method, path, controller_short, method)."""
@@ -123,6 +182,8 @@ def build_interface(
     routes: list[tuple[str, str, str, str]],
     signatures: dict[str, tuple[str, str]],
     uses: dict[str, str],
+    operations: dict[str, str],
+    class_desc: str,
 ) -> str:
     mod = module_for(controller)
     iface = interface_name(controller)
@@ -165,18 +226,35 @@ def build_interface(
 
         sig_params = f"({param_decl})" if param_decl else "()"
         ret_short = ret_fq.split("\\")[-1]
-        methods_lines.append(
-            f"    #[Route(method: '{verb}', path: '{rel}')]\n"
-            f"    public function {action}{sig_params}: {ret_short};"
+        desc = operations.get(action) or action
+        desc_php = php_single_quoted(desc)
+        doc_lines = [
+            "    /**",
+            f"     * {desc}",
+        ]
+        if param_decl:
+            doc_lines.append(f"     * @param {pt} $request 请求参数（字段见 Request DTO 上 ApiProperty）")
+        doc_lines.append(
+            f"     * @return {ret_short} 响应 data（字段见 Response / 嵌套 DTO 上 ApiProperty）"
         )
+        doc_lines.append("     */")
+        method_block = "\n".join(doc_lines) + "\n"
+        method_block += f"    #[ApiOperation('{desc_php}')]\n"
+        method_block += f"    #[Route(method: '{verb}', path: '{rel}')]\n"
+        method_block += f"    public function {action}{sig_params}: {ret_short};"
+        methods_lines.append(method_block)
 
     use_lines = []
     for fqcn in sorted(import_uses):
         use_lines.append(f"use {fqcn};")
+    use_lines.append("use InterfaceApi\\Support\\ApiController;")
+    use_lines.append("use InterfaceApi\\Support\\ApiOperation;")
     use_lines.append("use InterfaceApi\\Support\\Route;")
     use_lines.append("use InterfaceApi\\Support\\RouteGroup;")
 
     body = "\n\n".join(methods_lines)
+    class_doc = class_desc or iface.replace("ApiInterface", "")
+    class_desc_php = php_single_quoted(class_doc)
     return f"""<?php
 
 declare(strict_types=1);
@@ -185,6 +263,12 @@ namespace {ns};
 
 {chr(10).join(use_lines)}
 
+/**
+ * {class_doc}
+ *
+ * 入参 / 出参字段定义见各 Request、Response 及其 DTO 属性上的 {{@see \\InterfaceApi\\Support\\ApiProperty}}。
+ */
+#[ApiController(description: '{class_desc_php}')]
 #[RouteGroup(prefix: '{prefix}', name: '{group_name}')]
 interface {iface}
 {{
@@ -226,7 +310,9 @@ def main() -> None:
     for controller, path in CONTROLLERS.items():
         sigs = parse_controller_methods(path)
         uses = parse_controller_uses(path)
-        php = build_interface(controller, all_routes, sigs, uses)
+        ops = parse_api_operations(path)
+        class_desc = parse_class_description(path) or INTERFACE_CLASS_DESC.get(controller, "")
+        php = build_interface(controller, all_routes, sigs, uses, ops, class_desc)
         mod = module_for(controller)
         out_dir = ROOT / "InterfaceApi/ScheduleJob/App/Module" / mod / "Interface"
         out_dir.mkdir(parents=True, exist_ok=True)
