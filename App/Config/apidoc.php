@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * ApiDoc（gen:apidoc）可选配置（create 时复制为 Config/apidoc.php）
+ * ApiDoc 可选配置：swoolefy `gen:apidoc`（扫 Router）或 InterfaceApi `generate-openapi.php`（扫契约接口）均会读取本文件中的 version 等。
  *
  * 模块级 title/description 优先读 Router/api_router_module.json；
  * 本文件提供全局兜底与版本号。未配置时 title 默认为「{App} · {Module}」。

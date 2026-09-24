@@ -6,7 +6,7 @@
 
 | 路径 | 命名空间 |
 |---|---|
-| `InterfaceApi/bin/` | CLI（如 `generate-client.php`） |
+| `InterfaceApi/bin/` | CLI（`generate-client.php`、`generate-openapi.php`） |
 | `InterfaceApi/Support/` | `InterfaceApi\Support\`（注解、BaseRequest/Response、Client 基类、`Generator\` 引用检查与 Client 生成） |
 | `InterfaceApi/ScheduleJob/App/Module/Common/` | `InterfaceApi\ScheduleJob\App\Module\Common\` |
 | `InterfaceApi/ScheduleJob/App/Module/Cron/` | Request / Response / Dto |
@@ -63,6 +63,14 @@ python3 scripts/generate_api_interfaces.py
 
 ```bash
 php InterfaceApi/bin/generate-client.php --service=ScheduleJob/App
+```
+
+生成 OpenAPI 3.0 YAML（扫描 `Interface/*ApiInterface` 的 `#[Route]`，规则同 swoolefy `gen:apidoc`）：
+
+```bash
+php InterfaceApi/bin/generate-openapi.php --service=ScheduleJob/App
+# 默认输出 InterfaceApi/ScheduleJob/openapi/openapi-{cron|staff}.yaml
+# 模块 title/description：InterfaceApi/ScheduleJob/openapi-modules.json
 ```
 
 `--service` 为 `InterfaceApi/` 下相对路径，须以 `App` 结尾（如 `ScheduleJob/App`）；校验 `App` 目录存在后仅扫描其下 `Module/`。

@@ -1,0 +1,2318 @@
+openapi: 3.0.3
+info:
+  title: 'schedule-job · Staff'
+  description: '后台用户、角色、菜单与认证 API'
+  version: 1.0.0
+paths:
+  /api/v1/auth/login:
+    post:
+      tags:
+        - '登录 / 当前用户（公开注册已关闭，用户由管理员在后台创建）。'
+      summary: 用户登录
+      operationId: postStaffAuthApiInterfaceLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account:
+                  type: string
+                  description: '登录标识：含 @ 按邮箱验证，否则按账号验证'
+                password:
+                  type: string
+                  description: 密码
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      token: { type: string, description: JWT }
+                      tokenType: { type: string, description: 'token 类型' }
+                      expiresIn: { type: integer, description: 过期秒数 }
+                      user: { type: object, properties: { id: { type: integer, description: '用户 ID' }, account: { type: string, description: 账号 }, email: { type: string, description: 邮箱 }, userName: { type: string, description: 用户名称 }, isSuper: { type: boolean, description: 是否超级管理员 }, isEditorTaskGroup: { type: boolean, description: 是否任务组编辑角色 }, roles: { type: array, items: { type: string }, description: 角色列表 }, nodeGroupIds: { type: array, items: { type: integer }, description: '授权节点组 ID' }, menus: { type: array, items: { type: string }, description: 菜单树 } }, description: 当前用户 }
+                      loginMode: { type: string, description: 登录方式：temp=临时重置密码，normal=正常密码 }
+                      tempPasswordExpiresAt: { type: string, description: 临时重置密码到期时间，正常登录为空 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/auth/me:
+    get:
+      tags:
+        - '登录 / 当前用户（公开注册已关闭，用户由管理员在后台创建）。'
+      summary: 当前登录用户
+      operationId: getStaffAuthApiInterfaceMe
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      account: { type: string, description: 账号 }
+                      email: { type: string, description: 邮箱 }
+                      userName: { type: string, description: 用户名称 }
+                      isSuper: { type: boolean, description: 是否超级管理员 }
+                      isEditorTaskGroup: { type: boolean, description: 是否任务组编辑角色 }
+                      roles: { type: array, items: { type: string }, description: 角色列表 }
+                      nodeGroupIds: { type: array, items: { type: integer }, description: '授权节点组 ID' }
+                      menus: { type: array, items: { type: string }, description: 菜单树 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/auth/password:
+    post:
+      tags:
+        - '登录 / 当前用户（公开注册已关闭，用户由管理员在后台创建）。'
+      summary: 修改当前用户密码
+      operationId: postStaffAuthApiInterfaceChangePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                oldPassword:
+                  type: string
+                  description: 旧密码
+                newPassword:
+                  type: string
+                  description: 新密码
+                newPasswordConfirm:
+                  type: string
+                  description: 确认新密码
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      changed: { type: boolean, description: 密码是否已修改 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/auth/profile:
+    post:
+      tags:
+        - '登录 / 当前用户（公开注册已关闭，用户由管理员在后台创建）。'
+      summary: 修改当前用户资料
+      operationId: postStaffAuthApiInterfaceUpdateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userName:
+                  type: string
+                  description: 用户名称
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      account: { type: string, description: 账号 }
+                      email: { type: string, description: 邮箱 }
+                      userName: { type: string, description: 用户名称 }
+                      isSuper: { type: boolean, description: 是否超级管理员 }
+                      isEditorTaskGroup: { type: boolean, description: 是否任务组编辑角色 }
+                      roles: { type: array, items: { type: string }, description: 角色列表 }
+                      nodeGroupIds: { type: array, items: { type: integer }, description: '授权节点组 ID' }
+                      menus: { type: array, items: { type: string }, description: 菜单树 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/menus:
+    delete:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 删除菜单
+      operationId: deleteStaffRoleApiInterfaceDeleteMenu
+      parameters:
+        -
+          name: id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: '菜单 ID'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '记录 ID' }
+                      deleted: { type: boolean, description: 是否已删除 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    get:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 菜单树
+      operationId: getStaffRoleApiInterfaceListMenus
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      list: { type: array, items: { type: object, properties: { id: { type: integer, description: '菜单 ID' }, appId: { type: integer, description: '应用 ID' }, name: { type: string, description: 菜单名称 }, parentPrefix: { type: string, description: 父路径 }, parentId: { type: integer, description: '父菜单 ID' }, uri: { type: string, description: URI }, code: { type: string, description: 唯一标识 }, icon: { type: string, description: 图标 }, sort: { type: integer, description: 排序 }, status: { type: integer, description: 状态 }, children: { type: array, items: { type: object }, description: 子菜单 }, createdAt: { type: string, description: 创建时间 } } }, description: 菜单树 }
+                      total: { type: integer, description: 总条数 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    post:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 创建菜单
+      operationId: postStaffRoleApiInterfaceCreateMenu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: 菜单名称
+                code:
+                  type: string
+                  description: 唯一标识
+                uri:
+                  type: string
+                  description: '页面 URI'
+                icon:
+                  type: string
+                  description: '图标 class'
+                parentId:
+                  type: integer
+                  description: '父菜单 ID，0 为顶级'
+                sort:
+                  type: integer
+                  description: 排序，越大越靠前
+                status:
+                  type: integer
+                  description: 状态：1=启用，0=禁用
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '菜单 ID' }
+                      appId: { type: integer, description: '应用 ID' }
+                      name: { type: string, description: 菜单名称 }
+                      parentPrefix: { type: string, description: 父路径 }
+                      parentId: { type: integer, description: '父菜单 ID' }
+                      uri: { type: string, description: URI }
+                      code: { type: string, description: 唯一标识 }
+                      icon: { type: string, description: 图标 }
+                      sort: { type: integer, description: 排序 }
+                      status: { type: integer, description: 状态 }
+                      children: { type: array, items: { type: object }, description: 子菜单 }
+                      createdAt: { type: string, description: 创建时间 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    put:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 更新菜单
+      operationId: putStaffRoleApiInterfaceUpdateMenu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '菜单 ID'
+                name:
+                  type: string
+                  description: 菜单名称
+                code:
+                  type: string
+                  description: 唯一标识
+                uri:
+                  type: string
+                  description: '页面 URI'
+                icon:
+                  type: string
+                  description: '图标 class'
+                parentId:
+                  type: integer
+                  description: '父菜单 ID，0 为顶级'
+                sort:
+                  type: integer
+                  description: 排序，越大越靠前
+                status:
+                  type: integer
+                  description: 状态：1=启用，0=禁用
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '菜单 ID' }
+                      appId: { type: integer, description: '应用 ID' }
+                      name: { type: string, description: 菜单名称 }
+                      parentPrefix: { type: string, description: 父路径 }
+                      parentId: { type: integer, description: '父菜单 ID' }
+                      uri: { type: string, description: URI }
+                      code: { type: string, description: 唯一标识 }
+                      icon: { type: string, description: 图标 }
+                      sort: { type: integer, description: 排序 }
+                      status: { type: integer, description: 状态 }
+                      children: { type: array, items: { type: object }, description: 子菜单 }
+                      createdAt: { type: string, description: 创建时间 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/menus/detail:
+    get:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 菜单详情
+      operationId: getStaffRoleApiInterfaceGetMenu
+      parameters:
+        -
+          name: id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: '菜单 ID'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '菜单 ID' }
+                      appId: { type: integer, description: '应用 ID' }
+                      name: { type: string, description: 菜单名称 }
+                      parentPrefix: { type: string, description: 父路径 }
+                      parentId: { type: integer, description: '父菜单 ID' }
+                      uri: { type: string, description: URI }
+                      code: { type: string, description: 唯一标识 }
+                      icon: { type: string, description: 图标 }
+                      sort: { type: integer, description: 排序 }
+                      status: { type: integer, description: 状态 }
+                      children: { type: array, items: { type: object }, description: 子菜单 }
+                      createdAt: { type: string, description: 创建时间 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/menus/sort:
+    post:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 同级菜单排序
+      operationId: postStaffRoleApiInterfaceSortMenus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                parentId:
+                  type: integer
+                  description: '父菜单 ID，0 表示顶级分组'
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: '同级菜单 ID，按展示顺序排列'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      parentId: { type: integer, description: '父菜单 ID' }
+                      ids: { type: array, items: { type: integer }, description: '已保存的菜单 ID 顺序' }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/menus/status:
+    post:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 启用或禁用菜单
+      operationId: postStaffRoleApiInterfaceSwitchMenuStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '菜单 ID'
+                status:
+                  type: integer
+                  description: 状态：1=启用，0=禁用
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '记录 ID' }
+                      status: { type: integer, description: 更新后的状态 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/roles:
+    delete:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 删除角色
+      operationId: deleteStaffRoleApiInterfaceDeleteRole
+      parameters:
+        -
+          name: id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: '角色 ID'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '记录 ID' }
+                      deleted: { type: boolean, description: 是否已删除 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    get:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 分页查询角色
+      operationId: getStaffRoleApiInterfaceListRoles
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+                      list: { type: array, items: { type: object, properties: { id: { type: integer, description: '角色 ID' }, name: { type: string, description: 角色名称 }, code: { type: string, description: 唯一标识 }, desc: { type: string, description: 描述 }, isSuperRole: { type: boolean, description: 是否超管 }, isSystemRole: { type: boolean, description: 是否系统内置角色 }, status: { type: integer, description: 状态 }, userCount: { type: integer, description: 关联用户数 }, menuCount: { type: integer, description: 菜单权限数 }, pageIds: { type: array, items: { type: integer } }, apiPerIds: { type: array, items: { type: integer } }, taskPerIds: { type: array, items: { type: integer } }, createdAt: { type: string, description: 创建时间 }, updatedAt: { type: string, description: 更新时间 }, menus: { type: array, items: { type: string }, description: 菜单树（详情） }, apiPermissions: { type: array, items: { type: string }, description: 'API 权限目录（详情）' }, taskPermissions: { type: array, items: { type: string }, description: 任务权限目录（详情） } } } }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    post:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 创建角色
+      operationId: postStaffRoleApiInterfaceCreateRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: 角色名称
+                code:
+                  type: string
+                  description: 唯一标识
+                desc:
+                  type: string
+                  description: 角色描述
+                status:
+                  type: integer
+                  description: 状态：1=启用，0=禁用
+                isSuperRole:
+                  type: integer
+                  description: 是否超级管理员：1=是，0=否
+                pageIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '菜单页面 ID 列表'
+                apiPerIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: 'API 权限 ID 列表（type=1）'
+                taskPerIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '任务接口权限 ID 列表（type=2）'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '角色 ID' }
+                      name: { type: string, description: 角色名称 }
+                      code: { type: string, description: 唯一标识 }
+                      desc: { type: string, description: 描述 }
+                      isSuperRole: { type: boolean, description: 是否超管 }
+                      isSystemRole: { type: boolean, description: 是否系统内置角色 }
+                      status: { type: integer, description: 状态 }
+                      userCount: { type: integer, description: 关联用户数 }
+                      menuCount: { type: integer, description: 菜单权限数 }
+                      pageIds: { type: array, items: { type: integer } }
+                      apiPerIds: { type: array, items: { type: integer } }
+                      taskPerIds: { type: array, items: { type: integer } }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                      menus: { type: array, items: { type: string }, description: 菜单树（详情） }
+                      apiPermissions: { type: array, items: { type: string }, description: 'API 权限目录（详情）' }
+                      taskPermissions: { type: array, items: { type: string }, description: 任务权限目录（详情） }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    put:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 更新角色
+      operationId: putStaffRoleApiInterfaceUpdateRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '角色 ID'
+                name:
+                  type: string
+                  description: 角色名称
+                code:
+                  type: string
+                  description: 唯一标识
+                desc:
+                  type: string
+                  description: 角色描述
+                status:
+                  type: integer
+                  description: 状态：1=启用，0=禁用
+                isSuperRole:
+                  type: integer
+                  description: 是否超级管理员：1=是，0=否
+                pageIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '菜单页面 ID 列表'
+                apiPerIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: 'API 权限 ID 列表（type=1）'
+                taskPerIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '任务接口权限 ID 列表（type=2）'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '角色 ID' }
+                      name: { type: string, description: 角色名称 }
+                      code: { type: string, description: 唯一标识 }
+                      desc: { type: string, description: 描述 }
+                      isSuperRole: { type: boolean, description: 是否超管 }
+                      isSystemRole: { type: boolean, description: 是否系统内置角色 }
+                      status: { type: integer, description: 状态 }
+                      userCount: { type: integer, description: 关联用户数 }
+                      menuCount: { type: integer, description: 菜单权限数 }
+                      pageIds: { type: array, items: { type: integer } }
+                      apiPerIds: { type: array, items: { type: integer } }
+                      taskPerIds: { type: array, items: { type: integer } }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                      menus: { type: array, items: { type: string }, description: 菜单树（详情） }
+                      apiPermissions: { type: array, items: { type: string }, description: 'API 权限目录（详情）' }
+                      taskPermissions: { type: array, items: { type: string }, description: 任务权限目录（详情） }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/roles/detail:
+    get:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 角色详情
+      operationId: getStaffRoleApiInterfaceGetRole
+      parameters:
+        -
+          name: id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: '角色 ID'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '角色 ID' }
+                      name: { type: string, description: 角色名称 }
+                      code: { type: string, description: 唯一标识 }
+                      desc: { type: string, description: 描述 }
+                      isSuperRole: { type: boolean, description: 是否超管 }
+                      isSystemRole: { type: boolean, description: 是否系统内置角色 }
+                      status: { type: integer, description: 状态 }
+                      userCount: { type: integer, description: 关联用户数 }
+                      menuCount: { type: integer, description: 菜单权限数 }
+                      pageIds: { type: array, items: { type: integer } }
+                      apiPerIds: { type: array, items: { type: integer } }
+                      taskPerIds: { type: array, items: { type: integer } }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                      menus: { type: array, items: { type: string }, description: 菜单树（详情） }
+                      apiPermissions: { type: array, items: { type: string }, description: 'API 权限目录（详情）' }
+                      taskPermissions: { type: array, items: { type: string }, description: 任务权限目录（详情） }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/roles/options:
+    get:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 角色下拉选项
+      operationId: getStaffRoleApiInterfaceListRoleOptions
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      list: { type: array, items: { type: object, properties: { id: { type: integer, description: '角色 ID' }, name: { type: string, description: 角色名称 }, code: { type: string, description: 唯一标识 }, isSuper: { type: boolean, description: 是否超管角色 } } }, description: 角色下拉选项 }
+                      total: { type: integer, description: 总条数 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/roles/pages:
+    post:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 配置角色菜单页面权限
+      operationId: postStaffRoleApiInterfaceGrantRolePages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '角色 ID'
+                pageIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '菜单页面 ID 列表'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '角色 ID' }
+                      name: { type: string, description: 角色名称 }
+                      code: { type: string, description: 唯一标识 }
+                      desc: { type: string, description: 描述 }
+                      isSuperRole: { type: boolean, description: 是否超管 }
+                      isSystemRole: { type: boolean, description: 是否系统内置角色 }
+                      status: { type: integer, description: 状态 }
+                      userCount: { type: integer, description: 关联用户数 }
+                      menuCount: { type: integer, description: 菜单权限数 }
+                      pageIds: { type: array, items: { type: integer } }
+                      apiPerIds: { type: array, items: { type: integer } }
+                      taskPerIds: { type: array, items: { type: integer } }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                      menus: { type: array, items: { type: string }, description: 菜单树（详情） }
+                      apiPermissions: { type: array, items: { type: string }, description: 'API 权限目录（详情）' }
+                      taskPermissions: { type: array, items: { type: string }, description: 任务权限目录（详情） }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/roles/stats:
+    get:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 角色统计
+      operationId: getStaffRoleApiInterfaceRoleStats
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      total: { type: integer, description: 角色总数 }
+                      enabled: { type: integer, description: 启用数 }
+                      disabled: { type: integer, description: 禁用数 }
+                      super: { type: integer, description: 超管角色数 }
+                      userCount: { type: integer, description: 已分配角色的用户数 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/roles/status:
+    post:
+      tags:
+        - 权限组（角色）与菜单管理。
+      summary: 启用或禁用角色
+      operationId: postStaffRoleApiInterfaceSwitchStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '角色 ID'
+                status:
+                  type: integer
+                  description: 状态：1=启用，0=禁用
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '记录 ID' }
+                      status: { type: integer, description: 更新后的状态 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/users:
+    delete:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 删除用户
+      operationId: deleteStaffUserApiInterfaceDeleteUser
+      parameters:
+        -
+          name: id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: '用户 ID'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '记录 ID' }
+                      deleted: { type: boolean, description: 是否已删除 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    get:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 分页查询用户
+      operationId: getStaffUserApiInterfaceListUsers
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+                      list: { type: array, items: { type: object, properties: { id: { type: integer, description: '用户 ID' }, account: { type: string, description: 账号 }, email: { type: string, description: 邮箱，账号非邮箱时为空 }, userName: { type: string, description: 用户名称 }, status: { type: integer, description: 1=正常，0=已禁用 }, roles: { type: array, items: { type: string }, description: 角色列表 }, roleIds: { type: array, items: { type: integer }, description: '角色 ID' }, nodeGroupIds: { type: array, items: { type: integer }, description: '节点组 ID' }, nodeGroups: { type: array, items: { type: string }, description: 授权节点组 }, isSuper: { type: boolean, description: 是否超级管理员 }, createdAt: { type: string, description: 创建时间 }, updatedAt: { type: string, description: 更新时间 } } } }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    post:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 创建用户
+      operationId: postStaffUserApiInterfaceCreateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                account:
+                  type: string
+                  description: '账号：合法邮箱将同时写入 email；含 @ 但格式不对则拒绝'
+                email:
+                  type: string
+                  nullable: true
+                  description: 邮箱，可选；账号为邮箱时以后端同步值为准
+                userName:
+                  type: string
+                  description: 用户名称
+                password:
+                  type: string
+                  description: 密码
+                roleIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '角色 ID 列表'
+                nodeGroupIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '授权节点组 ID 列表，空表示不限制'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      account: { type: string, description: 账号 }
+                      email: { type: string, description: 邮箱，账号非邮箱时为空 }
+                      userName: { type: string, description: 用户名称 }
+                      status: { type: integer, description: 1=正常，0=已禁用 }
+                      roles: { type: array, items: { type: string }, description: 角色列表 }
+                      roleIds: { type: array, items: { type: integer }, description: '角色 ID' }
+                      nodeGroupIds: { type: array, items: { type: integer }, description: '节点组 ID' }
+                      nodeGroups: { type: array, items: { type: string }, description: 授权节点组 }
+                      isSuper: { type: boolean, description: 是否超级管理员 }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+    put:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 更新用户
+      operationId: putStaffUserApiInterfaceUpdateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '用户 ID'
+                account:
+                  type: string
+                  description: 账号（建议邮箱）
+                email:
+                  type: string
+                  nullable: true
+                  description: 邮箱，可选；账号为邮箱时以后端同步值为准
+                userName:
+                  type: string
+                  description: 用户名称
+                password:
+                  type: string
+                  description: 新密码，空则不改
+                roleIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '角色 ID 列表'
+                nodeGroupIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '授权节点组 ID 列表'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      account: { type: string, description: 账号 }
+                      email: { type: string, description: 邮箱，账号非邮箱时为空 }
+                      userName: { type: string, description: 用户名称 }
+                      status: { type: integer, description: 1=正常，0=已禁用 }
+                      roles: { type: array, items: { type: string }, description: 角色列表 }
+                      roleIds: { type: array, items: { type: integer }, description: '角色 ID' }
+                      nodeGroupIds: { type: array, items: { type: integer }, description: '节点组 ID' }
+                      nodeGroups: { type: array, items: { type: string }, description: 授权节点组 }
+                      isSuper: { type: boolean, description: 是否超级管理员 }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/users/by-node-group:
+    get:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 按节点分组查询可授权用户
+      operationId: getStaffUserApiInterfaceListUsersByNodeGroup
+      parameters:
+        -
+          name: nodeGroupId
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: '节点分组 ID'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      list: { type: array, items: { type: object, properties: { id: { type: integer, description: '用户 ID' }, account: { type: string, description: 账号 }, userName: { type: string, description: 用户名称 } } }, description: 用户简要列表 }
+                      total: { type: integer, description: 总条数 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/users/detail:
+    get:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 用户详情
+      operationId: getStaffUserApiInterfaceGetUser
+      parameters:
+        -
+          name: id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: '用户 ID'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      account: { type: string, description: 账号 }
+                      email: { type: string, description: 邮箱，账号非邮箱时为空 }
+                      userName: { type: string, description: 用户名称 }
+                      status: { type: integer, description: 1=正常，0=已禁用 }
+                      roles: { type: array, items: { type: string }, description: 角色列表 }
+                      roleIds: { type: array, items: { type: integer }, description: '角色 ID' }
+                      nodeGroupIds: { type: array, items: { type: integer }, description: '节点组 ID' }
+                      nodeGroups: { type: array, items: { type: string }, description: 授权节点组 }
+                      isSuper: { type: boolean, description: 是否超级管理员 }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/users/generate-reset-password:
+    post:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 生成临时重置密码
+      operationId: postStaffUserApiInterfaceGenerateResetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  description: '目标用户 ID'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      userId: { type: integer, description: '目标用户 ID' }
+                      password: { type: string, description: '32 位临时重置密码' }
+                      expiresAt: { type: string, description: 过期时间 }
+                      email: { type: string, description: 用户邮箱，未绑定为空 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/users/node-groups:
+    post:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 授权用户节点组
+      operationId: postStaffUserApiInterfaceGrantNodeGroups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '用户 ID'
+                nodeGroupIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '授权节点组 ID 列表'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      account: { type: string, description: 账号 }
+                      email: { type: string, description: 邮箱，账号非邮箱时为空 }
+                      userName: { type: string, description: 用户名称 }
+                      status: { type: integer, description: 1=正常，0=已禁用 }
+                      roles: { type: array, items: { type: string }, description: 角色列表 }
+                      roleIds: { type: array, items: { type: integer }, description: '角色 ID' }
+                      nodeGroupIds: { type: array, items: { type: integer }, description: '节点组 ID' }
+                      nodeGroups: { type: array, items: { type: string }, description: 授权节点组 }
+                      isSuper: { type: boolean, description: 是否超级管理员 }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/users/reset-password:
+    post:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 超级管理员重置用户密码
+      operationId: postStaffUserApiInterfaceResetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '目标用户 ID'
+                password:
+                  type: string
+                  description: 已生成的临时重置密码
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      changed: { type: boolean, description: 密码是否已更新 }
+                      mailSent: { type: boolean, description: 是否已发邮件 }
+                      email: { type: string, description: 接收邮箱 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/users/roles:
+    post:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 分配用户角色
+      operationId: postStaffUserApiInterfaceGrantRoles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '用户 ID'
+                roleIds:
+                  type: array
+                  items:
+                    type: integer
+                  description: '角色 ID 列表'
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '用户 ID' }
+                      account: { type: string, description: 账号 }
+                      email: { type: string, description: 邮箱，账号非邮箱时为空 }
+                      userName: { type: string, description: 用户名称 }
+                      status: { type: integer, description: 1=正常，0=已禁用 }
+                      roles: { type: array, items: { type: string }, description: 角色列表 }
+                      roleIds: { type: array, items: { type: integer }, description: '角色 ID' }
+                      nodeGroupIds: { type: array, items: { type: integer }, description: '节点组 ID' }
+                      nodeGroups: { type: array, items: { type: string }, description: 授权节点组 }
+                      isSuper: { type: boolean, description: 是否超级管理员 }
+                      createdAt: { type: string, description: 创建时间 }
+                      updatedAt: { type: string, description: 更新时间 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+  /api/v1/users/status:
+    post:
+      tags:
+        - '用户管理 —— Request ↔ DTO / Response 映射，业务在 {'
+      summary: 启用或禁用用户
+      operationId: postStaffUserApiInterfaceSwitchStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  description: '用户 ID'
+                status:
+                  type: integer
+                  description: 状态：1=启用，0=禁用
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      id: { type: integer, description: '记录 ID' }
+                      status: { type: integer, description: 更新后的状态 }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data

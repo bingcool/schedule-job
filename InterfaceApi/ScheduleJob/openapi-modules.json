@@ -1,0 +1,10 @@
+{
+  "Cron": {
+    "title": "schedule-job · Cron",
+    "description": "定时任务、节点、Agent 与机器人告警 API"
+  },
+  "Staff": {
+    "title": "schedule-job · Staff",
+    "description": "后台用户、角色、菜单与认证 API"
+  }
+}

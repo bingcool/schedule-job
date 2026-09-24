@@ -16,10 +16,10 @@ final class ConsoleReporter
         $this->color = function_exists('stream_isatty') && @stream_isatty(STDOUT);
     }
 
-    public function banner(): void
+    public function banner(string $title = 'InterfaceApi Client Generator'): void
     {
         $this->out('');
-        $this->out($this->style('InterfaceApi Client Generator', 'bold'));
+        $this->out($this->style($title, 'bold'));
         $this->out($this->style(str_repeat('─', 42), 'dim'));
     }
 
@@ -63,12 +63,17 @@ final class ConsoleReporter
         $this->out('  ' . $this->style('✗', 'red') . ' ' . $message);
     }
 
-    public function summary(float $seconds, int $writtenCount, int $skippedCount, int $removedStale): void
-    {
+    public function summary(
+        float $seconds,
+        int $writtenCount,
+        int $skippedCount,
+        int $removedStale,
+        string $writtenLabel = 'client(s) written',
+    ): void {
         $this->out('');
         $this->out($this->style(str_repeat('─', 42), 'dim'));
         $time = number_format($seconds, 2);
-        $tail = [(string) $writtenCount . ' client(s) written'];
+        $tail = [(string) $writtenCount . ' ' . $writtenLabel];
         if ($skippedCount > 0) {
             $tail[] = $skippedCount . ' skipped';
         }
