@@ -12,9 +12,9 @@ final class CronTaskOperationLogRowMapper
     /**
          * @param array<string, mixed> $row
          */
-        public static function fromEntityRow(array $row): \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronTaskOperationLogRowDto
+        public static function fromEntityRow(array $row): CronTaskOperationLogRowDto
         {
-            $dto = new \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronTaskOperationLogRowDto();
+            $dto = new CronTaskOperationLogRowDto();
             $actionType = (int) ($row['action_type'] ?? $row['actionType'] ?? 0);
             $dto->setId((int) ($row['id'] ?? 0));
             $dto->setCronId((int) ($row['cron_id'] ?? $row['cronId'] ?? 0));

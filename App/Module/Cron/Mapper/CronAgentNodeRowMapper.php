@@ -14,9 +14,9 @@ final class CronAgentNodeRowMapper
          *
          * @param array<string, mixed> $row cron_agent_node 查询行或实体 getAttributes() 结果
          */
-        public static function fromEntityRow(array $row): \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronAgentNodeRowDto
+        public static function fromEntityRow(array $row): CronAgentNodeRowDto
         {
-            $dto = new \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronAgentNodeRowDto();
+            $dto = new CronAgentNodeRowDto();
             $dto->setId((int)($row['id'] ?? 0));
             $dto->setNodeName((string)($row['node_name'] ?? ''));
             $dto->setNodeIp((string)($row['node_ip'] ?? ''));

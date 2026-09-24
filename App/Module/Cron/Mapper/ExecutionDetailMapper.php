@@ -12,9 +12,9 @@ final class ExecutionDetailMapper
     /**
          * @param array<string, mixed> $row
          */
-        public static function fromLogRow(array $row): \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\ExecutionDetailDto
+        public static function fromLogRow(array $row): ExecutionDetailDto
         {
-            $dto = new \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\ExecutionDetailDto();
+            $dto = new ExecutionDetailDto();
             $dto->id = (int) (self::pick($row, 'id') ?? 0);
             $dto->taskId = (int) (self::pick($row, 'cron_id', 'cronId') ?? 0);
             $dto->execBatchId = (string) (self::pick($row, 'exec_batch_id', 'execBatchId') ?? '');

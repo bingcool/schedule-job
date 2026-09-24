@@ -16,9 +16,9 @@ final class CronTaskLogRowMapper
          *
          * @param array<string, mixed> $row cron_task_log 查询行
          */
-        public static function fromEntityRow(array $row): \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronTaskLogRowDto
+        public static function fromEntityRow(array $row): CronTaskLogRowDto
         {
-            $dto = new \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronTaskLogRowDto();
+            $dto = new CronTaskLogRowDto();
             $dto->setId((int)($row['id'] ?? 0));
             $dto->setCronId((int)($row['cron_id'] ?? 0));
             $dto->setTaskName((string)($row['task_name'] ?? $row['cron_name'] ?? ''));

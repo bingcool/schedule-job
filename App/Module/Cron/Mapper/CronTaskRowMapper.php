@@ -20,9 +20,9 @@ final class CronTaskRowMapper
          * @param array<string, mixed> $row cron_task 查询行或实体 getAttributes() 结果
          * @param int|null $now 推算基准 unix 秒；空则 time()。单测可注入以对齐网格
          */
-        public static function fromEntityRow(array $row, ?int $now = null): \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronTaskRowDto
+        public static function fromEntityRow(array $row, ?int $now = null): CronTaskRowDto
         {
-            $dto = new \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronTaskRowDto();
+            $dto = new CronTaskRowDto();
             $dto->setId((int)($row['id'] ?? 0));
             $dto->setNodeId((int) self::pick($row, 'node_id', 'nodeId', 0));
             $dto->setNodeName((string) self::pick($row, 'node_name', 'nodeName', ''));

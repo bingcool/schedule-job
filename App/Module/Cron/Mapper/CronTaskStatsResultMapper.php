@@ -14,11 +14,11 @@ final class CronTaskStatsResultMapper
          *
          * @param array<string, mixed> $stats {@see ExecutionStatus::aggregateCounts()}
          */
-        public static function fromAggregated(int $taskId, array $stats): \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronTaskStatsResultDto
+        public static function fromAggregated(int $taskId, array $stats): CronTaskStatsResultDto
         {
             $empty = ExecutionStatus::emptyCounts();
             $stats = array_merge($empty, $stats);
-            $dto = new \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronTaskStatsResultDto();
+            $dto = new CronTaskStatsResultDto();
             $dto->taskId = $taskId;
             $dto->total = (int) $stats['total'];
             $dto->register = (int) $stats['register'];

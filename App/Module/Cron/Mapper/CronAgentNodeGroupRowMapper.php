@@ -11,9 +11,9 @@ final class CronAgentNodeGroupRowMapper
     /**
          * @param array<string, mixed> $row cron_agent_node_group 查询行或实体 getAttributes() 结果
          */
-        public static function fromEntityRow(array $row): \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronAgentNodeGroupRowDto
+        public static function fromEntityRow(array $row): CronAgentNodeGroupRowDto
         {
-            $dto = new \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronAgentNodeGroupRowDto();
+            $dto = new CronAgentNodeGroupRowDto();
             $id = (int)($row['id'] ?? 0);
             $dto->setId($id);
             $dto->setGroupId($id);

@@ -11,9 +11,9 @@ final class CronRobotRowMapper
     /**
          * @param array<string, mixed> $row
          */
-        public static function fromEntityRow(array $row): \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotRowDto
+        public static function fromEntityRow(array $row): CronRobotRowDto
         {
-            $dto = new \InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotRowDto();
+            $dto = new CronRobotRowDto();
             $dto->setId((int) ($row['id'] ?? 0));
             $dto->setName((string) ($row['name'] ?? ''));
             $dto->setPlatform((int) ($row['platform'] ?? 0));
