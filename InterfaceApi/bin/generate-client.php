@@ -8,7 +8,7 @@ declare(strict_types=1);
  * 每个带 #[RouteGroup] 且含 API 方法的 Interface 生成一个 Client（XxxApiInterface → XxxApi）。
  *
  * 用法（在 schedule-job 仓库根目录）：
- *   php InterfaceApi/bin/generate-client.php --service=ScheduleJob/App
+ *   php bin/generate-client.php --service=ScheduleJob/App
  */
 
 $binDir = __DIR__;
