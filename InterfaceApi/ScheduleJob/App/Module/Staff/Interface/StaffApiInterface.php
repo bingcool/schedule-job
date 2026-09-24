@@ -8,8 +8,8 @@ use InterfaceApi\Support\ApiController;
 use InterfaceApi\Support\RouteGroup;
 
 /**
- * Staff 模块 HTTP 契约汇总（生成 Client 时合并 {@see StaffAuthApiInterface}、
- * {@see StaffUserApiInterface}、{@see StaffRoleApiInterface}，因方法名可能冲突不做 PHP extends）。
+ * Staff 模块 HTTP 契约汇总（无方法；Client 按 {@see StaffAuthApiInterface}、
+ * {@see StaffUserApiInterface}、{@see StaffRoleApiInterface} 分别生成）。
  *
  * 字段说明见 DTO 上的 {@see \InterfaceApi\Support\ApiProperty}。
  */

@@ -8,7 +8,7 @@ use InterfaceApi\Support\ApiController;
 use InterfaceApi\Support\RouteGroup;
 
 /**
- * Cron 模块 HTTP 契约汇总（生成 Client 时可扫描本接口以包含全部路由）。
+ * Cron 模块 HTTP 契约汇总（extends 子接口；生成 `CronApi` Client 含全部路由，子接口另各有 Client）。
  *
  * 各 {@see CronTaskManagerApiInterface}、{@see CronRobotApiInterface} 由对应 Controller 实现。
  * 字段级说明见各 Request / Response / DTO 上的 {@see \InterfaceApi\Support\ApiProperty}。

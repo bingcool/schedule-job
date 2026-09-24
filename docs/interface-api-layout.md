@@ -6,7 +6,8 @@
 
 | 路径 | 命名空间 |
 |---|---|
-| `InterfaceApi/Support/` | `InterfaceApi\Support\`（注解、BaseRequest/Response、Client 基类） |
+| `InterfaceApi/bin/` | CLI（如 `generate-client.php`） |
+| `InterfaceApi/Support/` | `InterfaceApi\Support\`（注解、BaseRequest/Response、Client 基类、`Generator\` 引用检查与 Client 生成） |
 | `InterfaceApi/ScheduleJob/App/Module/Common/` | `InterfaceApi\ScheduleJob\App\Module\Common\` |
 | `InterfaceApi/ScheduleJob/App/Module/Cron/` | Request / Response / Dto |
 | `InterfaceApi/ScheduleJob/App/Module/Staff/` | Request / Response / Dto |
@@ -21,7 +22,7 @@ Controller / Service 通过 `InterfaceApi\ScheduleJob\App\Module\...` 引用契�
 
 ## §2 引用边界检查
 
-swoolefy 仓库尚未提供 `bin/generate-client.php` 时，可在 schedule-job 根目录执行：
+生成器位于 `InterfaceApi/Support/Generator/`（`ReferenceChecker`、`ClientGenerator`、`ClientWriter`）。
 
 ```bash
 php scripts/interface_api_reference_check.php
@@ -43,10 +44,10 @@ python3 scripts/migrate_interface_api_contracts.py
 
 | 模块 | 汇总接口 | 子接口（与 Controller 一一对应） |
 |---|---|---|
-| Cron | `InterfaceApi\ScheduleJob\App\Module\Cron\Interface\CronApiInterface` | `CronTaskManagerApiInterface`、`CronRobotApiInterface` |
-| Staff | `StaffApiInterface`（文档汇总，无 extends） | `StaffAuthApiInterface`、`StaffUserApiInterface`、`StaffRoleApiInterface` → Client：`StaffAuthApi`、`StaffUserApi`、`StaffRoleApi`（方法名冲突如 `switchStatus` 不可合并为单 Client） |
+| Cron | `CronApiInterface`（extends 子接口，Client：`CronApi`） | `CronTaskManagerApiInterface` → `CronTaskManagerApi`，`CronRobotApiInterface` → `CronRobotApi` |
+| Staff | `StaffApiInterface`（文档汇总，无方法） | `StaffAuthApiInterface`、`StaffUserApiInterface`、`StaffRoleApiInterface` → 各生成 `StaffAuthApi`、`StaffUserApi`、`StaffRoleApi` |
 
-路径：`InterfaceApi/ScheduleJob/App/Module/{Cron|Staff}/Interface/`。路由与 `App/Router/Module/*.php` 对齐，方法上标注 `#[Route]` / 接口上 `#[RouteGroup(prefix: '/api/v1', ...)]`。
+路径：契约接口 `InterfaceApi/ScheduleJob/App/Module/{Cron|Staff}/Interface/`；生成 Client `…/Module/{Cron|Staff}/Client/`（命名空间 `…\Module\{Cron|Staff}\Client`）。路由与 `App/Router/Module/*.php` 对齐，方法上标注 `#[Route]` / 接口上 `#[RouteGroup(prefix: '/api/v1', ...)]`。
 
 Controller 实现对应子接口，例如 `CronTaskManagerController implements CronTaskManagerApiInterface`。
 
@@ -58,14 +59,14 @@ Controller 实现对应子接口，例如 `CronTaskManagerController implements 
 python3 scripts/generate_api_interfaces.py
 ```
 
-生成 HTTP Client（默认模块级：`CronApi` + 三个 Staff Client；`--all` 含各子接口 Client）：
+生成 HTTP Client（**一个 `*ApiInterface` 对应一个 `*Api` Client**；无 API 方法的汇总接口如 `StaffApiInterface` 会跳过）：
 
 ```bash
-php bin/generate-client.php
-php bin/generate-client.php --all
+php InterfaceApi/bin/generate-client.php --service=ScheduleJob/App
 ```
+
+`--service` 为 `InterfaceApi/` 下相对路径，须以 `App` 结尾（如 `ScheduleJob/App`）；校验 `App` 目录存在后仅扫描其下 `Module/`。
 
 ## 后续
 
 - Controller 与契约方法签名保持一致；变更路由后重跑上述脚本。
-- 在 InterfaceApi 包根执行 Client 生成前，需清理契约中对 `App\Module\Entity` 等非 InterfaceApi 引用（或下沉到 Service 组装）。

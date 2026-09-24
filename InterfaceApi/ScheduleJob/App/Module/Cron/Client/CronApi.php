@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // @generated
 
-namespace InterfaceApi\ScheduleJob\App\Module\Cron\Interface\Client;
+namespace InterfaceApi\ScheduleJob\App\Module\Cron\Client;
 
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotCreateRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotIdRequest;

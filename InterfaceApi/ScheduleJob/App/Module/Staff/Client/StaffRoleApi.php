@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // @generated
 
-namespace InterfaceApi\ScheduleJob\App\Module\Staff\Interface\Client;
+namespace InterfaceApi\ScheduleJob\App\Module\Staff\Client;
 
 use InterfaceApi\ScheduleJob\App\Module\Staff\Request\StaffManager\ListRolesRequest;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Request\StaffManager\StaffMenuCreateRequest;
