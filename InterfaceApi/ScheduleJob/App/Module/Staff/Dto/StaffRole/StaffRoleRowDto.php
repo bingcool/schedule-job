@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole;
 
-use InterfaceApi\ScheduleJob\App\Module\Staff\StaffRoleCode;
 use InterfaceApi\Support\ApiProperty;
 use InterfaceApi\Support\AbstractDto;
 
@@ -76,38 +75,7 @@ class StaffRoleRowDto extends AbstractDto
     #[ApiProperty(description: '任务权限目录（详情）')]
     protected array $taskPermissions = [];
 
-    /**
-     * @param array<string, mixed> $row
-     */
-    public static function fromEntityRow(array $row): self
-    {
-        $dto = new self();
-        $dto->id = (int) ($row['id'] ?? 0);
-        $dto->name = (string) ($row['name'] ?? '');
-        $dto->code = (string) ($row['code'] ?? '');
-        $dto->desc = (string) ($row['desc'] ?? '');
-        $dto->isSuperRole = (int) ($row['is_super_role'] ?? $row['isSuperRole'] ?? 0) === 1;
-        $dto->isSystemRole = StaffRoleCode::isSystem($dto->code);
-        $dto->status = (int) ($row['status'] ?? 1);
-        $dto->userCount = (int) ($row['user_count'] ?? $row['userCount'] ?? 0);
-        $dto->menuCount = (int) ($row['menu_count'] ?? $row['menuCount'] ?? 0);
-        $dto->pageIds = array_values(array_map('intval', $row['page_ids'] ?? $row['pageIds'] ?? []));
-        $dto->apiPerIds = array_values(array_map('intval', $row['api_per_ids'] ?? $row['apiPerIds'] ?? []));
-        $dto->taskPerIds = array_values(array_map('intval', $row['task_per_ids'] ?? $row['taskPerIds'] ?? []));
-        $dto->createdAt = (string) ($row['created_at'] ?? $row['createdAt'] ?? '');
-        $dto->updatedAt = (string) ($row['updated_at'] ?? $row['updatedAt'] ?? '');
-        if (isset($row['menus']) && is_array($row['menus'])) {
-            $dto->menus = $row['menus'];
-        }
-        if (isset($row['apiPermissions']) && is_array($row['apiPermissions'])) {
-            $dto->apiPermissions = $row['apiPermissions'];
-        }
-        if (isset($row['taskPermissions']) && is_array($row['taskPermissions'])) {
-            $dto->taskPermissions = $row['taskPermissions'];
-        }
-
-        return $dto;
-    }
+    
 
     /**
      * @param array<int, array<string, mixed>> $menus

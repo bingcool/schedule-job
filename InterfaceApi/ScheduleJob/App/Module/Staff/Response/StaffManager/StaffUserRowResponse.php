@@ -14,11 +14,9 @@ class StaffUserRowResponse extends BaseResponse
     #[ApiProperty(description: '用户详情 data')]
     protected StaffUserRowDto $data;
 
-    public function __construct(StaffUserRowDto|array $attributes)
+    public function __construct(StaffUserRowDto $data)
     {
-        $this->data = $attributes instanceof StaffUserRowDto
-            ? $attributes
-            : StaffUserRowDto::fromEntityRow($attributes);
+        $this->data = $data;
     }
 
     public function getData(): StaffUserRowDto

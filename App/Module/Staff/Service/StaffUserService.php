@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Staff\Service;
 
 use App\Module\Cron\Repository\CronAgentNodeGroupRepository;
+use App\Module\Staff\Assembler\StaffContractDtoAssembler;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffUser\CreateUserDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffUser\GeneratedResetPasswordDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffUser\GrantUserNodeGroupsDto;
@@ -117,7 +118,7 @@ class StaffUserService
                 $this->nodeGroupsOfIdsAsDto($groupIds, $groupRows),
             );
             $row['is_super'] = $this->hasSuperRole($roles);
-            $pageResult->addListItem(StaffUserRowDto::fromEntityRow($row));
+            $pageResult->addListItem(StaffContractDtoAssembler::userRowFromEntityRow($row));
         }
 
         return $pageResult;
@@ -253,7 +254,7 @@ class StaffUserService
 
         $list = [];
         foreach ($users as $user) {
-            $list[] = StaffUserBriefDto::fromUserEntity($user);
+            $list[] = StaffContractDtoAssembler::userBriefFromEntity($user);
         }
 
         return $list;
@@ -666,7 +667,7 @@ class StaffUserService
         );
         $attrs['is_super'] = $this->hasSuperRole($roles);
 
-        return StaffUserRowDto::fromEntityRow($attrs);
+        return StaffContractDtoAssembler::userRowFromEntityRow($attrs);
     }
 
     /**
@@ -680,7 +681,7 @@ class StaffUserService
         $list = [];
         foreach ($groupIds as $groupId) {
             if (isset($map[$groupId])) {
-                $list[] = StaffNodeGroupBriefDto::fromSlice($map[$groupId]);
+                $list[] = StaffContractDtoAssembler::nodeGroupBriefFromSlice($map[$groupId]);
             }
         }
 

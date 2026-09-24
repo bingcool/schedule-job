@@ -57,29 +57,7 @@ class StaffUserRowDto extends AbstractDto
     #[ApiProperty(description: '更新时间')]
     protected string $updatedAt = '';
 
-    /**
-     * @param array<string, mixed> $row
-     */
-    public static function fromEntityRow(array $row): self
-    {
-        $dto = new self();
-        $dto->id = (int) ($row['id'] ?? 0);
-        $dto->account = (string) ($row['account'] ?? '');
-        $dto->email = (string) ($row['email'] ?? '');
-        $dto->userName = (string) ($row['user_name'] ?? $row['userName'] ?? '');
-        $dto->status = (int) ($row['status'] ?? 1) === 0 ? 0 : 1;
-        $dto->roles = is_array($row['roles'] ?? null) ? $row['roles'] : [];
-        $dto->roleIds = array_values(array_map('intval', $row['role_ids'] ?? $row['roleIds'] ?? []));
-        $dto->nodeGroupIds = array_values(array_map('intval', $row['node_group_ids'] ?? $row['nodeGroupIds'] ?? []));
-        $dto->nodeGroups = is_array($row['node_groups'] ?? $row['nodeGroups'] ?? null)
-            ? ($row['node_groups'] ?? $row['nodeGroups'] ?? [])
-            : [];
-        $dto->isSuper = (bool) ($row['is_super'] ?? $row['isSuper'] ?? false);
-        $dto->createdAt = (string) ($row['created_at'] ?? $row['createdAt'] ?? '');
-        $dto->updatedAt = (string) ($row['updated_at'] ?? $row['updatedAt'] ?? '');
-
-        return $dto;
-    }
+    
 
     public function getId(): int
     {

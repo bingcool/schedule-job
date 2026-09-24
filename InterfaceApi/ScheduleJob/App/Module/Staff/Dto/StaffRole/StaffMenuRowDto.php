@@ -48,26 +48,7 @@ class StaffMenuRowDto extends AbstractDto
     #[ApiProperty(description: '创建时间')]
     protected string $createdAt = '';
 
-    /**
-     * @param array<string, mixed> $row
-     */
-    public static function fromEntityRow(array $row): self
-    {
-        $dto = new self();
-        $dto->id = (int) ($row['id'] ?? 0);
-        $dto->appId = (int) ($row['app_id'] ?? $row['appId'] ?? 0);
-        $dto->name = (string) ($row['name'] ?? '');
-        $dto->parentPrefix = (string) ($row['parent_prefix'] ?? $row['parentPrefix'] ?? '');
-        $dto->parentId = (int) ($row['parent_id'] ?? $row['parentId'] ?? 0);
-        $dto->uri = (string) ($row['uri'] ?? '');
-        $dto->code = (string) ($row['code'] ?? '');
-        $dto->icon = (string) ($row['icon'] ?? '');
-        $dto->sort = (int) ($row['sort'] ?? 0);
-        $dto->status = (int) ($row['status'] ?? 1);
-        $dto->createdAt = (string) ($row['created_at'] ?? $row['createdAt'] ?? '');
-
-        return $dto;
-    }
+    
 
     public function getId(): int
     {

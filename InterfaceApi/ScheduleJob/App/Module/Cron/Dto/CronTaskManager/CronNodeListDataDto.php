@@ -47,15 +47,16 @@ class CronNodeListDataDto extends AbstractListDataDto
     }
 
     /**
-     * @param list<CronAgentNodeRowDto|array<string, mixed>> $items
+     * @param list<CronAgentNodeRowDto> $items
      */
     public static function fromItems(array $items): self
     {
         $dto = new self();
         foreach ($items as $item) {
-            $dto->addListItem($item instanceof CronAgentNodeRowDto
-                ? $item
-                : CronAgentNodeRowDto::fromEntityRow($item));
+            if (!$item instanceof CronAgentNodeRowDto) {
+                throw new InvalidArgumentException('list items must be instances of CronAgentNodeRowDto');
+            }
+            $dto->addListItem($item);
         }
         $dto->setTotal(count($dto->getList()));
 

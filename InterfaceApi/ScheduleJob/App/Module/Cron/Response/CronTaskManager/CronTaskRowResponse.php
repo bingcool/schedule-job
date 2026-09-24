@@ -14,11 +14,9 @@ class CronTaskRowResponse extends BaseResponse
     #[ApiProperty(description: '任务详情 data')]
     protected CronTaskRowDto $data;
 
-    public function __construct(CronTaskRowDto|array $attributes)
+    public function __construct(CronTaskRowDto $data)
     {
-        $this->data = $attributes instanceof CronTaskRowDto
-            ? $attributes
-            : CronTaskRowDto::fromEntityRow($attributes);
+        $this->data = $data;
     }
 
     public function getData(): CronTaskRowDto

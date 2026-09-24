@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot;
 
-use InterfaceApi\ScheduleJob\App\Module\Cron\Robot\RobotWebhookMask;
 use InterfaceApi\Support\ApiProperty;
 use InterfaceApi\Support\AbstractDto;
 
@@ -43,30 +42,7 @@ class CronRobotRowDto extends AbstractDto
     #[ApiProperty(description: '更新时间')]
     protected string $updatedAt = '';
 
-    /**
-     * @param array<string, mixed> $row
-     */
-    public static function fromEntityRow(array $row): self
-    {
-        $dto = new self();
-        $dto->setId((int) ($row['id'] ?? 0));
-        $dto->setName((string) ($row['name'] ?? ''));
-        $dto->setPlatform((int) ($row['platform'] ?? 0));
-        $masked = (string) ($row['webhook_url_masked'] ?? '');
-        if ($masked === '' && isset($row['webhook_url'])) {
-            $masked = RobotWebhookMask::maskUrl((string) $row['webhook_url']);
-        }
-        $dto->setWebhookUrl($masked);
-        $dto->setSecretConfigured(!empty($row['secret_configured']));
-        $dto->setStatus((int) ($row['status'] ?? 0));
-        $dto->setLastTestAt((string) ($row['last_test_at'] ?? ''));
-        $dto->setLastTestOk((int) ($row['last_test_ok'] ?? 0));
-        $dto->setLastTestError((string) ($row['last_test_error'] ?? ''));
-        $dto->setCreatedAt((string) ($row['created_at'] ?? ''));
-        $dto->setUpdatedAt((string) ($row['updated_at'] ?? ''));
-
-        return $dto;
-    }
+    
 
     public function getId(): int { return $this->id; }
     public function setId(int $id): static { $this->id = $id; return $this; }

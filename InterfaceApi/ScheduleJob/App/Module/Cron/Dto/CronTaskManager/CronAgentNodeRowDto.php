@@ -6,7 +6,6 @@ namespace InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager;
 
 use InterfaceApi\Support\ApiProperty;
 use InterfaceApi\Support\AbstractDto;
-use Swoolefy\Worker\Cron\CronNodeLiveness;
 
 /**
  * Cron Agent 节点行 DTO。
@@ -50,13 +49,13 @@ class CronAgentNodeRowDto extends AbstractDto
     protected string $lastHeartbeatAt = '';
 
     #[ApiProperty(description: '该节点心跳间隔（秒），Ack 时由 Worker 写入')]
-    protected int $heartbeatInterval = CronNodeLiveness::DEFAULT_INTERVAL;
+    protected int $heartbeatInterval = 15;
 
     #[ApiProperty(description: '超过该秒数未心跳则 offline：max(3*interval, interval+5)')]
     protected int $staleAfterSeconds = 45;
 
     #[ApiProperty(description: 'online / offline（从未心跳视为 offline）')]
-    protected string $status = CronNodeLiveness::STATUS_OFFLINE;
+    protected string $status = 'offline';
 
     #[ApiProperty(description: '绑定任务数')]
     protected int $taskCount = 0;
@@ -70,33 +69,7 @@ class CronAgentNodeRowDto extends AbstractDto
     #[ApiProperty(description: 'Agent API Key；仅创建节点时返回一次')]
     protected string $apiKey = '';
 
-    /**
-     * 从数据库实体行（snake_case）映射为 DTO。
-     *
-     * @param array<string, mixed> $row cron_agent_node 查询行或实体 getAttributes() 结果
-     */
-    public static function fromEntityRow(array $row): self
-    {
-        $dto = new self();
-        $dto->setId((int)($row['id'] ?? 0));
-        $dto->setNodeName((string)($row['node_name'] ?? ''));
-        $dto->setNodeIp((string)($row['node_ip'] ?? ''));
-        $dto->setGroupId((int)($row['group_id'] ?? 0));
-        $dto->setGroupName((string)($row['group_name'] ?? ''));
-        $dto->setRemark((string)($row['remark'] ?? ''));
-        $lastHb = (string)($row['last_heartbeat_at'] ?? '');
-        $interval = CronNodeLiveness::normalizeInterval((int)($row['heartbeat_interval'] ?? 0));
-        $now = time();
-        $dto->setLastHeartbeatAt($lastHb);
-        $dto->setHeartbeatInterval($interval);
-        $dto->setStaleAfterSeconds(CronNodeLiveness::staleAfterSeconds($interval));
-        $dto->setStatus(self::deriveHeartbeatStatus($lastHb, $now, $interval));
-        $dto->setTaskCount((int)($row['task_count'] ?? 0));
-        $dto->setCreatedAt((string)($row['created_at'] ?? ''));
-        $dto->setUpdatedAt((string)($row['updated_at'] ?? ''));
-
-        return $dto;
-    }
+    
 
     public function toDeepArray(): array
     {
@@ -108,25 +81,7 @@ class CronAgentNodeRowDto extends AbstractDto
         return $arr;
     }
 
-    /**
-     * 按该节点自己的心跳间隔判定 online / offline。
-     * 从未心跳或无法解析时间为 offline，不返回 unknown。
-     *
-     * @param string $lastHeartbeatAt DB datetime 或 unix 秒字符串
-     * @param int|null $now 当前 unix 秒，缺省 time()
-     * @param int $interval 该节点 heartbeat_interval（秒）
-     */
-    public static function deriveHeartbeatStatus(
-        string $lastHeartbeatAt,
-        ?int $now = null,
-        int $interval = CronNodeLiveness::DEFAULT_INTERVAL,
-    ): string {
-        return CronNodeLiveness::status(
-            $now ?? time(),
-            CronNodeLiveness::parseHeartbeatAt($lastHeartbeatAt),
-            $interval,
-        );
-    }
+    
 
     /** 获取节点 ID */
     public function getId(): int

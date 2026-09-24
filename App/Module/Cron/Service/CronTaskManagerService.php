@@ -10,7 +10,9 @@ use Swoolefy\Library\Db\Raw;
 use Swoolefy\Worker\Cron\CronNodeLiveness;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 use Swoolefy\Worker\Cron\ExpressionParser;
+use App\Module\Cron\Assembler\CronContractDtoAssembler;
 use App\Module\Cron\CronTaskOperationType;
+use App\Module\Cron\Mapper\CronAgentNodeRowMapper;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\AgentHeartbeatDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\AgentHeartbeatResultDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\AgentReportDto;
@@ -204,7 +206,7 @@ class CronTaskManagerService
 
         $pageResult->setTotal($total);
         foreach ($list as $row) {
-            $pageResult->addListItem(CronTaskRowDto::fromEntityRow($row));
+            $pageResult->addListItem(CronContractDtoAssembler::taskRowFromEntityRow($row));
         }
 
         return $pageResult;
@@ -504,7 +506,7 @@ class CronTaskManagerService
         $attrs['group_id'] = $groupId;
         $attrs['group_name'] = (string) $group->group_name;
 
-        $rowDto = CronAgentNodeRowDto::fromEntityRow($attrs);
+        $rowDto = CronContractDtoAssembler::agentNodeRowFromEntityRow($attrs);
         $apiKey = (string) ($attrs['api_key'] ?? '');
         if ($apiKey !== '') {
             $rowDto->setApiKey($apiKey);
@@ -558,7 +560,7 @@ class CronTaskManagerService
             $meta = $taskMetaMap[(int) ($row['cron_id'] ?? 0)] ?? [];
             $row['task_name'] = (string) ($meta['task_name'] ?? '');
             $row['exec_type'] = (int) ($meta['exec_type'] ?? 0);
-            $pageResult->addListItem(CronTaskLogRowDto::fromEntityRow($row));
+            $pageResult->addListItem(CronContractDtoAssembler::taskLogRowFromEntityRow($row));
         }
         $pageResult->setTotal($total);
 
@@ -821,7 +823,7 @@ class CronTaskManagerService
         $list = $qb->order('id', 'desc')->limit($query->getOffset(), $query->getPageSize())->select()->toArray();
         $pageResult->setTotal($total);
         foreach ($list as $row) {
-            $pageResult->addListItem(CronTaskOperationLogRowDto::fromEntityRow($row));
+            $pageResult->addListItem(CronContractDtoAssembler::taskOperationLogRowFromEntityRow($row));
         }
 
         return $pageResult;
@@ -912,7 +914,7 @@ class CronTaskManagerService
             $duration['samples'],
         );
 
-        return CronTaskStatsResultDto::fromAggregated($taskId, $stats);
+        return CronContractDtoAssembler::taskStatsFromAggregated($taskId, $stats);
     }
 
     /**
@@ -1271,7 +1273,7 @@ class CronTaskManagerService
             }
         }
 
-        return ExecutionDetailDto::fromLogRow($attrs);
+        return CronContractDtoAssembler::executionDetailFromLogRow($attrs);
     }
 
     /**
@@ -1857,7 +1859,7 @@ class CronTaskManagerService
                 $nodeMeta[$id] = [
                     'group_id' => self::rowInt($attrs, 'group_id', 'groupId'),
                     'node_name' => (string) ($attrs['node_name'] ?? $attrs['nodeName'] ?? ''),
-                    'node_status' => CronAgentNodeRowDto::deriveHeartbeatStatus(
+                    'node_status' => CronAgentNodeRowMapper::deriveHeartbeatStatus(
                         (string) ($attrs['last_heartbeat_at'] ?? ''),
                         time(),
                         (int) ($attrs['heartbeat_interval'] ?? 0),
@@ -1955,7 +1957,7 @@ class CronTaskManagerService
         }
 
         $attrs = $metaRows[0]->getAttributes();
-        $status = CronAgentNodeRowDto::deriveHeartbeatStatus(
+        $status = CronAgentNodeRowMapper::deriveHeartbeatStatus(
             (string) ($attrs['last_heartbeat_at'] ?? ''),
             time(),
             (int) ($attrs['heartbeat_interval'] ?? 0),
@@ -2514,7 +2516,7 @@ class CronTaskManagerService
 
     protected function toTaskRowDtoFromAttributes(array $attrs): CronTaskRowDto
     {
-        return CronTaskRowDto::fromEntityRow(
+        return CronContractDtoAssembler::taskRowFromEntityRow(
             $this->attachTaskNodeGroupInfo([$attrs])[0],
         );
     }
@@ -2526,14 +2528,14 @@ class CronTaskManagerService
     protected function toNodeRowDtos(array $rows): array
     {
         return array_map(
-            static fn (array $row): CronAgentNodeRowDto => CronAgentNodeRowDto::fromEntityRow($row),
+            static fn (array $row): CronAgentNodeRowDto => CronContractDtoAssembler::agentNodeRowFromEntityRow($row),
             $rows,
         );
     }
 
     protected function toNodeRowDtoFromAttributes(array $attrs): CronAgentNodeRowDto
     {
-        return CronAgentNodeRowDto::fromEntityRow(
+        return CronContractDtoAssembler::agentNodeRowFromEntityRow(
             $this->attachNodeGroupInfo([$attrs])[0],
         );
     }
@@ -2545,14 +2547,14 @@ class CronTaskManagerService
     protected function toNodeGroupRowDtos(array $rows): array
     {
         return array_map(
-            static fn (array $row): CronAgentNodeGroupRowDto => CronAgentNodeGroupRowDto::fromEntityRow($row),
+            static fn (array $row): CronAgentNodeGroupRowDto => CronContractDtoAssembler::agentNodeGroupRowFromEntityRow($row),
             $rows,
         );
     }
 
     protected function toNodeGroupRowDtoFromAttributes(array $attrs): CronAgentNodeGroupRowDto
     {
-        return CronAgentNodeGroupRowDto::fromEntityRow(
+        return CronContractDtoAssembler::agentNodeGroupRowFromEntityRow(
             $this->attachRobotInfoToGroups([$attrs])[0],
         );
     }

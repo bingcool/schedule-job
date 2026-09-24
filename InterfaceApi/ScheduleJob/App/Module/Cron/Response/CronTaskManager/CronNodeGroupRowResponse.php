@@ -14,11 +14,9 @@ class CronNodeGroupRowResponse extends BaseResponse
     #[ApiProperty(description: '节点分组详情 data')]
     protected CronAgentNodeGroupRowDto $data;
 
-    public function __construct(CronAgentNodeGroupRowDto|array $attributes)
+    public function __construct(CronAgentNodeGroupRowDto $data)
     {
-        $this->data = $attributes instanceof CronAgentNodeGroupRowDto
-            ? $attributes
-            : CronAgentNodeGroupRowDto::fromEntityRow($attributes);
+        $this->data = $data;
     }
 
     public function getData(): CronAgentNodeGroupRowDto

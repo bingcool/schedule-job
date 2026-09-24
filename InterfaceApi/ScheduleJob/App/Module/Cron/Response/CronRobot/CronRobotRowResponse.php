@@ -14,11 +14,9 @@ class CronRobotRowResponse extends BaseResponse
     #[ApiProperty(description: '机器人详情 data')]
     protected CronRobotRowDto $data;
 
-    public function __construct(CronRobotRowDto|array $attributes)
+    public function __construct(CronRobotRowDto $data)
     {
-        $this->data = $attributes instanceof CronRobotRowDto
-            ? $attributes
-            : CronRobotRowDto::fromEntityRow($attributes);
+        $this->data = $data;
     }
 
     public function getData(): CronRobotRowDto

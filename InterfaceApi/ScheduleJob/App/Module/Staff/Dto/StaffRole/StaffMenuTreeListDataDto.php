@@ -53,9 +53,10 @@ class StaffMenuTreeListDataDto extends AbstractListDataDto
     {
         $dto = new self();
         foreach ($items as $item) {
-            $dto->addListItem($item instanceof StaffMenuRowDto
-                ? $item
-                : StaffMenuRowDto::fromEntityRow($item));
+            if (!$item instanceof StaffMenuRowDto) {
+                throw new InvalidArgumentException('list items must be instances of StaffMenuRowDto');
+            }
+            $dto->addListItem($item);
         }
         $dto->setTotal(count($dto->getList()));
 

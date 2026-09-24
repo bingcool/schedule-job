@@ -53,9 +53,10 @@ class CronRobotListDataDto extends AbstractListDataDto
     {
         $dto = new self();
         foreach ($items as $item) {
-            $dto->addListItem($item instanceof CronRobotRowDto
-                ? $item
-                : CronRobotRowDto::fromEntityRow($item));
+            if (!$item instanceof CronRobotRowDto) {
+                throw new InvalidArgumentException('list items must be instances of CronRobotRowDto');
+            }
+            $dto->addListItem($item);
         }
         $dto->setTotal(count($dto->getList()));
 

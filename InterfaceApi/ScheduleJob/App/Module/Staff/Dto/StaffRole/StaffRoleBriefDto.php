@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole;
 
-use InterfaceApi\ScheduleJob\App\Module\Staff\Entity\StaffRoleEntity;
 use InterfaceApi\Support\ApiProperty;
 use InterfaceApi\Support\AbstractDto;
 
@@ -22,30 +21,9 @@ class StaffRoleBriefDto extends AbstractDto
     #[ApiProperty(description: '是否超管角色')]
     protected bool $isSuperRole = false;
 
-    public static function fromRoleEntity(StaffRoleEntity $role): self
-    {
-        $dto = new self();
-        $dto->id = (int) $role->id;
-        $dto->name = (string) $role->name;
-        $dto->code = (string) $role->code;
-        $dto->isSuperRole = (int) ($role->is_super_role ?? 0) === 1;
+    
 
-        return $dto;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    public static function fromSlice(array $row): self
-    {
-        $dto = new self();
-        $dto->id = (int) ($row['id'] ?? 0);
-        $dto->name = (string) ($row['name'] ?? '');
-        $dto->code = (string) ($row['code'] ?? '');
-        $dto->isSuperRole = !empty($row['isSuperRole']) || (int) ($row['is_super_role'] ?? 0) === 1;
-
-        return $dto;
-    }
+    
 
     public function getId(): int
     {

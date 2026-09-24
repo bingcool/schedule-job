@@ -22,6 +22,7 @@ use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\SwitchMenuStatusDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\SwitchRoleStatusDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\UpdateMenuDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\UpdateRoleDto;
+use App\Module\Staff\Assembler\StaffContractDtoAssembler;
 use App\Module\Staff\Entity\StaffMenuPageEntity;
 use App\Module\Staff\Entity\StaffRoleEntity;
 use App\Module\Staff\Entity\StaffRolePageEntity;
@@ -63,7 +64,7 @@ class StaffRoleService
      */
     public static function apiPermissionCatalog(): array
     {
-        return StaffApiPermissionItemDto::catalog();
+        return StaffContractDtoAssembler::apiPermissionCatalog();
     }
 
     /**
@@ -71,7 +72,7 @@ class StaffRoleService
      */
     public static function taskPermissionCatalog(): array
     {
-        return StaffTaskPermissionItemDto::catalog();
+        return StaffContractDtoAssembler::taskPermissionCatalog();
     }
 
     public function listRoles(ListRolesQueryDto $query): ListRolesPageResult
@@ -102,7 +103,7 @@ class StaffRoleService
             $roleId = (int) $row['id'];
             $row['user_count'] = $userCounts[$roleId] ?? 0;
             $row['menu_count'] = $menuCounts[$roleId] ?? 0;
-            $pageResult->addListItem(StaffRoleRowDto::fromEntityRow($row));
+            $pageResult->addListItem(StaffContractDtoAssembler::roleRowFromEntityRow($row));
         }
 
         return $pageResult;
@@ -134,7 +135,7 @@ class StaffRoleService
     {
         $list = [];
         foreach ($this->roleRepository->listEnabledOptionRows() as $role) {
-            $list[] = StaffRoleOptionDto::fromRoleEntity($role);
+            $list[] = StaffContractDtoAssembler::roleOptionFromEntity($role);
         }
 
         return $list;
@@ -223,7 +224,7 @@ class StaffRoleService
         $attrs['user_count'] = $this->countUsersByRoleIds([(int) $role->id])[(int) $role->id] ?? 0;
         $attrs['menu_count'] = count($pageIds);
 
-        return StaffRoleRowDto::fromEntityRow($attrs)
+        return StaffContractDtoAssembler::roleRowFromEntityRow($attrs)
             ->setMenus($this->menuTreeArrays())
             ->setApiPermissions($this->permissionCatalogToArray(self::apiPermissionCatalog()))
             ->setTaskPermissions($this->permissionCatalogToArray(self::taskPermissionCatalog()));
@@ -303,7 +304,7 @@ class StaffRoleService
             'status' => StaffApp::MENU_STATUS_ENABLED,
         ]);
 
-        return StaffMenuRowDto::fromEntityRow($menu->getAttributes());
+        return StaffContractDtoAssembler::menuRowFromEntityRow($menu->getAttributes());
     }
 
     public function updateMenu(UpdateMenuDto $dto): StaffMenuRowDto
@@ -327,7 +328,7 @@ class StaffRoleService
             'sort' => $dto->getSort(),
         ]));
 
-        return StaffMenuRowDto::fromEntityRow($menu->getAttributes());
+        return StaffContractDtoAssembler::menuRowFromEntityRow($menu->getAttributes());
     }
 
     public function switchMenuStatus(SwitchMenuStatusDto $dto): SwitchMenuStatusDto
@@ -380,7 +381,7 @@ class StaffRoleService
 
     public function getMenu(MenuIdDto $dto): StaffMenuRowDto
     {
-        return StaffMenuRowDto::fromEntityRow($this->requireMenu($dto->getId())->getAttributes());
+        return StaffContractDtoAssembler::menuRowFromEntityRow($this->requireMenu($dto->getId())->getAttributes());
     }
 
     public function deleteMenu(MenuIdDto $dto): int
@@ -463,7 +464,7 @@ class StaffRoleService
         $roles = [];
         if ($roleIds !== []) {
             foreach ($this->roleRepository->listEnabledRowsByIds($roleIds) as $role) {
-                $roles[(int) $role->id] = StaffRoleBriefDto::fromRoleEntity($role);
+                $roles[(int) $role->id] = StaffContractDtoAssembler::roleBriefFromEntity($role);
             }
         }
         foreach ($rels as $rel) {
@@ -650,7 +651,7 @@ class StaffRoleService
         /** @var array<int, StaffMenuRowDto> $map */
         $map = [];
         foreach ($rows as $row) {
-            $map[(int) $row['id']] = StaffMenuRowDto::fromEntityRow($row);
+            $map[(int) $row['id']] = StaffContractDtoAssembler::menuRowFromEntityRow($row);
         }
 
         $roots = [];

@@ -10,6 +10,7 @@ use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotTestResultDt
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\RobotIdDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\SwitchRobotStatusDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\UpdateRobotDto;
+use App\Module\Cron\Assembler\CronContractDtoAssembler;
 use App\Module\Cron\Entity\CronRobotEntity;
 use App\Module\Cron\Repository\CronAgentNodeGroupRepository;
 use App\Module\Cron\Repository\CronRobotRepository;
@@ -285,7 +286,7 @@ class CronRobotService
         $row['secret_configured'] = trim((string) ($row['secret'] ?? '')) !== '';
         unset($row['webhook_url'], $row['secret'], $row['config_json']);
 
-        return CronRobotRowDto::fromEntityRow($row);
+        return CronContractDtoAssembler::robotRowFromEntityRow($row);
     }
 
     private function currentUserId(): int

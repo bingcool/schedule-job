@@ -14,11 +14,9 @@ class StaffMenuRowResponse extends BaseResponse
     #[ApiProperty(description: '菜单详情 data')]
     protected StaffMenuRowDto $data;
 
-    public function __construct(StaffMenuRowDto|array $attributes)
+    public function __construct(StaffMenuRowDto $data)
     {
-        $this->data = $attributes instanceof StaffMenuRowDto
-            ? $attributes
-            : StaffMenuRowDto::fromEntityRow($attributes);
+        $this->data = $data;
     }
 
     public function getData(): StaffMenuRowDto

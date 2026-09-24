@@ -53,9 +53,10 @@ class CronNodeGroupListDataDto extends AbstractListDataDto
     {
         $dto = new self();
         foreach ($items as $item) {
-            $dto->addListItem($item instanceof CronAgentNodeGroupRowDto
-                ? $item
-                : CronAgentNodeGroupRowDto::fromEntityRow($item));
+            if (!$item instanceof CronAgentNodeGroupRowDto) {
+                throw new InvalidArgumentException('list items must be instances of CronAgentNodeGroupRowDto');
+            }
+            $dto->addListItem($item);
         }
         $dto->setTotal(count($dto->getList()));
 
