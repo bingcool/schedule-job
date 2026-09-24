@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Controller;
 
+use InterfaceApi\ScheduleJob\App\Module\Staff\Interface\StaffRoleApiInterface;
+
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\GrantRolePagesDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\CreateMenuDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\CreateRoleDto;
@@ -43,7 +45,7 @@ use Swoolefy\Core\Controller\BController;
 /**
  * 权限组（角色）与菜单管理。
  */
-class StaffRoleController extends BController
+class StaffRoleController extends BController implements StaffRoleApiInterface
 {
     private StaffRoleService $staffRoleService {
         get => $this->staffRoleService ??= new StaffRoleService();

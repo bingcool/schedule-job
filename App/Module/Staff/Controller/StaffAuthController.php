@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Controller;
 
+use InterfaceApi\ScheduleJob\App\Module\Staff\Interface\StaffAuthApiInterface;
+
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\LoginDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\RegisterDto;
@@ -22,7 +24,7 @@ use Swoolefy\Core\Controller\BController;
 /**
  * 登录 / 当前用户（公开注册已关闭，用户由管理员在后台创建）。
  */
-class StaffAuthController extends BController
+class StaffAuthController extends BController implements StaffAuthApiInterface
 {
     private StaffAuthService $staffAuthService {
         get => $this->staffAuthService ??= new StaffAuthService();

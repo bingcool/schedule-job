@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Module\Staff\Controller;
 
+use InterfaceApi\ScheduleJob\App\Module\Staff\Interface\StaffUserApiInterface;
+
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffUser\CreateUserDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffUser\GrantUserNodeGroupsDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffUser\GrantUserRolesDto;
@@ -36,7 +38,7 @@ use Swoolefy\Core\Controller\BController;
 /**
  * 用户管理 —— Request ↔ DTO / Response 映射，业务在 {@see StaffUserService}。
  */
-class StaffUserController extends BController
+class StaffUserController extends BController implements StaffUserApiInterface
 {
     private StaffUserService $staffUserService {
         get => $this->staffUserService ??= new StaffUserService();

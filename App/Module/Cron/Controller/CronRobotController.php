@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Controller;
 
+use InterfaceApi\ScheduleJob\App\Module\Cron\Interface\CronRobotApiInterface;
+
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CreateRobotDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\RobotIdDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\SwitchRobotStatusDto;
@@ -20,7 +22,7 @@ use App\Module\Cron\Service\CronRobotService;
 use Swoolefy\Annotation\ApiOperation;
 use Swoolefy\Core\Controller\BController;
 
-class CronRobotController extends BController
+class CronRobotController extends BController implements CronRobotApiInterface
 {
     private CronRobotService $cronRobotService {
         get => $this->cronRobotService ??= new CronRobotService();

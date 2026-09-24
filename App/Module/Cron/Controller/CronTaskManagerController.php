@@ -2,6 +2,8 @@
 
 namespace App\Module\Cron\Controller;
 
+use InterfaceApi\ScheduleJob\App\Module\Cron\Interface\CronTaskManagerApiInterface;
+
 use Swoolefy\Annotation\ApiOperation;
 use Swoolefy\Core\Controller\BController;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\AgentHeartbeatDto;
@@ -83,7 +85,7 @@ use App\Module\Cron\Service\CronTaskManagerService;
  * 路由定义：`Test/Router/Module/CronManager.php`（前缀 `api/v1`，默认端口 9501）。
  * 各方法 PHPDoc 中 curl 代码块无行首 `*`，便于直接复制执行。
  */
-class CronTaskManagerController extends BController
+class CronTaskManagerController extends BController implements CronTaskManagerApiInterface
 {
     /** PHP 8.4 property hook：首次访问时惰性创建 Service */
     private CronTaskManagerService $cronTaskManagerService {

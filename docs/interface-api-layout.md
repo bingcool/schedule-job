@@ -39,7 +39,24 @@ python3 scripts/migrate_interface_api_contracts.py
 
 然后全局替换引用为 `InterfaceApi\ScheduleJob\App\Module\...`（脚本已修复 `\App\Module\` 误替换问题）。
 
+## HTTP 契约接口（ApiInterface）
+
+| 模块 | 汇总接口 | 子接口（与 Controller 一一对应） |
+|---|---|---|
+| Cron | `InterfaceApi\ScheduleJob\App\Module\Cron\Interface\CronApiInterface` | `CronTaskManagerApiInterface`、`CronRobotApiInterface` |
+| Staff | `InterfaceApi\ScheduleJob\App\Module\Staff\Interface\StaffApiInterface` | `StaffAuthApiInterface`、`StaffUserApiInterface`、`StaffRoleApiInterface` |
+
+路径：`InterfaceApi/ScheduleJob/App/Module/{Cron|Staff}/Interface/`。路由与 `App/Router/Module/*.php` 对齐，方法上标注 `#[Route]` / 接口上 `#[RouteGroup(prefix: '/api/v1', ...)]`。
+
+Controller 实现对应子接口，例如 `CronTaskManagerController implements CronTaskManagerApiInterface`。
+
+从路由与 Controller 重新生成子接口：
+
+```bash
+python3 scripts/generate_api_interfaces.py
+```
+
 ## 后续
 
-- 按 InterfaceApi.md 定义 `*ApiInterface` + `#[RouteGroup]` / `#[Route]`，Controller `implements` 接口。
+- Controller 与契约方法签名保持一致；变更路由后重跑上述脚本。
 - 在 InterfaceApi 包根执行 Client 生成前，需清理契约中对 `App\Module\Entity` 等非 InterfaceApi 引用（或下沉到 Service 组装）。
