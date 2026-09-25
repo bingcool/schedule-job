@@ -16,14 +16,14 @@
 
 ## 部署与 Autoloader
 
-`App\Autoloader` 已注册 `InterfaceApi\` 命名空间，**无需**把契约包写进 `composer.json` 也能加载类。
+生产/CI 可在 `composer.json` 的 `require` 里固定 `interface-api` 版本，类从 **vendor** 加载（与改 `composer.json` 的 path 无关）。
 
-解析逻辑在 `App/Autoloader.php`（`resolveInterfaceApiDirectory()`）：
+解析逻辑在 `App/Autoloader.php`（`resolveInterfaceApiDirectory()` + `loadFromFile()`）：
 
-1. **默认**：`{schedule-job 根}/InterfaceApi/`（与 `App/` 同级）
-2. **`REGISTER_LOCAL_INTERFACE_API=1`**（`.env` 的 `env('REGISTER_LOCAL_INTERFACE_API')` 或进程环境变量）：**只**加载同级独立仓 `{上一级}/interface-api-service/`（含 `App/` 的契约树），**不再**使用项目内 `InterfaceApi/`。
+1. **默认（未开本地开关）**：优先由 Composer 已安装的 `interface-api`（vendor）解析；若项目内仍有 `{根}/InterfaceApi/`，App Autoloader 也会在队列末尾尝试该目录。
+2. **`REGISTER_LOCAL_INTERFACE_API=1`**（`App/.env` 或进程环境变量）：**只**在同级 `{上一级}/interface-api-service/` 查找 `InterfaceApi\` 类；不使用项目内 `InterfaceApi/`，**也不会**在本地找不到时回退 vendor（会直接抛错，避免误用 composer 里的旧契约）。
 
-Autoloader 以 `register(true)` **prepend** 注册，使 `InterfaceApi\` 优先于 Composer `vendor/autoload.php`，避免误把契约装进 composer 后加载旧包。本仓库 `composer.json` 未依赖 InterfaceApi；本地开发请勿再 `require` 契约 path 包。
+本地模式会 `Autoloader::register(true)` **prepend**，保证先于 Composer 执行；关闭本地开关时用 `register(false)`，便于正常使用 vendor 里的契约包。
 
 目录示例（dev + 独立契约仓）：
 

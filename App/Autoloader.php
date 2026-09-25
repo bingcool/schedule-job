@@ -162,6 +162,14 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
 
                 if (is_file($filepath)) {
                     require_once $filepath;
+                } elseif ($namespace === 'InterfaceApi' && self::isRegisterLocalInterfaceApi()) {
+                    throw new \RuntimeException(
+                        'REGISTER_LOCAL_INTERFACE_API=1：仅从本地契约仓加载 InterfaceApi\\，未找到 '
+                        . $className
+                        . '，期望文件 '
+                        . $filepath
+                        . '（不会回退到 vendor/composer 安装的 interface-api）',
+                    );
                 }
 
                 break;
