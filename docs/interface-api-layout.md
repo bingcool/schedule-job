@@ -7,7 +7,7 @@
 | 路径 | 命名空间 |
 |---|---|
 | `InterfaceApi/bin/` | CLI（`generate-client.php`、`generate-openapi.php`） |
-| `InterfaceApi/Support/` | `InterfaceApi\Support\`（注解、BaseRequest/Response、Client 基类、`Generator\` 引用检查与 Client 生成） |
+| `InterfaceApi/Support/` | `InterfaceApi\Support\`（公共基础设施，见 [`Support/README.md`](../InterfaceApi/Support/README.md)；含 `Generator\`） |
 | `InterfaceApi/ScheduleJob/App/Module/Common/` | `InterfaceApi\ScheduleJob\App\Module\Common\` |
 | `InterfaceApi/ScheduleJob/App/Module/Cron/` | Request / Response / Dto |
 | `InterfaceApi/ScheduleJob/App/Module/Staff/` | Request / Response / Dto |
@@ -39,7 +39,7 @@
 
 Controller / Service 通过 `InterfaceApi\ScheduleJob\App\Module\...` 引用契约类，不再使用 `App\Module\...\Dto|Request|Response`。
 
-`InterfaceApi\Support` 在 schedule-job 内对 Swoolefy 做了薄继承（如 `BaseRequest`、`BaseResponse`、`ValidationRule`），保证 HttpRoute 校验与 JSON 信封行为不变；独立发包时可改回纯 Support 实现。
+`InterfaceApi\Support` 对 Swoolefy 的薄继承是**面向 Swoolefy 项目的正式设计**（见 [`Support/README.md`](../InterfaceApi/Support/README.md)），嵌仓或独立契约仓均如此，以保证 HttpRoute 校验与 JSON 信封行为与运行时一致。
 
 ## §2 引用边界检查
 
