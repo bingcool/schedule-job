@@ -30,10 +30,6 @@ try {
 
 ProjectBootstrap::register($projectRoot, $interfaceApiRoot);
 
-if (getenv('REGISTER_LOCAL_INTERFACE_API') !== '1') {
-    putenv('REGISTER_LOCAL_INTERFACE_API=1');
-}
-
 $serviceKey = parseGenerateClientArgv($argv ?? []);
 
 try {

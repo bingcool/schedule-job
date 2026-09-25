@@ -57,7 +57,8 @@ final class ProjectBootstrap
         if (is_file($appAutoload)) {
             require_once $appAutoload;
             if (class_exists(\App\Autoloader::class, false)) {
-                \App\Autoloader::register();
+                $prepend = \App\Autoloader::isRegisterLocalInterfaceApi();
+                \App\Autoloader::register($prepend);
                 self::$registered = true;
 
                 return;

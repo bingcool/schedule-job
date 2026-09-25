@@ -18,6 +18,8 @@ final class ReferenceChecker
         foreach ($this->listContractPhpFiles($contractRoot) as $file) {
             $code = file_get_contents($file);
             if ($code === false) {
+                $violations[] = [$file, 1, '(unreadable file — cannot run check)'];
+
                 continue;
             }
             $tokens = token_get_all($code);
