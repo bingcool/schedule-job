@@ -190,23 +190,12 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
 
         /**
          * 约定：
-         * - 默认：{项目根}/InterfaceApi（与 App 同级，不走 composer vendor）
-         * - REGISTER_LOCAL_INTERFACE_API=1：仅用 {项目上级}/{interfaceApiServiceDirName}（默认 interface-api-service），
-         *   不再加载项目内 InterfaceApi/，也不依赖 composer 中的契约包。
+         * - 默认：{项目根}/InterfaceApi（与 App 同级)
+         *   不再加载项目内 InterfaceApi/；本地找不到类时抛错，不回退 vendor
          */
         private static function resolveInterfaceApiDirectory(string $projectRoot): string
         {
             $embedded = $projectRoot . DIRECTORY_SEPARATOR . 'InterfaceApi';
-
-            if (self::isRegisterLocalInterfaceApi()) {
-                $localRepo = dirname($projectRoot) . DIRECTORY_SEPARATOR . self::$interfaceApiServiceDirName;
-                if (self::isInterfaceApiTree($localRepo)) {
-                    return realpath($localRepo) ?: $localRepo;
-                }
-
-                return $localRepo;
-            }
-
             if (self::isInterfaceApiTree($embedded)) {
                 return realpath($embedded) ?: $embedded;
             }
@@ -404,7 +393,7 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         }
     }
 
-    // prepend=true：InterfaceApi\ 优先于 Composer autoload，避免 vendor 里旧契约包抢先加载
+    // 本地契约：prepend 优先于 Composer；关闭开关时 register(false) 便于 vendor interface-api
     if (Autoloader::isRegisterLocalInterfaceApi()) {
         Autoloader::register(true);
     } else {
