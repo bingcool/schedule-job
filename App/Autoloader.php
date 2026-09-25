@@ -29,6 +29,9 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
         /** @var list<string> */
         private static $rootNamespace = ['App','InterfaceApi'];
 
+        /** @var string */
+        private static $interfaceApiServiceDirName = 'interface-api-service';
+
         /** @var array<string, true> */
         private static $classMapNamespace = [];
 
@@ -180,19 +183,22 @@ if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {
          */
         private static function resolveInterfaceApiDirectory(string $projectRoot): string
         {
-            $embedded = $projectRoot . DIRECTORY_SEPARATOR . 'InterfaceApi';
-            if (self::isInterfaceApiTree($embedded)) {
-                return realpath($embedded) ?: $embedded;
-            }
+//            $embedded = $projectRoot . DIRECTORY_SEPARATOR . 'InterfaceApi';
+//            if (self::isInterfaceApiTree($embedded)) {
+//                return realpath($embedded) ?: $embedded;
+//            }
 
             if (self::isRegisterLocalInterfaceApi()) {
-                $sibling = dirname($projectRoot) . DIRECTORY_SEPARATOR . 'InterfaceApi';
+                $sibling = dirname($projectRoot) . DIRECTORY_SEPARATOR . (self::$interfaceApiServiceDirName ?? 'interface-api-service');
                 if (self::isInterfaceApiTree($sibling)) {
+                    var_dump($sibling);
                     return realpath($sibling) ?: $sibling;
                 }
             }
 
-            return $embedded;
+            return '';
+
+            //return $embedded;
         }
 
         private static function isInterfaceApiTree(string $path): bool
