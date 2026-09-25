@@ -14,6 +14,27 @@
 
 `{项目}` = `ScheduleJob`，`{应用}` = `App`，与服务端 `App\Module\...` 目录结构对应。
 
+## 部署与 Autoloader
+
+`App\Autoloader` 已注册 `InterfaceApi\` 命名空间，**无需**把契约包写进 `composer.json` 也能加载类。
+
+解析逻辑在 `App/Autoloader.php`（`resolveInterfaceApiDirectory()`），约定 **InterfaceApi 只会在两处之一**：
+
+1. **项目内**：`{schedule-job 根}/InterfaceApi/`（与 `App/` 同级）
+2. **独立仓库（本地显式开启）**：当 `REGISTER_LOCAL_INTERFACE_API=1`（`env('REGISTER_LOCAL_INTERFACE_API')` 或进程环境变量）且项目内没有有效契约树时，再试 `{上一级}/InterfaceApi/`（与 schedule-job 同级目录）
+
+未设置该变量时**只**认项目内的 `InterfaceApi/`。
+
+目录示例（dev + 独立契约仓）：
+
+```text
+/home/wwwroot/schedule-job/App/...
+/home/wwwroot/InterfaceApi/Support/...
+/home/wwwroot/InterfaceApi/ScheduleJob/App/Module/...
+```
+
+本地使用同级独立契约仓时在 `.env` 或 shell 中设置：`REGISTER_LOCAL_INTERFACE_API=1`。
+
 ## 服务端引用
 
 Controller / Service 通过 `InterfaceApi\ScheduleJob\App\Module\...` 引用契约类，不再使用 `App\Module\...\Dto|Request|Response`。

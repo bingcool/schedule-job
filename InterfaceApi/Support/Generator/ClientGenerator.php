@@ -98,7 +98,8 @@ final class ClientGenerator
             );
         }
 
-        $appRoot = rtrim($this->projectRoot, '/\\') . DIRECTORY_SEPARATOR . 'InterfaceApi'
+        $interfaceApiRoot = ProjectBootstrap::resolveInterfaceApiRoot($this->projectRoot);
+        $appRoot = $interfaceApiRoot
             . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $serviceKey);
         if (!is_dir($appRoot)) {
             throw new GeneratorException("App directory not found: {$appRoot}");
@@ -119,8 +120,7 @@ final class ClientGenerator
 
     private function bootstrapAutoload(): void
     {
-        $interfaceApiRoot = $this->projectRoot . DIRECTORY_SEPARATOR . 'InterfaceApi';
-        ProjectBootstrap::register($this->projectRoot, $interfaceApiRoot);
+        ProjectBootstrap::register($this->projectRoot);
     }
 
     private function resolveServiceName(string $packageRoot): string

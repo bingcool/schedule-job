@@ -31,11 +31,16 @@ try {
 
 ProjectBootstrap::register($projectRoot, $interfaceApiRoot);
 
+if (getenv('REGISTER_LOCAL_INTERFACE_API') !== '1') {
+    putenv('REGISTER_LOCAL_INTERFACE_API=1');
+}
+
 [$serviceKey, $outRel] = parseGenerateOpenApiArgv($argv ?? []);
 
+$interfaceApiRoot = ProjectBootstrap::resolveInterfaceApiRoot($projectRoot);
 $outputDir = $outRel !== ''
     ? $projectRoot . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, ltrim($outRel, '/\\'))
-    : $projectRoot . DIRECTORY_SEPARATOR . 'InterfaceApi' . DIRECTORY_SEPARATOR . explode('/', $serviceKey)[0] . DIRECTORY_SEPARATOR . 'openapi';
+    : $interfaceApiRoot . DIRECTORY_SEPARATOR . explode('/', $serviceKey)[0] . DIRECTORY_SEPARATOR . 'openapi';
 
 try {
     (new OpenApiDocGenerator($projectRoot, $serviceKey, $outputDir))->run();

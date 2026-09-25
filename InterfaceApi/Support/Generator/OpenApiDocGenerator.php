@@ -62,7 +62,7 @@ final class OpenApiDocGenerator
         $console = $this->console ?? new ConsoleReporter($this->projectRoot);
 
         [$appRoot, $moduleRoot, $packageRoot] = $this->resolveServicePaths();
-        ProjectBootstrap::register($this->projectRoot, $this->projectRoot . DIRECTORY_SEPARATOR . 'InterfaceApi');
+        ProjectBootstrap::register($this->projectRoot);
 
         $violations = (new ReferenceChecker())->check($appRoot);
         if ($violations !== []) {
@@ -120,7 +120,8 @@ final class OpenApiDocGenerator
             throw new GeneratorException('--service must end with /App (e.g. ScheduleJob/App)');
         }
 
-        $appRoot = rtrim($this->projectRoot, '/\\') . DIRECTORY_SEPARATOR . 'InterfaceApi'
+        $interfaceApiRoot = ProjectBootstrap::resolveInterfaceApiRoot($this->projectRoot);
+        $appRoot = $interfaceApiRoot
             . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $serviceKey);
         if (!is_dir($appRoot)) {
             throw new GeneratorException("App directory not found: {$appRoot}");
