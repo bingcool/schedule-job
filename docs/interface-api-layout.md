@@ -18,22 +18,22 @@
 
 `App\Autoloader` 已注册 `InterfaceApi\` 命名空间，**无需**把契约包写进 `composer.json` 也能加载类。
 
-解析逻辑在 `App/Autoloader.php`（`resolveInterfaceApiDirectory()`），约定 **InterfaceApi 只会在两处之一**：
+解析逻辑在 `App/Autoloader.php`（`resolveInterfaceApiDirectory()`）：
 
-1. **项目内**：`{schedule-job 根}/InterfaceApi/`（与 `App/` 同级）
-2. **独立仓库（本地显式开启）**：当 `REGISTER_LOCAL_INTERFACE_API=1`（`env('REGISTER_LOCAL_INTERFACE_API')` 或进程环境变量）且项目内没有有效契约树时，再试 `{上一级}/InterfaceApi/`（与 schedule-job 同级目录）
+1. **默认**：`{schedule-job 根}/InterfaceApi/`（与 `App/` 同级）
+2. **`REGISTER_LOCAL_INTERFACE_API=1`**（`.env` 的 `env('REGISTER_LOCAL_INTERFACE_API')` 或进程环境变量）：**只**加载同级独立仓 `{上一级}/interface-api-service/`（含 `App/` 的契约树），**不再**使用项目内 `InterfaceApi/`。
 
-未设置该变量时**只**认项目内的 `InterfaceApi/`。
+Autoloader 以 `register(true)` **prepend** 注册，使 `InterfaceApi\` 优先于 Composer `vendor/autoload.php`，避免误把契约装进 composer 后加载旧包。本仓库 `composer.json` 未依赖 InterfaceApi；本地开发请勿再 `require` 契约 path 包。
 
 目录示例（dev + 独立契约仓）：
 
 ```text
 /home/wwwroot/schedule-job/App/...
-/home/wwwroot/InterfaceApi/Support/...
-/home/wwwroot/InterfaceApi/ScheduleJob/App/Module/...
+/home/wwwroot/interface-api-service/App/...
+/home/wwwroot/interface-api-service/ScheduleJob/App/Module/...
 ```
 
-本地使用同级独立契约仓时在 `.env` 或 shell 中设置：`REGISTER_LOCAL_INTERFACE_API=1`。
+本地联调独立契约仓：在 `App/.env` 设置 `REGISTER_LOCAL_INTERFACE_API=1`，并把契约仓 clone 到与 schedule-job 同级的 `interface-api-service`。
 
 ## 服务端引用
 
