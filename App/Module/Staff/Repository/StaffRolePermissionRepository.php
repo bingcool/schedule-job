@@ -38,8 +38,8 @@ class StaffRolePermissionRepository
     }
 
     /**
-     * @param array<int, int> $apiPerIds
-     * @param array<int, int> $taskPerIds
+     * @param array<int> $apiPerIds
+     * @param array<int> $taskPerIds
      */
     public function replaceForRole(int $roleId, array $apiPerIds, array $taskPerIds): void
     {
@@ -51,7 +51,7 @@ class StaffRolePermissionRepository
     }
 
     /**
-     * @param array<int, int> $perIds
+     * @param array<int> $perIds
      */
     private function insertPermissions(int $roleId, int $type, array $perIds): void
     {

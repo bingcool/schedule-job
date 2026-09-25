@@ -30,7 +30,7 @@ class StaffRolePageRepository
     }
 
     /**
-     * @param array<int, int> $roleIds
+     * @param array<int> $roleIds
      * @return list<StaffRolePageEntity>
      */
     public function listRowsByRoleIds(array $roleIds): array
@@ -49,7 +49,7 @@ class StaffRolePageRepository
     }
 
     /**
-     * @return array<int, int>
+     * @return array<int>
      */
     public function listPageIdsByRoleId(int $roleId): array
     {
@@ -63,8 +63,8 @@ class StaffRolePageRepository
     }
 
     /**
-     * @param array<int, int> $roleIds
-     * @return array<int, int>
+     * @param array<int> $roleIds
+     * @return array<int>
      */
     public function countPagesGroupedByRoleIds(array $roleIds): array
     {
@@ -81,7 +81,7 @@ class StaffRolePageRepository
     }
 
     /**
-     * @param array<int, int> $pageIds
+     * @param array<int> $pageIds
      */
     public function replaceForRole(int $roleId, array $pageIds): void
     {

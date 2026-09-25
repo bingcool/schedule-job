@@ -80,7 +80,7 @@ class StaffUserRepository
     }
 
     /**
-     * @param array<int, int> $ids
+     * @param array<int> $ids
      * @return list<StaffUserEntity>
      */
     public function listBriefRowsByIds(array $ids): array
@@ -99,7 +99,7 @@ class StaffUserRepository
     }
 
     /**
-     * @param array<int, int> $ids
+     * @param array<int> $ids
      * @return list<StaffUserEntity>
      */
     public function listActiveBriefRowsByIds(array $ids): array

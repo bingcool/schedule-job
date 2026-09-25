@@ -68,7 +68,8 @@ class StaffUserRoleRepository
     }
 
     /**
-     * @param array<int, int> $roleIds
+     * @param array<int> $roleIds
+     * @param array<int> $roleIds
      */
     public function replaceForUser(int $userId, array $roleIds): void
     {
@@ -89,6 +90,7 @@ class StaffUserRoleRepository
     }
 
     /**
+     * @param int $userId
      * @return list<StaffUserRoleEntity>
      */
     public function listRowsByUserId(int $userId): array

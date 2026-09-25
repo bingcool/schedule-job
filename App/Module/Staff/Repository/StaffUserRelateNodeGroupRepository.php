@@ -28,7 +28,7 @@ class StaffUserRelateNodeGroupRepository
     }
 
     /**
-     * @return array<int, int>
+     * @return array<int>
      */
     public function listUserIdsByNodeGroupId(int $nodeGroupId): array
     {
@@ -53,8 +53,8 @@ class StaffUserRelateNodeGroupRepository
     }
 
     /**
-     * @param array<int, int> $userIds
-     * @return array<int, array<int, int>>
+     * @param array<int> $userIds
+     * @return array<int, array<int>>
      */
     public function nodeGroupIdsGroupedByUserIds(array $userIds): array
     {
@@ -73,7 +73,7 @@ class StaffUserRelateNodeGroupRepository
     }
 
     /**
-     * @param array<int, int> $groupIds
+     * @param array<int> $groupIds
      */
     public function replaceForUser(int $userId, array $groupIds): void
     {

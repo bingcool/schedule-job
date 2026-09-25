@@ -73,7 +73,7 @@ class StaffRoleRepository
     }
 
     /**
-     * @param array<int, int> $roleIds
+     * @param array<int> $roleIds
      * @return list<StaffRoleEntity>
      */
     public function listRowsByIdsForApp(array $roleIds): array
@@ -92,7 +92,7 @@ class StaffRoleRepository
     }
 
     /**
-     * @param array<int, int> $roleIds
+     * @param array<int> $roleIds
      * @return list<StaffRoleEntity>
      */
     public function listEnabledRowsByIds(array $roleIds): array

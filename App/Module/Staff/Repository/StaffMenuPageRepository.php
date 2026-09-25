@@ -37,7 +37,7 @@ class StaffMenuPageRepository
     }
 
     /**
-     * @param array<int, int> $pageIds
+     * @param array<int> $pageIds
      * @return list<StaffMenuPageEntity>
      */
     public function listVisibleRowsByIds(array $pageIds): array
@@ -111,7 +111,7 @@ class StaffMenuPageRepository
     }
 
     /**
-     * @param array<int, int> $pageIds
+     * @param array<int> $pageIds
      * @return list<StaffMenuPageEntity>
      */
     public function listEnabledVisibleRowsByIds(array $pageIds): array
