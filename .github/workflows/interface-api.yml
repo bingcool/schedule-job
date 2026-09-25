@@ -4,12 +4,10 @@ on:
   push:
     paths:
       - 'InterfaceApi/**'
-      - 'scripts/interface_api_reference_check.php'
       - '.github/workflows/interface-api.yml'
   pull_request:
     paths:
       - 'InterfaceApi/**'
-      - 'scripts/interface_api_reference_check.php'
       - '.github/workflows/interface-api.yml'
 
 jobs:
@@ -21,4 +19,4 @@ jobs:
         with:
           php-version: '8.4'
       - name: InterfaceApi §2 reference boundary
-        run: php scripts/interface_api_reference_check.php
+        run: php InterfaceApi/bin/reference-check.php

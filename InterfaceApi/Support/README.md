@@ -35,7 +35,7 @@
 
 ```bash
 # §2 引用边界
-php scripts/interface_api_reference_check.php
+php InterfaceApi/bin/reference-check.php
 
 # HTTP Client / OpenAPI
 php InterfaceApi/bin/generate-client.php --service=ScheduleJob/App

@@ -1,3 +1,4 @@
+#!/usr/bin/env php
 <?php
 
 declare(strict_types=1);
@@ -5,15 +6,21 @@ declare(strict_types=1);
 /**
  * InterfaceApi §2 引用边界检查。
  *
- * 用法：php scripts/interface_api_reference_check.php [contractRoot]
+ * 用法（schedule-job 根或 InterfaceApi 仓库）：
+ *   php InterfaceApi/bin/reference-check.php
+ *   php InterfaceApi/bin/reference-check.php InterfaceApi/ScheduleJob
  */
 
-$root = isset($argv[1]) ? rtrim($argv[1], '/\\') : dirname(__DIR__) . '/InterfaceApi/ScheduleJob';
+$interfaceApiRoot = dirname(__DIR__);
+$support = $interfaceApiRoot . '/Support/Generator';
 
-require dirname(__DIR__) . '/App/Autoloader.php';
-\App\Autoloader::register();
+require_once $support . '/GeneratorException.php';
+require_once $support . '/ReferenceChecker.php';
 
 use InterfaceApi\Support\Generator\ReferenceChecker;
+
+$defaultRoot = $interfaceApiRoot . DIRECTORY_SEPARATOR . 'ScheduleJob';
+$root = isset($argv[1]) ? rtrim($argv[1], '/\\') : $defaultRoot;
 
 if (!is_dir($root)) {
     fwrite(STDERR, "Contract root not found: {$root}\n");

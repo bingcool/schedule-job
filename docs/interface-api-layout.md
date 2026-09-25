@@ -6,7 +6,7 @@
 
 | 路径 | 命名空间 |
 |---|---|
-| `InterfaceApi/bin/` | CLI（`generate-client.php`、`generate-openapi.php`） |
+| `InterfaceApi/bin/` | CLI（`reference-check.php`、`generate-client.php`、`generate-openapi.php`） |
 | `InterfaceApi/Support/` | `InterfaceApi\Support\`（公共基础设施，见 [`Support/README.md`](../InterfaceApi/Support/README.md)；含 `Generator\`） |
 | `InterfaceApi/ScheduleJob/App/Module/Common/` | `InterfaceApi\ScheduleJob\App\Module\Common\` |
 | `InterfaceApi/ScheduleJob/App/Module/Cron/` | Request / Response / Dto |
@@ -46,20 +46,10 @@ Controller / Service 通过 `InterfaceApi\ScheduleJob\App\Module\...` 引用契�
 生成器位于 `InterfaceApi/Support/Generator/`（`ReferenceChecker`、`ClientGenerator`、`ClientWriter`）。
 
 ```bash
-php scripts/interface_api_reference_check.php
+php InterfaceApi/bin/reference-check.php
 ```
 
-默认扫描 `InterfaceApi/ScheduleJob/`（跳过 `Client/`、`Support/`）。失败时输出 `文件:行号 FQCN`。
-
-## 重新迁移契约文件
-
-契约以 `InterfaceApi/ScheduleJob/App/Module/` 为唯一来源；`App/Module` 下不再保留 Dto/Request/Response 副本。若需从历史 App 树重新拷贝，可执行：
-
-```bash
-python3 scripts/migrate_interface_api_contracts.py
-```
-
-然后全局替换引用为 `InterfaceApi\ScheduleJob\App\Module\...`（脚本已修复 `\App\Module\` 误替换问题）。
+默认扫描 `InterfaceApi/ScheduleJob/`（跳过 `Client/`、`Support/`）。失败时输出 `文件:行号 FQCN`。生成 Client 前也会自动执行同一检查。
 
 ## HTTP 契约接口（ApiInterface）
 
@@ -73,12 +63,6 @@ python3 scripts/migrate_interface_api_contracts.py
 Controller 实现对应子接口，例如 `CronTaskManagerController implements CronTaskManagerApiInterface`。
 
 契约接口上：`#[ApiController]` / `#[ApiOperation]` 描述模块与方法（对齐 OpenAPI 文案）；具体 JSON 字段见 Request / Response / DTO 属性上的 `#[ApiProperty]`。
-
-从路由与 Controller 重新生成子接口：
-
-```bash
-python3 scripts/generate_api_interfaces.py
-```
 
 生成 HTTP Client（**一个 `*ApiInterface` 对应一个 `*Api` Client**；无 API 方法的汇总接口如 `StaffApiInterface` 会跳过）：
 
