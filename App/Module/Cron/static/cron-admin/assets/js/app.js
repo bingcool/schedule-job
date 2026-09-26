@@ -109,7 +109,9 @@
         profileSaving: false,
         profileForm: { account: '', userName: '' },
         loginHintNow: Date.now(),
-        loginHintTimer: null
+        loginHintTimer: null,
+        projectGithub: 'https://github.com/bingcool/schedule-job',
+        copyrightLine: '© ' + new Date().getFullYear() + ' bingcool · MIT License'
       };
     },
     computed: {
