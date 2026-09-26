@@ -9,7 +9,6 @@ $appName = ucfirst($_SERVER['argv'][2]);
 define('APP_NAME', $appName);
 // 启动目录
 defined('START_DIR_ROOT') or define('START_DIR_ROOT', __DIR__);
-
 // composer安装时，必须定义成如下路径
 defined('SRC_DIR_ROOT') or define('SRC_DIR_ROOT', __DIR__."/vendor/bingcool/swoolefy/src");
 // 应用父目录
@@ -49,7 +48,6 @@ define('IS_SCRIPT_SERVICE', 0);
 define('PHP_BIN_FILE','/usr/bin/php');
 
 define('WORKER_SERVICE_NAME', makeServerName($_SERVER['argv'][2]));
-
 define('WORKER_START_SCRIPT_FILE', str_contains($_SERVER['SCRIPT_FILENAME'], $_SERVER['PWD']) ? $_SERVER['SCRIPT_FILENAME'] : $_SERVER['PWD'].'/'.$_SERVER['SCRIPT_FILENAME']);
 define('WORKER_PID_FILE_ROOT', '/tmp/workerfy/log/'.WORKER_SERVICE_NAME);
 define('WORKER_PID_FILE', WORKER_PID_FILE_ROOT.'/worker.pid');

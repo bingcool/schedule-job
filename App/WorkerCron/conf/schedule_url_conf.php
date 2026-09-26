@@ -3,9 +3,9 @@
 use Swoolefy\Worker\Cron\CronProcess;
 
 return [
-    // 定时请求远程url触发远程url的任务处理
+    // 定时请求远程url触发远程http-url的任务处理
     [
-        'process_name' => 'schedule-url-task-cron', // 进程名称
+        'process_name' => 'schedule-http-url-task-cron', // 进程名称
         'handler' => \App\WorkerCron\ScheduleUrlCronProcess::class,
         'worker_num' => 1, // 默认动态进程数量
         'max_handle' => 1000, //消费达到10000后reboot进程
