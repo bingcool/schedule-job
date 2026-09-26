@@ -394,6 +394,7 @@ HTTP 服务默认暴露（可在 `App/Config/health.php` 调整）：
 | 操作记录 | `#/tasks/operation-logs` | 任务变更审计 |
 | 执行记录 | `#/executions` | 按任务 / 状态 / 批次筛选 |
 | Cron Nodes | `#/nodes` | 节点与分组管理 |
+| 机器人告警 | `#/robots` | 企微 / 钉钉 / 飞书群机器人，节点组绑定后失败/超时告警 |
 | Runtime | `#/runtime` | Worker 运行时概览 |
 | 用户 / 角色 / 菜单 | `#/users` 等 | RBAC 管理 |
 
@@ -401,55 +402,31 @@ HTTP 服务默认暴露（可在 `App/Config/health.php` 调整）：
 
 ## 界面截图
 
-以下为管理台主要页面预览（截图位于 [`docs/`](docs/) 目录）。
+以下为管理台主要页面预览（截图位于 [`docs/images/`](docs/images/)）。
 
-### Dashboard
-
-任务统计、今日执行趋势与节点心跳概览。
-
-![Dashboard](docs/images/dashboard.png)
-
-### 计划任务
+### 计划任务列表
 
 任务列表：筛选、启停、手动执行、创建人过滤等。
 
-![计划任务列表](docs/images/tasklist.png)
+![计划任务列表](docs/images/cronlist.png)
 
-### 创建 / 编辑任务
+### 创建 / 编辑计划任务
 
 配置 Cron 表达式、执行方式（Shell / HTTP / Kubernetes）、节点、重试与阻塞策略等。
 
-![编辑计划任务](docs/images/edittask.png)
+![创建计划任务](docs/images/createcron.png)
 
 ### 执行记录
 
-按任务、状态、批次查看 Execution，可进入单次执行详情。
+按任务、状态、批次查看 Execution，可进入单次执行详情与日志。
 
-![执行记录](docs/images/log.png)
+![执行记录](docs/images/cronrecord.png)
 
-### Cron Nodes
+### 机器人告警
 
-Agent 节点与分组管理、心跳状态查看。
+配置企微 / 钉钉 / 飞书 Webhook；在 **Cron Nodes → 节点分组** 绑定后，组内任务失败或超时（非取消）向对应群机器人发告警。
 
-![Cron Nodes](docs/images/node.png)
-
-### 用户管理
-
-管理系统用户、角色分配与节点组授权。
-
-![用户管理](docs/images/user.png)
-
-### 角色管理
-
-定义角色、配置菜单页面权限；系统内置角色（超管、编辑任务组）不可删除。
-
-![角色管理](docs/images/role.png)
-
-### 菜单管理
-
-维护侧栏菜单结构，支持分组与排序。
-
-![菜单管理](docs/images/menu.png)
+![机器人告警](docs/images/robot.png)
 
 ---
 
