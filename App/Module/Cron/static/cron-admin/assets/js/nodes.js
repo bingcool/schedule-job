@@ -32,7 +32,7 @@
         form: emptyNodeForm(),
         groupForm: emptyGroupForm(),
         robotForm: emptyRobotForm(),
-        enabledRobots: [],
+        robotOptions: [],
         isSuper: common.isViewerSuper()
       };
     },
@@ -188,6 +188,13 @@
       platformLabel: function (platform) {
         return PLATFORM_LABELS[Number(platform)] || '未知';
       },
+      robotOptionLabel: function (r) {
+        var base = (r.name || ('#' + r.id)) + '（' + this.platformLabel(r.platform) + '）';
+        return Number(r.status) === 1 ? base : base + ' — 已禁用';
+      },
+      isRobotSelectable: function (r) {
+        return Number(r.status) === 1;
+      },
       openGroupRobot: async function (row) {
         if (!common.isViewerSuper()) {
           this.$message.warning('仅超级管理员可绑定机器人');
@@ -201,14 +208,21 @@
         };
         try {
           var d = await common.api('/robots');
-          this.enabledRobots = ((d && d.list) || []).filter(function (r) {
-            return Number(r.status) === 1;
-          });
-          if (row.robotId && !this.enabledRobots.some(function (r) { return Number(r.id) === Number(row.robotId); })) {
-            this.enabledRobots.unshift({
+          var rows = common.extractListRows(d);
+          this.robotOptions = rows.map(function (r) {
+            return {
+              id: Number(r.id),
+              name: String(r.name || ''),
+              platform: Number(r.platform || 0),
+              status: Number(r.status == null ? 1 : r.status)
+            };
+          }).filter(function (r) { return r.id > 0; });
+          if (row.robotId && !this.robotOptions.some(function (r) { return r.id === Number(row.robotId); })) {
+            this.robotOptions.unshift({
               id: Number(row.robotId),
               name: row.robotName || ('#' + row.robotId),
-              platform: row.robotPlatform || 0
+              platform: Number(row.robotPlatform || 0),
+              status: Number(row.robotStatus == null ? 0 : row.robotStatus)
             });
           }
         } catch (e) {

@@ -40,7 +40,7 @@
         this.loading = true;
         try {
           var d = await common.api('/robots');
-          this.items = (d && d.list) || [];
+          this.items = common.extractListRows(d);
         } catch (e) {
           common.toastErr(this, e);
         } finally {

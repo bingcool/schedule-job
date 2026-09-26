@@ -58,7 +58,8 @@ class StaffMenuPermissionService
         '/api/v1/robots/detail' => '/robots',
         '/api/v1/robots/status' => '/robots',
         '/api/v1/robots/test' => '/robots',
-        '/api/v1/robots' => '/robots',
+        // 节点组绑定告警机器人时需拉列表；写操作仍由 Service 校验超管
+        '/api/v1/robots' => ['/robots', '/nodes'],
         '/api/v1/runtime/overview' => '/runtime',
         '/api/v1/users/generate-reset-password' => '/users',
         '/api/v1/users/reset-password' => '/users',

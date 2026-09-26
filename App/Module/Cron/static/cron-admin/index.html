@@ -1141,9 +1141,9 @@
             <el-table-column prop="id" label="ID" width="64"></el-table-column>
             <el-table-column prop="groupName" label="分组名称" min-width="140" show-overflow-tooltip></el-table-column>
             <el-table-column prop="nodeCount" label="节点数" width="80"></el-table-column>
-            <el-table-column label="机器人告警" min-width="140" show-overflow-tooltip>
+            <el-table-column label="机器人告警" min-width="180" show-overflow-tooltip>
               <template slot-scope="s">
-                <span v-if="s.row.robotId">{{ s.row.robotName || ('#' + s.row.robotId) }}<span v-if="s.row.robotStatus === 0" class="text-muted">（已禁用）</span></span>
+                <span v-if="s.row.robotId">{{ s.row.robotName || ('#' + s.row.robotId) }}（{{ platformLabel(s.row.robotPlatform) }}）<span v-if="s.row.robotStatus === 0" class="status-mark status-failed"> — 已禁用</span></span>
                 <span v-else class="text-muted">未绑定</span>
               </template>
             </el-table-column>
@@ -1197,7 +1197,7 @@
         <el-form-item label="机器人">
           <el-select v-model="robotForm.robotId" placeholder="不使用机器人" clearable style="width:100%">
             <el-option :value="0" label="不使用机器人"></el-option>
-            <el-option v-for="r in enabledRobots" :key="'rb-'+r.id" :value="r.id" :label="r.name + '（' + platformLabel(r.platform) + '）'"></el-option>
+            <el-option v-for="r in robotOptions" :key="'rb-'+r.id" :value="r.id" :label="robotOptionLabel(r)" :disabled="!isRobotSelectable(r)"></el-option>
           </el-select>
         </el-form-item>
         <p class="section-desc" style="margin:0 0 0 90px">选择机器人警告后，节点分组内所有节点的任务失败或超时（非取消）时，将向该组当前选择绑定的群机器人发告警。仅超级管理员可修改。</p>
