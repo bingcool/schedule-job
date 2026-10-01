@@ -7,8 +7,12 @@ namespace InterfaceApi\Support\Generator;
 use InterfaceApi\Support\ApiOperation;
 use InterfaceApi\Support\BaseRequest;
 use InterfaceApi\Support\BaseResponse;
+use InterfaceApi\Support\ChunkedResponse;
+use InterfaceApi\Support\DownloadResponse;
 use InterfaceApi\Support\Route;
 use InterfaceApi\Support\RouteGroup;
+use InterfaceApi\Support\StreamResponse;
+use ReflectionNamedType;
 use ReflectionClass;
 use ReflectionMethod;
 
@@ -57,8 +61,8 @@ final class ClientWriter
         $methodBlocks = [];
         $uses = [
             'InterfaceApi\\Support\\BaseClientApi',
-            'InterfaceApi\\Support\\CovertProperty',
         ];
+        $needsCovertProperty = false;
 
         foreach ($methods as $method) {
             $this->validateMethod($method, $interfaceFqcn);
@@ -105,24 +109,11 @@ final class ClientWriter
                 $uses[$reqFqcn] = $reqFqcn;
             }
 
-            $retType = $method->getReturnType();
-            $retFqcn = null;
-            $isVoid = false;
-            if ($retType === null) {
-                throw new GeneratorException("{$method->getName()}(): return type required");
-            }
-            if ($retType instanceof \ReflectionNamedType) {
-                if ($retType->getName() === 'void') {
-                    $isVoid = true;
-                } else {
-                    $retFqcn = $retType->getName();
-                    if (!is_a($retFqcn, BaseResponse::class, true)) {
-                        throw new GeneratorException("{$method->getName()}(): return must be BaseResponse or void");
-                    }
-                    $uses[$retFqcn] = $retFqcn;
-                }
-            } else {
-                throw new GeneratorException("{$method->getName()}(): union/intersection return not supported");
+            $responseMode = $this->resolveResponseMode($method);
+            [$retFqcn, $isVoid, $returnSignature] = $this->validateResponseType($method, $responseMode);
+            if ($responseMode === 'json' && !$isVoid && $retFqcn !== null) {
+                $uses[$retFqcn] = $retFqcn;
+                $needsCovertProperty = true;
             }
 
             $doc = $this->formatMethodDocblock($method);
@@ -131,9 +122,14 @@ final class ClientWriter
                 $verb,
                 $fullPath,
                 $reqFqcn,
-                $retFqcn,
+                $returnSignature,
                 $isVoid,
+                $responseMode,
             );
+        }
+
+        if ($needsCovertProperty) {
+            $uses['InterfaceApi\\Support\\CovertProperty'] = 'InterfaceApi\\Support\\CovertProperty';
         }
 
         sort($uses);
@@ -238,16 +234,74 @@ PHP;
         return implode("\n", $lines) . "\n";
     }
 
+    /**
+     * @return 'json'|'sse'|'chunked'|'download'
+     */
+    private function resolveResponseMode(ReflectionMethod $method): string
+    {
+        $modes = [];
+        if ($method->getAttributes(StreamResponse::class) !== []) {
+            $modes[] = 'sse';
+        }
+        if ($method->getAttributes(ChunkedResponse::class) !== []) {
+            $modes[] = 'chunked';
+        }
+        if ($method->getAttributes(DownloadResponse::class) !== []) {
+            $modes[] = 'download';
+        }
+        if (count($modes) > 1) {
+            throw new GeneratorException($method->getName() . '(): only one response mode is allowed');
+        }
+
+        return $modes[0] ?? 'json';
+    }
+
+    /**
+     * @return array{0: ?string, 1: bool, 2: string} retFqcn, isVoid, generated return signature
+     */
+    private function validateResponseType(ReflectionMethod $method, string $responseMode): array
+    {
+        $retType = $method->getReturnType();
+        if ($retType === null) {
+            throw new GeneratorException("{$method->getName()}(): return type required");
+        }
+        if (!$retType instanceof ReflectionNamedType) {
+            throw new GeneratorException("{$method->getName()}(): union/intersection return not supported");
+        }
+
+        if ($responseMode === 'json') {
+            if ($retType->getName() === 'void') {
+                return [null, true, 'void'];
+            }
+            $retFqcn = $retType->getName();
+            if ($retType->isBuiltin() || !is_a($retFqcn, BaseResponse::class, true)) {
+                throw new GeneratorException("{$method->getName()}(): return must be BaseResponse or void");
+            }
+
+            return [$retFqcn, false, $this->shortName($retFqcn)];
+        }
+
+        $expected = $responseMode === 'chunked' ? 'string' : 'array';
+        if ($retType->getName() === 'void') {
+            throw new GeneratorException("{$method->getName()}(): {$responseMode} response cannot return void");
+        }
+        if (!$retType->isBuiltin() || $retType->getName() !== $expected || $retType->allowsNull()) {
+            throw new GeneratorException("{$method->getName()}(): {$responseMode} response must return {$expected}");
+        }
+
+        return [null, false, $expected];
+    }
+
     private function emitClientMethod(
         string $name,
         string $verb,
         string $fullPath,
         ?string $reqFqcn,
-        ?string $retFqcn,
+        string $returnSignature,
         bool $isVoid,
+        string $responseMode,
     ): string {
         $reqShort = $reqFqcn !== null ? $this->shortName($reqFqcn) : null;
-        $retShort = $retFqcn !== null ? $this->shortName($retFqcn) : 'void';
         $paramList = $reqShort !== null ? "{$reqShort} \$request, array \$options = []" : 'array $options = []';
         $pathLit = var_export($fullPath, true);
         $verbLit = var_export($verb, true);
@@ -258,18 +312,33 @@ PHP;
                 $body[] = '        $requestDefaults[\'query\'] = $request->toDeepArray();';
             } else {
                 $body[] = '        $requestDefaults[\'body\'] = json_encode($request->toDeepArray(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);';
+                if ($responseMode === 'sse' || $responseMode === 'chunked') {
+                    $body[] = '        $requestDefaults[\'headers\'][\'Content-Type\'] = \'application/json\';';
+                }
             }
         }
-        $body[] = '        $options = $this->mergeClientOptions($requestDefaults, $options);';
+        if ($responseMode === 'sse') {
+            $body[] = '        $requestDefaults[\'headers\'][\'Accept\'] = \'text/event-stream\';';
+        }
+        $mergeMethod = $responseMode === 'sse' || $responseMode === 'chunked'
+            ? 'mergeStreamClientOptions'
+            : 'mergeClientOptions';
+        $body[] = "        \$options = \$this->{$mergeMethod}(\$requestDefaults, \$options);";
         $body[] = "        \$response = \$this->requestWithConnectRetry({$verbLit}, \$this->uri({$pathLit}), \$options);";
-        $body[] = '        $result = $this->parseResponseByHeaders($response);';
-        if ($isVoid) {
-            $body[] = '        return;';
+        if ($responseMode === 'json') {
+            if ($isVoid) {
+                $body[] = '        $this->parseResponseByHeaders($response);';
+                $body[] = '        return;';
+            } else {
+                $body[] = '        $result = $this->parseResponseByHeaders($response);';
+                $body[] = "        return CovertProperty::toCovertDeepProperty(\$result, {$returnSignature}::class);";
+            }
         } else {
-            $body[] = "        return CovertProperty::toCovertDeepProperty(\$result, {$retShort}::class);";
+            $modeLit = var_export($responseMode, true);
+            $body[] = "        return \$this->parseResponseByHeaders(\$response, {$modeLit});";
         }
 
-        return '    public function ' . $name . '(' . $paramList . '): ' . $retShort . "\n    {\n"
+        return '    public function ' . $name . '(' . $paramList . '): ' . $returnSignature . "\n    {\n"
             . implode("\n", $body) . "\n    }";
     }
 

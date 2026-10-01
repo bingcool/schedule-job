@@ -409,14 +409,17 @@
         </el-table-column>
       </el-table>
       <el-dialog title="更改权限所属人" :visible.sync="ownerDlg" width="480px" append-to-body>
-        <p style="margin:0 0 12px;color:var(--muted);font-size:13px">
+        <p style="margin:0 0 8px;color:var(--muted);font-size:13px">
           任务「{{ ownerTask && ownerTask.name }}」的权限将转移给所选用户；仅可选择已授权节点分组「{{ groupNameOf(ownerTask || {}) }}」的用户。
+        </p>
+        <p style="margin:0 0 12px;font-size:13px">
+          当前权限所属人：<strong>{{ creatorNameOf(ownerTask) }}</strong>
         </p>
         <el-select
           v-model="ownerForm.userId"
           filterable
           popper-append-to-body
-          placeholder="选择用户"
+          placeholder="选择新的权限所属人"
           style="width:100%"
         >
           <el-option
@@ -1730,7 +1733,7 @@
 <script defer src="/cron-admin/assets/vendor/element-ui/index.js"></script>
 <script defer src="/cron-admin/assets/js/common.js?v=temp-login-hint-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js?v=dash-trend-view-1"></script>
-<script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-1"></script>
+<script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-2"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=k8s-timeout-hours-1"></script>
 <script defer src="/cron-admin/assets/js/detail.js?v=avg-duration-sec-1"></script>
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=cancel-op-1"></script>

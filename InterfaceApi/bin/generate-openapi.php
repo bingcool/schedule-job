@@ -7,39 +7,37 @@ declare(strict_types=1);
  * 从 InterfaceApi 契约（*ApiInterface + #[Route]）生成 OpenAPI 3.0 YAML。
  * 行为对齐 swoolefy `gen:apidoc` 的 schema/响应信封规则，数据源改为契约接口而非 Router。
  *
- * 用法（schedule-job 仓库根）：
- *   php InterfaceApi/bin/generate-openapi.php --service=ScheduleJob/App
- *   php InterfaceApi/bin/generate-openapi.php --service=ScheduleJob/App --out=swaggerui/apidoc
+ * 用法（interface-api-service 仓库根目录）：
+ *   php bin/generate-openapi.php --service=ScheduleJob/App
+ *   php bin/generate-openapi.php --service=ScheduleJob/App --out=ScheduleJob/openapi
  */
 
 $binDir = __DIR__;
-$interfaceApiRoot = dirname($binDir);
+$repositoryRoot = dirname($binDir);
 
-require_once $interfaceApiRoot . '/Support/Generator/GeneratorException.php';
-require_once $interfaceApiRoot . '/Support/Generator/ProjectBootstrap.php';
+require_once $repositoryRoot . '/Support/Generator/GeneratorException.php';
+require_once $repositoryRoot . '/Support/Generator/ProjectBootstrap.php';
 
 use InterfaceApi\Support\Generator\GeneratorException;
 use InterfaceApi\Support\Generator\OpenApiDocGenerator;
 use InterfaceApi\Support\Generator\ProjectBootstrap;
 
 try {
-    [$projectRoot] = ProjectBootstrap::resolveFromBinDir($binDir);
+    $repositoryRoot = ProjectBootstrap::resolveRepositoryRootFromBinDir($binDir);
+    ProjectBootstrap::register($repositoryRoot);
 } catch (GeneratorException $e) {
     fwrite(STDERR, $e->getMessage() . PHP_EOL);
     exit(2);
 }
 
-ProjectBootstrap::register($projectRoot, $interfaceApiRoot);
-
 [$serviceKey, $outRel] = parseGenerateOpenApiArgv($argv ?? []);
 
-$interfaceApiRoot = ProjectBootstrap::resolveInterfaceApiRoot($projectRoot);
 $outputDir = $outRel !== ''
-    ? $projectRoot . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, ltrim($outRel, '/\\'))
-    : $interfaceApiRoot . DIRECTORY_SEPARATOR . explode('/', $serviceKey)[0] . DIRECTORY_SEPARATOR . 'openapi';
+    ? $repositoryRoot . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, ltrim($outRel, '/\\'))
+    : $repositoryRoot . DIRECTORY_SEPARATOR . explode('/', $serviceKey)[0] . DIRECTORY_SEPARATOR . 'openapi';
 
 try {
-    (new OpenApiDocGenerator($projectRoot, $serviceKey, $outputDir))->run();
+    (new OpenApiDocGenerator($repositoryRoot, $serviceKey, $outputDir))->run();
 } catch (GeneratorException $e) {
     fwrite(STDERR, PHP_EOL . 'Error: ' . $e->getMessage() . PHP_EOL . PHP_EOL);
     exit(1);
@@ -69,8 +67,8 @@ function parseGenerateOpenApiArgv(array $argv): array
     }
 
     if ($serviceKey === null || trim($serviceKey) === '') {
-        fwrite(STDERR, "Missing required --service=ScheduleJob/App\n");
-        fwrite(STDERR, "Usage: php InterfaceApi/bin/generate-openapi.php --service=ScheduleJob/App [--out=InterfaceApi/ScheduleJob/openapi]\n");
+        fwrite(STDERR, "Missing required --service=xxxxxx/App\n");
+        fwrite(STDERR, "Usage: php bin/generate-openapi.php --service=xxxxxx/App [--out=ScheduleJob/openapi]\n");
         exit(2);
     }
 

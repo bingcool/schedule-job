@@ -23,10 +23,10 @@ final class ClientDirectoryReadme
 
 ## 如何更新
 
-在 schedule-job 仓库根目录执行：
+在 **interface-api-service** 仓库根目录执行：
 
 ```bash
-php InterfaceApi/bin/generate-client.php --service=ScheduleJob/App
+php bin/generate-client.php --service=ScheduleJob/App
 ```
 
 修改路由或方法签名时，请先改 `Interface/` 下的接口与 Request/Response，再运行上述命令重新生成 Client。

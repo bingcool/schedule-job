@@ -63,26 +63,6 @@ final class ConsoleReporter
         $this->out('  ' . $this->style('✗', 'red') . ' ' . $message);
     }
 
-    public function finishSuccess(float $seconds, string $message): void
-    {
-        $this->out('');
-        $this->out($this->style(str_repeat('─', 42), 'dim'));
-        $time = number_format($seconds, 2);
-        $this->out('');
-        $this->out($this->style('Passed in ' . $time . 's — ' . $message, 'highlight'));
-        $this->out('');
-    }
-
-    public function finishFailure(float $seconds, string $message): void
-    {
-        $this->out('');
-        $this->out($this->style(str_repeat('─', 42), 'dim'));
-        $time = number_format($seconds, 2);
-        $this->out('');
-        $this->out($this->style('Failed in ' . $time . 's — ' . $message, 'fail'));
-        $this->out('');
-    }
-
     public function summary(
         float $seconds,
         int $writtenCount,
@@ -144,7 +124,6 @@ final class ConsoleReporter
             'red' => "\033[31m{$text}\033[0m",
             // 粗体 + 高亮绿（终端无法真正放大字号，用加粗与高对比突出收尾行）
             'highlight' => "\033[1;92m{$text}\033[0m",
-            'fail' => "\033[1;31m{$text}\033[0m",
             default => $text,
         };
     }

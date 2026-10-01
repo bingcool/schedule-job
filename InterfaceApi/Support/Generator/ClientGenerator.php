@@ -98,7 +98,7 @@ final class ClientGenerator
             );
         }
 
-        $interfaceApiRoot = ProjectBootstrap::resolveInterfaceApiRoot($this->projectRoot);
+        $interfaceApiRoot = ProjectBootstrap::resolveInterfaceApiRoot();
         $appRoot = $interfaceApiRoot
             . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $serviceKey);
         if (!is_dir($appRoot)) {

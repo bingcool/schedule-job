@@ -120,7 +120,7 @@ final class OpenApiDocGenerator
             throw new GeneratorException('--service must end with /App (e.g. ScheduleJob/App)');
         }
 
-        $interfaceApiRoot = ProjectBootstrap::resolveInterfaceApiRoot($this->projectRoot);
+        $interfaceApiRoot = ProjectBootstrap::resolveInterfaceApiRoot();
         $appRoot = $interfaceApiRoot
             . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $serviceKey);
         if (!is_dir($appRoot)) {
@@ -1087,7 +1087,6 @@ final class OpenApiDocGenerator
     {
         $candidates = [
             $packageRoot . DIRECTORY_SEPARATOR . 'openapi-modules.json',
-            $this->projectRoot . DIRECTORY_SEPARATOR . 'App' . DIRECTORY_SEPARATOR . 'Router' . DIRECTORY_SEPARATOR . 'api_router_module.json',
         ];
         $file = null;
         foreach ($candidates as $candidate) {
@@ -1136,8 +1135,10 @@ final class OpenApiDocGenerator
             'default_title_template' => self::DEFAULT_TITLE_TEMPLATE,
         ];
 
+        $packageName = explode('/', trim(str_replace('\\', '/', $this->serviceKey), '/'))[0];
         $candidates = [
-            $this->projectRoot . DIRECTORY_SEPARATOR . 'App' . DIRECTORY_SEPARATOR . 'Config' . DIRECTORY_SEPARATOR . 'apidoc.php',
+            $this->projectRoot . DIRECTORY_SEPARATOR . $packageName . DIRECTORY_SEPARATOR . 'apidoc.php',
+            $this->projectRoot . DIRECTORY_SEPARATOR . 'apidoc.php',
         ];
 
         $file = null;

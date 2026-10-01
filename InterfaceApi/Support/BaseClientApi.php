@@ -6,7 +6,9 @@ namespace InterfaceApi\Support;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\TransferException;
 use Psr\Http\Message\ResponseInterface;
 use Swoolefy\Support\HeaderPropagation\HeaderPropagator;
 
@@ -111,7 +113,7 @@ abstract class BaseClientApi
     }
 
     /**
-     * 发起 HTTP 请求；RequestException（含 ConnectException、4xx/5xx）时按策略重试。
+     * 发起 HTTP 请求。仅连接失败或无 HTTP 响应的传输失败按策略重试；4xx/5xx 直接抛出。
      *
      * 重试次数优先级：$retryNum > $options['connect_retry_num'] > 方法默认值。
      * - GET/HEAD/PUT/DELETE/OPTIONS 默认 1 次；POST/PATCH 默认 0（需业务显式开启，保证幂等）
@@ -139,8 +141,8 @@ abstract class BaseClientApi
         while (true) {
             try {
                 return $this->httpClient->request($method, $uri, $options);
-            } catch (RequestException $e) {
-                if ($retriesLeft <= 0) {
+            } catch (TransferException $e) {
+                if (!$this->isConnectRetryable($e) || $retriesLeft <= 0) {
                     throw $e;
                 }
 
@@ -171,6 +173,16 @@ abstract class BaseClientApi
                 $retriesLeft--;
             }
         }
+    }
+
+    /** 连接失败，或没有 HTTP 响应的传输失败，才允许重试。4xx/5xx 直接抛出。 */
+    private function isConnectRetryable(TransferException $e): bool
+    {
+        if ($e instanceof ConnectException) {
+            return true;
+        }
+
+        return $e instanceof RequestException && !$e->hasResponse();
     }
 
     /** Nacos 模式下重新发现 base_uri 并重建 Guzzle Client */
@@ -209,7 +221,7 @@ abstract class BaseClientApi
      * 记录重试日志（guzzle_curl 通道），含失败/下一跳 host:port 与异常信息。
      */
     protected function logConnectRetry(
-        RequestException $e,
+        TransferException $e,
         string $method,
         string $uri,
         int $attempt,
@@ -289,7 +301,7 @@ abstract class BaseClientApi
         return min(3, $retryNum);
     }
 
-    /** 创建 Guzzle Client；http_errors=true 以便 RequestException 触发重试逻辑 */
+    /** 创建 Guzzle Client；http_errors=true 使 4xx/5xx 抛出带响应的 RequestException，不进入连接重试 */
     protected function createHttpClient(): Client
     {
         return new Client([
@@ -345,8 +357,9 @@ abstract class BaseClientApi
     }
 
     /**
-     * JSON client defaults + per-request keys (body, query, …) + caller overrides; headers are deep-merged.
+     * JSON client defaults + per-request keys (body, query, …) + caller overrides.
      *
+     * Headers merge in order: propagated defaults, contract defaults, caller overrides.
      * SDK 专用选项（不会传给 Guzzle）：connect_retry_num（0~3，POST 默认 0，GET/PUT/DELETE 等默认 1）。
      *
      * @param array<string, mixed> $requestDefaults
@@ -357,7 +370,7 @@ abstract class BaseClientApi
     {
         // GuzzleHttp\Exception\RequestException 或其子类 GuzzleHttp\Exception\ConnectException。
         // 你可以使用 try-catch 来捕获它们，但这有一个重要前提：请求的 http_errors 选项必须被设置为 true（这也是该选项的默认行为）
-        $defaults = [
+        return $this->mergeRequestOptions([
             'http_errors' => true,
             'headers' => array_merge(
                 HeaderPropagator::outgoingHeaders(),
@@ -365,20 +378,14 @@ abstract class BaseClientApi
             ),
             'connect_timeout' => 30.0,
             'timeout' => 120.0,
-        ];
-        $defaults = array_merge($defaults, $requestDefaults);
-        $merged = array_merge($defaults, $options);
-        if (isset($defaults['headers'], $options['headers']) && is_array($defaults['headers']) && is_array($options['headers'])) {
-            $merged['headers'] = array_merge($defaults['headers'], $options['headers']);
-        }
-
-        return $merged;
+        ], $requestDefaults, $options);
     }
 
     /**
      * 流式请求默认选项：不设置 Content-Type: application/json。
      *
      * 用于 SSE / Chunked 等接口；普通 JSON API 请用 mergeClientOptions()。
+     * Headers 同样按「透传默认头、契约默认头、调用方头」合并，避免契约头覆盖 trace id / User-Agent。
      *
      * @param array<string, mixed> $requestDefaults
      * @param array<string, mixed> $options
@@ -386,19 +393,44 @@ abstract class BaseClientApi
      */
     protected function mergeStreamClientOptions(array $requestDefaults, array $options = []): array
     {
-        $defaults = [
+        return $this->mergeRequestOptions([
             'http_errors' => true,
             'headers' => HeaderPropagator::outgoingHeaders(),
             'connect_timeout' => 30.0,
             'timeout' => 120.0,
-        ];
-        $defaults = array_merge($defaults, $requestDefaults);
-        $merged = array_merge($defaults, $options);
-        if (isset($defaults['headers'], $options['headers']) && is_array($defaults['headers']) && is_array($options['headers'])) {
-            $merged['headers'] = array_merge($defaults['headers'], $options['headers']);
-        }
+        ], $requestDefaults, $options);
+    }
+
+    /**
+     * @param array<string, mixed> $base
+     * @param array<string, mixed> $requestDefaults
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    private function mergeRequestOptions(array $base, array $requestDefaults, array $options): array
+    {
+        $headers = array_merge(
+            $this->headerMap($base),
+            $this->headerMap($requestDefaults),
+            $this->headerMap($options),
+        );
+        unset($base['headers'], $requestDefaults['headers'], $options['headers']);
+
+        $merged = array_merge($base, $requestDefaults, $options);
+        $merged['headers'] = $headers;
 
         return $merged;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return array<string, mixed>
+     */
+    private function headerMap(array $options): array
+    {
+        $headers = $options['headers'] ?? [];
+
+        return is_array($headers) ? $headers : [];
     }
 
     /**

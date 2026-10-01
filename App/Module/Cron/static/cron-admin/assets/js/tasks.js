@@ -350,13 +350,19 @@
           return;
         }
         this.ownerTask = row;
-        var currentOwner = Number(row.createdBy || row.created_by || 0);
-        this.ownerForm = { userId: currentOwner > 0 ? currentOwner : null };
+        this.ownerForm = { userId: null };
         this.ownerUserOptions = [];
         this.ownerDlg = true;
         try {
           var d = await common.api('/users/by-node-group?nodeGroupId=' + encodeURIComponent(groupId));
-          this.ownerUserOptions = (d && d.list) || [];
+          var rows = common.extractListRows(d);
+          this.ownerUserOptions = rows.map(function (u) {
+            return {
+              id: Number(u.id),
+              account: u.account || '',
+              userName: u.userName || u.user_name || ''
+            };
+          }).filter(function (u) { return u.id > 0; });
           if (!this.ownerUserOptions.length) {
             this.$message.warning('该节点分组下暂无可选用户');
           }

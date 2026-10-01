@@ -5,115 +5,96 @@ declare(strict_types=1);
 namespace InterfaceApi\Support\Generator;
 
 /**
- * generate-client 与 ClientGenerator 共用的仓库根目录解析与自动加载。
+ * generate-client / generate-openapi 仅在 interface-api-service 仓库根内运行时的引导与自动加载。
  */
 final class ProjectBootstrap
 {
     private static bool $registered = false;
 
-    public static function resolveInterfaceApiRoot(string $projectRoot): string
-    {
-        $autoload = rtrim($projectRoot, '/\\') . DIRECTORY_SEPARATOR . 'App' . DIRECTORY_SEPARATOR . 'Autoloader.php';
-        if (is_file($autoload)) {
-            require_once $autoload;
-            if (method_exists(\App\Autoloader::class, 'interfaceApiRoot')) {
-                return \App\Autoloader::interfaceApiRoot($projectRoot);
-            }
-        }
+    private static ?string $repositoryRoot = null;
 
-        return self::fallbackInterfaceApiRoot($projectRoot);
-    }
-
-    /**
-     * @return array{0: string, 1: string} projectRoot, interfaceApiRoot
-     */
-    public static function resolveFromBinDir(string $binDir): array
+    public static function resolveRepositoryRootFromBinDir(string $binDir): string
     {
-        $interfaceApiRoot = realpath(dirname($binDir)) ?: dirname($binDir);
-        $support = $interfaceApiRoot . DIRECTORY_SEPARATOR . 'Support';
+        $root = realpath(dirname($binDir)) ?: dirname($binDir);
+        $support = $root . DIRECTORY_SEPARATOR . 'Support';
         if (!is_dir($support)) {
-            throw new GeneratorException('Not an InterfaceApi tree (missing Support/): ' . $interfaceApiRoot);
+            throw new GeneratorException('Not an interface-api-service tree (missing Support/): ' . $root);
         }
 
-        $projectRoot = self::findApplicationProjectRoot($interfaceApiRoot);
-
-        return [$projectRoot, $interfaceApiRoot];
+        return $root;
     }
 
-    public static function register(string $projectRoot, ?string $interfaceApiRoot = null): void
+    public static function repositoryRoot(): string
+    {
+        if (self::$repositoryRoot === null) {
+            throw new GeneratorException('ProjectBootstrap::register() has not been called');
+        }
+
+        return self::$repositoryRoot;
+    }
+
+    /** 契约包根目录（与本仓库根相同）。 */
+    public static function resolveInterfaceApiRoot(): string
+    {
+        return self::repositoryRoot();
+    }
+
+    public static function register(string $repositoryRoot): void
     {
         if (self::$registered) {
             return;
         }
 
-        $interfaceApiRoot ??= self::resolveInterfaceApiRoot($projectRoot);
-
-        $composer = $projectRoot . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
-        if (is_file($composer)) {
-            require_once $composer;
+        if (!is_dir($repositoryRoot . DIRECTORY_SEPARATOR . 'Support')) {
+            throw new GeneratorException('Not an interface-api-service tree: ' . $repositoryRoot);
         }
 
-        $appAutoload = $projectRoot . DIRECTORY_SEPARATOR . 'App' . DIRECTORY_SEPARATOR . 'Autoloader.php';
-        if (is_file($appAutoload)) {
-            require_once $appAutoload;
-            if (class_exists(\App\Autoloader::class, false)) {
-                $prepend = \App\Autoloader::isRegisterLocalInterfaceApi();
-                \App\Autoloader::register($prepend);
-                self::$registered = true;
+        self::$repositoryRoot = realpath($repositoryRoot) ?: $repositoryRoot;
 
-                return;
-            }
+        self::registerInterfaceApiAutoload(self::$repositoryRoot);
+
+        $vendor = self::resolveVendorAutoload(self::$repositoryRoot);
+        if ($vendor === null) {
+            throw new GeneratorException(
+                'Missing vendor/autoload.php. Run `composer install` in the contract repo'
+                . ' (interface-api-service), or in the host project that contains InterfaceApi/ (schedule-job).',
+            );
         }
-
-        spl_autoload_register(static function (string $class) use ($interfaceApiRoot): void {
-            if ($class !== 'InterfaceApi' && !str_starts_with($class, 'InterfaceApi\\')) {
-                return;
-            }
-            $relative = substr($class, strlen('InterfaceApi\\'));
-            $path = $interfaceApiRoot . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $relative) . '.php';
-            if (is_file($path)) {
-                require_once $path;
-            }
-        });
+        require_once $vendor;
 
         self::$registered = true;
     }
 
-    private static function findApplicationProjectRoot(string $interfaceApiRoot): string
+    /**
+     * 独立契约仓：{仓库根}/vendor/autoload.php。
+     * 嵌在业务项目里：{项目根}/vendor/autoload.php（InterfaceApi 的上一级）。
+     */
+    private static function resolveVendorAutoload(string $repositoryRoot): ?string
     {
-        $parent = dirname($interfaceApiRoot);
-
-        if (self::looksLikeScheduleJobRoot($parent)) {
-            return realpath($parent) ?: $parent;
-        }
-
-        if (is_dir($parent)) {
-            foreach (scandir($parent) ?: [] as $name) {
-                if ($name === '.' || $name === '..' || $name === basename($interfaceApiRoot)) {
-                    continue;
-                }
-                $candidate = $parent . DIRECTORY_SEPARATOR . $name;
-                if (self::looksLikeScheduleJobRoot($candidate)) {
-                    return realpath($candidate) ?: $candidate;
-                }
+        $candidates = [
+            $repositoryRoot . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php',
+            dirname($repositoryRoot) . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php',
+        ];
+        foreach ($candidates as $path) {
+            if (is_file($path)) {
+                return $path;
             }
         }
 
-        throw new GeneratorException(
-            'Cannot find schedule-job project root (need App/ + cli.php sibling to InterfaceApi): ' . $parent,
-        );
+        return null;
     }
 
-    private static function looksLikeScheduleJobRoot(string $path): bool
+    private static function registerInterfaceApiAutoload(string $repositoryRoot): void
     {
-        return is_dir($path . DIRECTORY_SEPARATOR . 'App')
-            && (is_file($path . DIRECTORY_SEPARATOR . 'cli.php') || is_file($path . DIRECTORY_SEPARATOR . 'cron.php'));
-    }
-
-    private static function fallbackInterfaceApiRoot(string $projectRoot): string
-    {
-        $embedded = rtrim($projectRoot, '/\\') . DIRECTORY_SEPARATOR . 'InterfaceApi';
-
-        return $embedded;
+        spl_autoload_register(static function (string $class) use ($repositoryRoot): void {
+            if ($class !== 'InterfaceApi' && !str_starts_with($class, 'InterfaceApi\\')) {
+                return;
+            }
+            $relative = substr($class, strlen('InterfaceApi\\'));
+            $path = $repositoryRoot . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $relative) . '.php';
+            if (is_file($path)) {
+                require_once $path;
+            }
+        });
     }
 }
