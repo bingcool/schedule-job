@@ -10,31 +10,31 @@ use Swoolefy\Worker\Cron\ExecutionStatus;
 final class CronTaskStatsResultMapper
 {
     /**
-         * 由 GROUP BY 聚合结果构造。空数据返回完整零值结构。
-         *
-         * @param array<string, mixed> $stats {@see ExecutionStatus::aggregateCounts()}
-         */
-        public static function fromAggregated(int $taskId, array $stats): CronTaskStatsResultDto
-        {
-            $empty = ExecutionStatus::emptyCounts();
-            $stats = array_merge($empty, $stats);
-            $dto = new CronTaskStatsResultDto();
-            $dto->taskId = $taskId;
-            $dto->total = (int) $stats['total'];
-            $dto->register = (int) $stats['register'];
-            $dto->running = (int) $stats['running'];
-            $dto->success = (int) $stats['success'];
-            $dto->failed = (int) $stats['failed'];
-            $dto->skipped = (int) $stats['skipped'];
-            $dto->timeout = (int) $stats['timeout'];
-            $dto->cancelled = (int) $stats['cancelled'];
-            $dto->finished = (int) $stats['finished'];
-            $dto->attempted = (int) $stats['attempted'];
-            $dto->successRate = (float) $stats['successRate'];
-            $dto->avgDurationMs = (float) $stats['avgDurationMs'];
-            $dto->maxDurationMs = (float) $stats['maxDurationMs'];
-            $dto->samples = (int) $stats['samples'];
+     * 由 GROUP BY 聚合结果构造。空数据返回完整零值结构。
+     *
+     * @param array<string, mixed> $stats {@see ExecutionStatus::aggregateCounts()}
+     */
+    public static function fromAggregated(int $taskId, array $stats): CronTaskStatsResultDto
+    {
+        $empty = ExecutionStatus::emptyCounts();
+        $stats = array_merge($empty, $stats);
+        $dto = new CronTaskStatsResultDto();
+        $dto->setTaskId($taskId);
+        $dto->setTotal((int) $stats['total']);
+        $dto->setRegister((int) $stats['register']);
+        $dto->setRunning((int) $stats['running']);
+        $dto->setSuccess((int) $stats['success']);
+        $dto->setFailed((int) $stats['failed']);
+        $dto->setSkipped((int) $stats['skipped']);
+        $dto->setTimeout((int) $stats['timeout']);
+        $dto->setCancelled((int) $stats['cancelled']);
+        $dto->setFinished((int) $stats['finished']);
+        $dto->setAttempted((int) $stats['attempted']);
+        $dto->setSuccessRate((float) $stats['successRate']);
+        $dto->setAvgDurationMs((float) $stats['avgDurationMs']);
+        $dto->setMaxDurationMs((float) $stats['maxDurationMs']);
+        $dto->setSamples((int) $stats['samples']);
 
-            return $dto;
-        }
+        return $dto;
+    }
 }
