@@ -130,4 +130,88 @@ class StaffUserRowDto extends AbstractDto
     {
         return $this->updatedAt;
     }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function setAccount(string $account): static
+    {
+        $this->account = $account;
+
+        return $this;
+    }
+
+    public function setEmail(string $email): static
+    {
+        $this->email = $email;
+
+        return $this;
+    }
+
+    public function setUserName(string $userName): static
+    {
+        $this->userName = $userName;
+
+        return $this;
+    }
+
+    public function setStatus(int $status): static
+    {
+        $this->status = $status;
+
+        return $this;
+    }
+
+    public function setRoles(array $roles): static
+    {
+        $this->roles = $roles;
+
+        return $this;
+    }
+
+    public function setRoleIds(array $roleIds): static
+    {
+        $this->roleIds = $roleIds;
+
+        return $this;
+    }
+
+    public function setNodeGroupIds(array $nodeGroupIds): static
+    {
+        $this->nodeGroupIds = $nodeGroupIds;
+
+        return $this;
+    }
+
+    public function setNodeGroups(array $nodeGroups): static
+    {
+        $this->nodeGroups = $nodeGroups;
+
+        return $this;
+    }
+
+    public function setIsSuper(bool $isSuper): static
+    {
+        $this->isSuper = $isSuper;
+
+        return $this;
+    }
+
+    public function setCreatedAt(string $createdAt): static
+    {
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function setUpdatedAt(string $updatedAt): static
+    {
+        $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
 }

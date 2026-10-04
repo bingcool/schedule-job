@@ -121,4 +121,97 @@ class AuthMeProfileDto extends AbstractDto
 
         return $data;
     }
+
+    public function getId(): int
+    {
+        return $this->id;
+    }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function getAccount(): string
+    {
+        return $this->account;
+    }
+
+    public function setAccount(string $account): static
+    {
+        $this->account = $account;
+
+        return $this;
+    }
+
+    public function getEmail(): string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(string $email): static
+    {
+        $this->email = $email;
+
+        return $this;
+    }
+
+    public function getUserName(): string
+    {
+        return $this->userName;
+    }
+
+    public function setUserName(string $userName): static
+    {
+        $this->userName = $userName;
+
+        return $this;
+    }
+
+    public function setIsSuper(bool $isSuper): static
+    {
+        $this->isSuper = $isSuper;
+
+        return $this;
+    }
+
+    public function getIsEditorTaskGroup(): bool
+    {
+        return $this->isEditorTaskGroup;
+    }
+
+    public function setIsEditorTaskGroup(bool $isEditorTaskGroup): static
+    {
+        $this->isEditorTaskGroup = $isEditorTaskGroup;
+
+        return $this;
+    }
+
+    public function setRoles(array $roles): static
+    {
+        $this->roles = $roles;
+
+        return $this;
+    }
+
+    public function getNodeGroupIds(): array
+    {
+        return $this->nodeGroupIds;
+    }
+
+    public function setNodeGroupIds(array $nodeGroupIds): static
+    {
+        $this->nodeGroupIds = $nodeGroupIds;
+
+        return $this;
+    }
+
+    public function setMenus(array $menus): static
+    {
+        $this->menus = $menus;
+
+        return $this;
+    }
 }

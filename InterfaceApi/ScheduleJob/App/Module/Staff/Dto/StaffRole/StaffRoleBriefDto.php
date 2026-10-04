@@ -39,4 +39,37 @@ class StaffRoleBriefDto extends AbstractDto
     {
         return $this->code;
     }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function setName(string $name): static
+    {
+        $this->name = $name;
+
+        return $this;
+    }
+
+    public function setCode(string $code): static
+    {
+        $this->code = $code;
+
+        return $this;
+    }
+
+    public function setIsSuperRole(bool $isSuperRole): static
+    {
+        $this->isSuperRole = $isSuperRole;
+
+        return $this;
+    }
 }

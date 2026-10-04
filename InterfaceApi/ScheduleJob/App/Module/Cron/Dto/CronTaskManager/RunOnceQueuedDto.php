@@ -34,4 +34,52 @@ class RunOnceQueuedDto extends AbstractDto
 
         return $dto;
     }
+
+    public function getId(): int
+    {
+        return $this->id;
+    }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function getQueued(): bool
+    {
+        return $this->queued;
+    }
+
+    public function setQueued(bool $queued): static
+    {
+        $this->queued = $queued;
+
+        return $this;
+    }
+
+    public function getRequestedAt(): string
+    {
+        return $this->requestedAt;
+    }
+
+    public function setRequestedAt(string $requestedAt): static
+    {
+        $this->requestedAt = $requestedAt;
+
+        return $this;
+    }
+
+    public function getMessage(): string
+    {
+        return $this->message;
+    }
+
+    public function setMessage(string $message): static
+    {
+        $this->message = $message;
+
+        return $this;
+    }
 }

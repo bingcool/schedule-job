@@ -358,4 +358,237 @@ class CronTaskPayloadDto extends AbstractDto
 
         return $out;
     }
+
+    public function getName(): ?string
+    {
+        return $this->name;
+    }
+
+    public function setName(?string $name): static
+    {
+        $this->name = $name;
+        $this->presentFields['name'] = true;
+
+        return $this;
+    }
+
+    public function getExpression(): ?string
+    {
+        return $this->expression;
+    }
+
+    public function setExpression(?string $expression): static
+    {
+        $this->expression = $expression;
+        $this->presentFields['expression'] = true;
+
+        return $this;
+    }
+
+    public function getCommand(): ?string
+    {
+        return $this->command;
+    }
+
+    public function setCommand(?string $command): static
+    {
+        $this->command = $command;
+        $this->presentFields['command'] = true;
+
+        return $this;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): static
+    {
+        $this->description = $description;
+        $this->presentFields['description'] = true;
+
+        return $this;
+    }
+
+    public function getNodeId(): ?int
+    {
+        return $this->nodeId;
+    }
+
+    public function setNodeId(?int $nodeId): static
+    {
+        $this->nodeId = $nodeId;
+        $this->presentFields['nodeId'] = true;
+
+        return $this;
+    }
+
+    public function getExecType(): ?int
+    {
+        return $this->execType;
+    }
+
+    public function setExecType(?int $execType): static
+    {
+        $this->execType = $execType;
+        $this->presentFields['execType'] = true;
+
+        return $this;
+    }
+
+    public function getStatus(): ?int
+    {
+        return $this->status;
+    }
+
+    public function setStatus(?int $status): static
+    {
+        $this->status = $status;
+        $this->presentFields['status'] = true;
+
+        return $this;
+    }
+
+    public function getWithBlockLapping(): ?int
+    {
+        return $this->withBlockLapping;
+    }
+
+    public function setWithBlockLapping(?int $withBlockLapping): static
+    {
+        $this->withBlockLapping = $withBlockLapping;
+        $this->presentFields['withBlockLapping'] = true;
+
+        return $this;
+    }
+
+    public function getRetry(): ?int
+    {
+        return $this->retry;
+    }
+
+    public function setRetry(?int $retry): static
+    {
+        $this->retry = $retry;
+        $this->presentFields['retry'] = true;
+
+        return $this;
+    }
+
+    public function getTimeout(): ?int
+    {
+        return $this->timeout;
+    }
+
+    public function setTimeout(?int $timeout): static
+    {
+        $this->timeout = $timeout;
+        $this->presentFields['timeout'] = true;
+
+        return $this;
+    }
+
+    public function getHttpMethod(): ?string
+    {
+        return $this->httpMethod;
+    }
+
+    public function setHttpMethod(?string $httpMethod): static
+    {
+        $this->httpMethod = $httpMethod;
+        $this->presentFields['httpMethod'] = true;
+
+        return $this;
+    }
+
+    public function getHttpRequestTimeOut(): ?int
+    {
+        return $this->httpRequestTimeOut;
+    }
+
+    public function setHttpRequestTimeOut(?int $httpRequestTimeOut): static
+    {
+        $this->httpRequestTimeOut = $httpRequestTimeOut;
+        $this->presentFields['httpRequestTimeOut'] = true;
+
+        return $this;
+    }
+
+    public function getCronBetween(): ?array
+    {
+        return $this->cronBetween;
+    }
+
+    public function setCronBetween(?array $cronBetween): static
+    {
+        $this->cronBetween = $cronBetween;
+        $this->presentFields['cronBetween'] = true;
+
+        return $this;
+    }
+
+    public function getCronSkip(): ?array
+    {
+        return $this->cronSkip;
+    }
+
+    public function setCronSkip(?array $cronSkip): static
+    {
+        $this->cronSkip = $cronSkip;
+        $this->presentFields['cronSkip'] = true;
+
+        return $this;
+    }
+
+    public function getHttpBody(): ?array
+    {
+        return $this->httpBody;
+    }
+
+    public function setHttpBody(?array $httpBody): static
+    {
+        $this->httpBody = $httpBody;
+        $this->presentFields['httpBody'] = true;
+
+        return $this;
+    }
+
+    public function getHttpHeaders(): ?array
+    {
+        return $this->httpHeaders;
+    }
+
+    public function setHttpHeaders(?array $httpHeaders): static
+    {
+        $this->httpHeaders = $httpHeaders;
+        $this->presentFields['httpHeaders'] = true;
+
+        return $this;
+    }
+
+    public function getK8sSpec(): ?array
+    {
+        return $this->k8sSpec;
+    }
+
+    public function setK8sSpec(?array $k8sSpec): static
+    {
+        $this->k8sSpec = $k8sSpec;
+        $this->presentFields['k8sSpec'] = true;
+
+        return $this;
+    }
+
+    public function getPresentFields(): array
+    {
+        return $this->presentFields;
+    }
+
+    public function setPresentFields(array $presentFields): static
+    {
+        $this->presentFields = $presentFields;
+
+        return $this;
+    }
 }

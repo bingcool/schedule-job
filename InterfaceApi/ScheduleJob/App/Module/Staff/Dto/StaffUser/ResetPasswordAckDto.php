@@ -48,4 +48,37 @@ class ResetPasswordAckDto extends AbstractDto
     {
         return $this->email;
     }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function getChanged(): bool
+    {
+        return $this->changed;
+    }
+
+    public function setChanged(bool $changed): static
+    {
+        $this->changed = $changed;
+
+        return $this;
+    }
+
+    public function setMailSent(bool $mailSent): static
+    {
+        $this->mailSent = $mailSent;
+
+        return $this;
+    }
+
+    public function setEmail(string $email): static
+    {
+        $this->email = $email;
+
+        return $this;
+    }
 }

@@ -33,4 +33,18 @@ class CronRobotTestResultDto extends AbstractDto
     {
         return $this->error;
     }
+
+    public function setOk(bool $ok): static
+    {
+        $this->ok = $ok;
+
+        return $this;
+    }
+
+    public function setError(string $error): static
+    {
+        $this->error = $error;
+
+        return $this;
+    }
 }

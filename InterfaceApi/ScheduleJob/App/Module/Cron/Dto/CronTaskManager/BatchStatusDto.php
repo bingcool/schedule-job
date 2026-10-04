@@ -45,4 +45,18 @@ class BatchStatusDto extends AbstractDto
     {
         return $this->status;
     }
+
+    public function setIds(array $ids): static
+    {
+        $this->ids = $ids;
+
+        return $this;
+    }
+
+    public function setStatus(int $status): static
+    {
+        $this->status = $status;
+
+        return $this;
+    }
 }

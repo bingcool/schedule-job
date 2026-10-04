@@ -74,4 +74,32 @@ class ExpressionPreviewResultDto extends AbstractDto
     {
         return $this->nextRuns;
     }
+
+    public function setValid(bool $valid): static
+    {
+        $this->valid = $valid;
+
+        return $this;
+    }
+
+    public function setType(string $type): static
+    {
+        $this->type = $type;
+
+        return $this;
+    }
+
+    public function setDescription(string $description): static
+    {
+        $this->description = $description;
+
+        return $this;
+    }
+
+    public function setNextRuns(array $nextRuns): static
+    {
+        $this->nextRuns = $nextRuns;
+
+        return $this;
+    }
 }

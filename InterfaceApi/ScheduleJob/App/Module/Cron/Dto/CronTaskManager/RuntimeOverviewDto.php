@@ -49,4 +49,52 @@ class RuntimeOverviewDto extends AbstractDto
 
         return $dto;
     }
+
+    public function getScheduler(): array
+    {
+        return $this->scheduler;
+    }
+
+    public function setScheduler(array $scheduler): static
+    {
+        $this->scheduler = $scheduler;
+
+        return $this;
+    }
+
+    public function getSync(): array
+    {
+        return $this->sync;
+    }
+
+    public function setSync(array $sync): static
+    {
+        $this->sync = $sync;
+
+        return $this;
+    }
+
+    public function getNodes(): array
+    {
+        return $this->nodes;
+    }
+
+    public function setNodes(array $nodes): static
+    {
+        $this->nodes = $nodes;
+
+        return $this;
+    }
+
+    public function getNote(): string
+    {
+        return $this->note;
+    }
+
+    public function setNote(string $note): static
+    {
+        $this->note = $note;
+
+        return $this;
+    }
 }

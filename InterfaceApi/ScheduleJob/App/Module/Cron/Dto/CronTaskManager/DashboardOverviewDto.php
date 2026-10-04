@@ -47,4 +47,40 @@ class DashboardOverviewDto extends AbstractDto
 
         return $dto;
     }
+
+    public function getTasks(): array
+    {
+        return $this->tasks;
+    }
+
+    public function setTasks(array $tasks): static
+    {
+        $this->tasks = $tasks;
+
+        return $this;
+    }
+
+    public function getExecutions(): array
+    {
+        return $this->executions;
+    }
+
+    public function setExecutions(array $executions): static
+    {
+        $this->executions = $executions;
+
+        return $this;
+    }
+
+    public function getNodes(): array
+    {
+        return $this->nodes;
+    }
+
+    public function setNodes(array $nodes): static
+    {
+        $this->nodes = $nodes;
+
+        return $this;
+    }
 }

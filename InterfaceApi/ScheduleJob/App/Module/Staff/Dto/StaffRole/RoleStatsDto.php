@@ -35,4 +35,64 @@ class RoleStatsDto extends AbstractDto
 
         return $dto;
     }
+
+    public function getTotal(): int
+    {
+        return $this->total;
+    }
+
+    public function setTotal(int $total): static
+    {
+        $this->total = $total;
+
+        return $this;
+    }
+
+    public function getEnabled(): int
+    {
+        return $this->enabled;
+    }
+
+    public function setEnabled(int $enabled): static
+    {
+        $this->enabled = $enabled;
+
+        return $this;
+    }
+
+    public function getDisabled(): int
+    {
+        return $this->disabled;
+    }
+
+    public function setDisabled(int $disabled): static
+    {
+        $this->disabled = $disabled;
+
+        return $this;
+    }
+
+    public function getSuper(): int
+    {
+        return $this->super;
+    }
+
+    public function setSuper(int $super): static
+    {
+        $this->super = $super;
+
+        return $this;
+    }
+
+    public function getUserCount(): int
+    {
+        return $this->userCount;
+    }
+
+    public function setUserCount(int $userCount): static
+    {
+        $this->userCount = $userCount;
+
+        return $this;
+    }
 }

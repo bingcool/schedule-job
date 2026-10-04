@@ -23,4 +23,28 @@ class ChangePasswordAckDto extends AbstractDto
 
         return $dto;
     }
+
+    public function getId(): int
+    {
+        return $this->id;
+    }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function getChanged(): bool
+    {
+        return $this->changed;
+    }
+
+    public function setChanged(bool $changed): static
+    {
+        $this->changed = $changed;
+
+        return $this;
+    }
 }

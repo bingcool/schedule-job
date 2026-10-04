@@ -76,4 +76,18 @@ class CronTaskPayloadBuildResultDto extends AbstractDto
     {
         return $this->payload;
     }
+
+    public function setPayload(?CronTaskPayloadDto $payload): static
+    {
+        $this->payload = $payload;
+
+        return $this;
+    }
+
+    public function setError(?string $error): static
+    {
+        $this->error = $error;
+
+        return $this;
+    }
 }

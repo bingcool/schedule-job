@@ -24,4 +24,11 @@ class UpdateProfileDto extends AbstractDto
     {
         return $this->userName;
     }
+
+    public function setUserName(string $userName): static
+    {
+        $this->userName = $userName;
+
+        return $this;
+    }
 }

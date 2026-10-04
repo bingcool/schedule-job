@@ -23,4 +23,28 @@ class AgentReportAckDto extends AbstractDto
 
         return $dto;
     }
+
+    public function getSaved(): bool
+    {
+        return $this->saved;
+    }
+
+    public function setSaved(bool $saved): static
+    {
+        $this->saved = $saved;
+
+        return $this;
+    }
+
+    public function getCronId(): int
+    {
+        return $this->cronId;
+    }
+
+    public function setCronId(int $cronId): static
+    {
+        $this->cronId = $cronId;
+
+        return $this;
+    }
 }

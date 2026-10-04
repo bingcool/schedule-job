@@ -52,4 +52,25 @@ class ExecutionCancelResultDto extends AbstractDto
     {
         return $this->alreadyFinished;
     }
+
+    public function setExecutionId(int $executionId): static
+    {
+        $this->executionId = $executionId;
+
+        return $this;
+    }
+
+    public function setStatus(string $status): static
+    {
+        $this->status = $status;
+
+        return $this;
+    }
+
+    public function setAlreadyFinished(bool $alreadyFinished): static
+    {
+        $this->alreadyFinished = $alreadyFinished;
+
+        return $this;
+    }
 }

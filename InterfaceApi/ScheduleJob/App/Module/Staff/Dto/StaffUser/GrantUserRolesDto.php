@@ -42,4 +42,18 @@ class GrantUserRolesDto extends AbstractDto
     {
         return $this->roleIds;
     }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function setRoleIds(array $roleIds): static
+    {
+        $this->roleIds = $roleIds;
+
+        return $this;
+    }
 }

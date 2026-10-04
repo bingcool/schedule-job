@@ -33,4 +33,18 @@ class LoginDto extends AbstractDto
     {
         return $this->password;
     }
+
+    public function setAccount(string $account): static
+    {
+        $this->account = $account;
+
+        return $this;
+    }
+
+    public function setPassword(string $password): static
+    {
+        $this->password = $password;
+
+        return $this;
+    }
 }

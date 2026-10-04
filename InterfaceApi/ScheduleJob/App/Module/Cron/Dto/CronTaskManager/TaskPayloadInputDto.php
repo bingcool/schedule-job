@@ -52,4 +52,16 @@ class TaskPayloadInputDto extends AbstractDto
     {
         return $this->payload;
     }
+
+    public function getPayload(): array
+    {
+        return $this->payload;
+    }
+
+    public function setPayload(array $payload): static
+    {
+        $this->payload = $payload;
+
+        return $this;
+    }
 }

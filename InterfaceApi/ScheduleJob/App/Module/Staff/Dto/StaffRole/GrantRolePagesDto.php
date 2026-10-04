@@ -42,4 +42,18 @@ class GrantRolePagesDto extends AbstractDto
     {
         return $this->pageIds;
     }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function setPageIds(array $pageIds): static
+    {
+        $this->pageIds = $pageIds;
+
+        return $this;
+    }
 }

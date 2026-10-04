@@ -390,4 +390,100 @@ class CronTaskLogRowDto extends AbstractDto
 
         return $this;
     }
+
+    public function getRequestId(): ?int
+    {
+        return $this->requestId;
+    }
+
+    public function setRequestId(?int $requestId): static
+    {
+        $this->requestId = $requestId;
+
+        return $this;
+    }
+
+    public function getNodeId(): int
+    {
+        return $this->nodeId;
+    }
+
+    public function setNodeId(int $nodeId): static
+    {
+        $this->nodeId = $nodeId;
+
+        return $this;
+    }
+
+    public function getLeaseOwner(): string
+    {
+        return $this->leaseOwner;
+    }
+
+    public function setLeaseOwner(string $leaseOwner): static
+    {
+        $this->leaseOwner = $leaseOwner;
+
+        return $this;
+    }
+
+    public function getLeaseUntil(): string
+    {
+        return $this->leaseUntil;
+    }
+
+    public function setLeaseUntil(string $leaseUntil): static
+    {
+        $this->leaseUntil = $leaseUntil;
+
+        return $this;
+    }
+
+    public function getHeartbeatAt(): string
+    {
+        return $this->heartbeatAt;
+    }
+
+    public function setHeartbeatAt(string $heartbeatAt): static
+    {
+        $this->heartbeatAt = $heartbeatAt;
+
+        return $this;
+    }
+
+    public function getTimeoutAt(): string
+    {
+        return $this->timeoutAt;
+    }
+
+    public function setTimeoutAt(string $timeoutAt): static
+    {
+        $this->timeoutAt = $timeoutAt;
+
+        return $this;
+    }
+
+    public function getCancelledAt(): string
+    {
+        return $this->cancelledAt;
+    }
+
+    public function setCancelledAt(string $cancelledAt): static
+    {
+        $this->cancelledAt = $cancelledAt;
+
+        return $this;
+    }
+
+    public function getFailureReason(): string
+    {
+        return $this->failureReason;
+    }
+
+    public function setFailureReason(string $failureReason): static
+    {
+        $this->failureReason = $failureReason;
+
+        return $this;
+    }
 }

@@ -166,4 +166,53 @@ class AgentTasksResultDto extends AbstractDto
     {
         return $this->total;
     }
+
+    public function setNodeId(int $nodeId): static
+    {
+        $this->nodeId = $nodeId;
+
+        return $this;
+    }
+
+    public function setExecType(?int $execType): static
+    {
+        $this->execType = $execType;
+
+        return $this;
+    }
+
+    public function setList(?array $list): static
+    {
+        $this->list = $list;
+
+        return $this;
+    }
+
+    public function setShellTasks(?array $shellTasks): static
+    {
+        $this->shellTasks = $shellTasks;
+
+        return $this;
+    }
+
+    public function setHttpTasks(?array $httpTasks): static
+    {
+        $this->httpTasks = $httpTasks;
+
+        return $this;
+    }
+
+    public function setK8sTasks(?array $k8sTasks): static
+    {
+        $this->k8sTasks = $k8sTasks;
+
+        return $this;
+    }
+
+    public function setTotal(int $total): static
+    {
+        $this->total = $total;
+
+        return $this;
+    }
 }

@@ -29,4 +29,28 @@ class StaffMenuSortAckDto extends AbstractDto
 
         return $dto;
     }
+
+    public function getParentId(): int
+    {
+        return $this->parentId;
+    }
+
+    public function setParentId(int $parentId): static
+    {
+        $this->parentId = $parentId;
+
+        return $this;
+    }
+
+    public function getIds(): array
+    {
+        return $this->ids;
+    }
+
+    public function setIds(array $ids): static
+    {
+        $this->ids = $ids;
+
+        return $this;
+    }
 }

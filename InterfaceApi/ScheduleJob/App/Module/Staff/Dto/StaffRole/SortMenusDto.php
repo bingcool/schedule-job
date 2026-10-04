@@ -42,4 +42,18 @@ class SortMenusDto extends AbstractDto
     {
         return $this->ids;
     }
+
+    public function setParentId(int $parentId): static
+    {
+        $this->parentId = $parentId;
+
+        return $this;
+    }
+
+    public function setIds(array $ids): static
+    {
+        $this->ids = $ids;
+
+        return $this;
+    }
 }

@@ -36,4 +36,18 @@ class ResetUserPasswordDto extends AbstractDto
     {
         return $this->password;
     }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function setPassword(string $password): static
+    {
+        $this->password = $password;
+
+        return $this;
+    }
 }

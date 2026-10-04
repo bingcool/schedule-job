@@ -106,4 +106,187 @@ class StaffRoleRowDto extends AbstractDto
 
         return $this;
     }
+
+    public function getId(): int
+    {
+        return $this->id;
+    }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function setName(string $name): static
+    {
+        $this->name = $name;
+
+        return $this;
+    }
+
+    public function getCode(): string
+    {
+        return $this->code;
+    }
+
+    public function setCode(string $code): static
+    {
+        $this->code = $code;
+
+        return $this;
+    }
+
+    public function getDesc(): string
+    {
+        return $this->desc;
+    }
+
+    public function setDesc(string $desc): static
+    {
+        $this->desc = $desc;
+
+        return $this;
+    }
+
+    public function getIsSuperRole(): bool
+    {
+        return $this->isSuperRole;
+    }
+
+    public function setIsSuperRole(bool $isSuperRole): static
+    {
+        $this->isSuperRole = $isSuperRole;
+
+        return $this;
+    }
+
+    public function getIsSystemRole(): bool
+    {
+        return $this->isSystemRole;
+    }
+
+    public function setIsSystemRole(bool $isSystemRole): static
+    {
+        $this->isSystemRole = $isSystemRole;
+
+        return $this;
+    }
+
+    public function getStatus(): int
+    {
+        return $this->status;
+    }
+
+    public function setStatus(int $status): static
+    {
+        $this->status = $status;
+
+        return $this;
+    }
+
+    public function getUserCount(): int
+    {
+        return $this->userCount;
+    }
+
+    public function setUserCount(int $userCount): static
+    {
+        $this->userCount = $userCount;
+
+        return $this;
+    }
+
+    public function getMenuCount(): int
+    {
+        return $this->menuCount;
+    }
+
+    public function setMenuCount(int $menuCount): static
+    {
+        $this->menuCount = $menuCount;
+
+        return $this;
+    }
+
+    public function getPageIds(): array
+    {
+        return $this->pageIds;
+    }
+
+    public function setPageIds(array $pageIds): static
+    {
+        $this->pageIds = $pageIds;
+
+        return $this;
+    }
+
+    public function getApiPerIds(): array
+    {
+        return $this->apiPerIds;
+    }
+
+    public function setApiPerIds(array $apiPerIds): static
+    {
+        $this->apiPerIds = $apiPerIds;
+
+        return $this;
+    }
+
+    public function getTaskPerIds(): array
+    {
+        return $this->taskPerIds;
+    }
+
+    public function setTaskPerIds(array $taskPerIds): static
+    {
+        $this->taskPerIds = $taskPerIds;
+
+        return $this;
+    }
+
+    public function getCreatedAt(): string
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(string $createdAt): static
+    {
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): string
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(string $updatedAt): static
+    {
+        $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function getMenus(): array
+    {
+        return $this->menus;
+    }
+
+    public function getApiPermissions(): array
+    {
+        return $this->apiPermissions;
+    }
+
+    public function getTaskPermissions(): array
+    {
+        return $this->taskPermissions;
+    }
 }

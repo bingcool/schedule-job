@@ -14,4 +14,16 @@ abstract class AbstractListDataDto extends \InterfaceApi\Support\AbstractListDat
 {
     #[ApiProperty(description: '总条数')]
     protected int $total = 0;
+
+    public function getTotal(): int
+    {
+        return $this->total;
+    }
+
+    public function setTotal(int $total): static
+    {
+        $this->total = $total;
+
+        return $this;
+    }
 }

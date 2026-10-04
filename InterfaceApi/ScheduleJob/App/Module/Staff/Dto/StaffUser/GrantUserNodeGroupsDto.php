@@ -42,4 +42,18 @@ class GrantUserNodeGroupsDto extends AbstractDto
     {
         return $this->nodeGroupIds;
     }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function setNodeGroupIds(array $nodeGroupIds): static
+    {
+        $this->nodeGroupIds = $nodeGroupIds;
+
+        return $this;
+    }
 }

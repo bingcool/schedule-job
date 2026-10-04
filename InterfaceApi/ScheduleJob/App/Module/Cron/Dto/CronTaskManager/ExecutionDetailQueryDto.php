@@ -45,4 +45,25 @@ class ExecutionDetailQueryDto extends AbstractDto
     {
         return $this->execBatchId;
     }
+
+    public function setLogId(?int $logId): static
+    {
+        $this->logId = $logId;
+
+        return $this;
+    }
+
+    public function setTaskId(int $taskId): static
+    {
+        $this->taskId = $taskId;
+
+        return $this;
+    }
+
+    public function setExecBatchId(string $execBatchId): static
+    {
+        $this->execBatchId = $execBatchId;
+
+        return $this;
+    }
 }

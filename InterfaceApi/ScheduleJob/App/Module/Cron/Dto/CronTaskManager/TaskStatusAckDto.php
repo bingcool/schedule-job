@@ -56,4 +56,18 @@ class TaskStatusAckDto extends AbstractDto
     {
         return $this->status;
     }
+
+    public function setId(int $id): static
+    {
+        $this->id = $id;
+
+        return $this;
+    }
+
+    public function setStatus(int $status): static
+    {
+        $this->status = $status;
+
+        return $this;
+    }
 }

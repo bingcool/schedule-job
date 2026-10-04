@@ -42,4 +42,25 @@ class ChangePasswordDto extends AbstractDto
     {
         return $this->newPasswordConfirm;
     }
+
+    public function setOldPassword(string $oldPassword): static
+    {
+        $this->oldPassword = $oldPassword;
+
+        return $this;
+    }
+
+    public function setNewPassword(string $newPassword): static
+    {
+        $this->newPassword = $newPassword;
+
+        return $this;
+    }
+
+    public function setNewPasswordConfirm(string $newPasswordConfirm): static
+    {
+        $this->newPasswordConfirm = $newPasswordConfirm;
+
+        return $this;
+    }
 }
