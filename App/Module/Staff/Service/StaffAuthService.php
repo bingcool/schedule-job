@@ -11,12 +11,11 @@ use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\LoginDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\RegisterDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\UpdateProfileDto;
+use App\Factory;
 use App\Module\Staff\Entity\StaffUserEntity;
 use App\Module\Staff\Exception\StaffException;
 use App\Module\Staff\Repository\StaffUserRepository;
-use Swoolefy\Core\Application;
 use Swoolefy\Support\Auth\AuthUser;
-use Swoolefy\Support\Auth\JwtAuthGuard;
 use Swoolefy\Support\FrameworkContext;
 
 /**
@@ -202,9 +201,7 @@ class StaffAuthService
             $roleCodes[] = 'admin';
         }
 
-        /** @var JwtAuthGuard $guard */
-        $guard = Application::getApp()->get('auth.guard');
-        $token = $guard->generateToken(new AuthUser(
+        $token = Factory::getGuard()->generateToken(new AuthUser(
             userId: (string) $user->id,
             roles: $roleCodes,
         ));

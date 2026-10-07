@@ -9,6 +9,7 @@
 | **路由与文档注解** | `Route`、`RouteGroup`、`ApiOperation`、`ApiController`、`ApiProperty` 等，供 `*ApiInterface` 与 Request/Response/DTO 使用 |
 | **HTTP 契约基类** | `BaseRequest` / `BaseResponse` / `BasePageRequest`、分页与列表 DTO 抽象、特殊响应（Stream/Download/Chunked） |
 | **校验与序列化** | `ValidationRule`、`ArrayList`、`CovertProperty` 等，与运行时 HttpRoute 校验、Client 反序列化一致 |
+| **Enum 基契约** | `Enum/BaseIntEnum`、`Enum/BaseStringEnum`；业务枚举 `implements` 后 `use Enum\Concerns\InteractsWithBackedEnumLabel` 并实现 `getLabel()` |
 | **调用方 Client 基类** | `BaseClientApi`、`ClientException`、`NacosServiceDiscovery`（生成出的 `*Api` 继承于此） |
 | **Generator/** | 引用边界检查（§2）、Client / OpenAPI 生成器及 CLI 引导代码（见仓库根 `bin/`） |
 
