@@ -57,6 +57,7 @@ return [
             'auth_enabled' => filter_var(env('WORKFLOW_HITL_AUTH_ENABLED', '1'), FILTER_VALIDATE_BOOLEAN),
             'api_key' => env('WORKFLOW_HITL_API_KEY', ''),
             'role_header' => env('WORKFLOW_HITL_ROLE_HEADER', 'X-Workflow-Role'),
+            // admin 由 StaffRoleResolver 在超管 roleCode 之外补上，与 AuthUser::isAdmin() 对齐
             'allowed_roles' => ['operator', 'admin'],
             'require_assignee_match' => filter_var(env('WORKFLOW_HITL_REQUIRE_ASSIGNEE_MATCH', '1'), FILTER_VALIDATE_BOOLEAN),
         ],

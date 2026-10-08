@@ -13,6 +13,7 @@
  * @see Config/auth.php
  */
 
+use App\Module\Staff\Auth\StaffRoleResolver;
 use Swoolefy\Support\Auth\JwtAuthGuard;
 
 $authConfig = include APP_PATH . '/Config/auth.php';
@@ -20,5 +21,14 @@ $authConfig = include APP_PATH . '/Config/auth.php';
 return [
     'auth.guard' => static function () use ($authConfig) {
         return new JwtAuthGuard($authConfig['jwt'] ?? []);
+    },
+
+    /**
+     * 当前登陆者服务端角色。JWT 只证明身份；角色是由，第一次 AuthUser::roles() 才调用。
+     * 按 userId 读取 staff_roles.code。空数组表示该用户当前没有任何角色。
+     * 不要在这里缓存请求用户。
+     */
+    'auth.role_resolver' => static function () {
+        return new StaffRoleResolver();
     },
 ];

@@ -18,7 +18,8 @@
  * | jwt.ttl_seconds | 签发建议 TTL；校验看 token exp |
  * | jwt.issuer / audience | 空串 = 不校验 |
  * | jwt.id_claim | 默认 uid（其次标准 sub） |
- * | jwt.roles_claim / tenant_claim | 角色与租户 claim 名 |
+ * | jwt.roles_claim | 保留键名。签发与验票都不读取；角色由 auth.role_resolver 提供 |
+ * | jwt.tenant_claim | 租户 claim 名 |
  *
  * @see docs/Auth.md
  */

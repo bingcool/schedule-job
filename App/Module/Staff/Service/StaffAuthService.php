@@ -6,7 +6,6 @@ namespace App\Module\Staff\Service;
 
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\AuthMeProfileDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\AuthSessionDto;
-use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffRole\StaffRoleBriefDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\ChangePasswordDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\LoginDto;
 use InterfaceApi\ScheduleJob\App\Module\Staff\Dto\StaffAuth\RegisterDto;
@@ -193,17 +192,10 @@ class StaffAuthService
     ): AuthSessionDto {
         $profile = $this->profileOf($user);
         $this->assertHasMenuAccess($profile);
-        $roleCodes = array_values(array_filter(array_map(
-            static fn (StaffRoleBriefDto $role): string => $role->getCode(),
-            $profile->getRoles(),
-        )));
-        if ($profile->getIsSuper() && !in_array('admin', $roleCodes, true)) {
-            $roleCodes[] = 'admin';
-        }
 
+        // token 只带用户身份。授权角色在后续请求里由 auth.role_resolver 按 userId 读取。
         $token = Factory::getGuard()->generateToken(new AuthUser(
             userId: (string) $user->id,
-            roles: $roleCodes,
         ));
 
         $authConfig = include APP_PATH . '/Config/auth.php';
