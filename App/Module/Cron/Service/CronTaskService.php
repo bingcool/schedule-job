@@ -181,7 +181,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             $cronK8sTask->retry = max(0, (int) ($item['retry'] ?? 0));
             $cronK8sTask->cron_between = $item['cron_between'] ?? [];
             $cronK8sTask->cron_skip = $item['cron_skip'] ?? [];
-            $cronK8sTask->command = (string) ($item['command'] ?? '');
+            $cronK8sTask->command = self::appendFromK8sToCommandLine((string) ($item['command'] ?? ''));
             // 不是本机脚本，绝不能被当成 swoolefy script 走 fork 分支
             $cronK8sTask->exec_script = '';
             $cronK8sTask->run_type = '';
@@ -190,7 +190,7 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             $arr['exec_type'] = CronProcess::EXEC_K8S_TYPE;
             $arr['node_id'] = $item['node_id'] ?? null;
             $arr['timeout'] = max(0, (int) ($item['timeout'] ?? 0));
-            $arr['k8s_spec'] = self::normalizeK8sSpec($item['k8s_spec'] ?? []);
+            $arr['k8s_spec'] = self::appendFromK8sFlag(self::normalizeK8sSpec($item['k8s_spec'] ?? []));
             $pendingIds = $pendingByTaskId[(int) ($item['id'] ?? 0)] ?? [];
             $arr['run_once_request_ids'] = $pendingIds;
             $arr['run_once_request_id'] = $pendingIds[0] ?? null;
@@ -409,5 +409,69 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
         }
 
         return is_array($k8sSpec) ? $k8sSpec : [];
+    }
+
+    /**
+     * swoolefy 脚本在 k8s 里跑时补上 --fromk8s=1，让 script.php 跳过启动横幅。
+     * 只改本次下发给 Agent 的 spec，不回写数据库。非 script.php 的命令不动。
+     *
+     * @param array<string, mixed> $spec
+     * @return array<string, mixed>
+     */
+    private static function appendFromK8sFlag(array $spec): array
+    {
+        $command = is_array($spec['command'] ?? null) ? array_values($spec['command']) : [];
+        $hasArgs = array_key_exists('args', $spec) && is_array($spec['args']);
+        $args = $hasArgs ? array_values($spec['args']) : [];
+        $argv = array_merge($command, $args);
+        if (!self::argvContainsScriptPhp($argv) || self::argvHasFromK8s($argv)) {
+            return $spec;
+        }
+
+        if ($hasArgs || $command !== []) {
+            $spec['args'] = array_merge($args, ['--fromk8s=1']);
+        }
+
+        return $spec;
+    }
+
+    private static function appendFromK8sToCommandLine(string $command): string
+    {
+        if ($command === '' || !str_contains($command, 'script.php') || str_contains($command, '--fromk8s')) {
+            return $command;
+        }
+
+        return rtrim($command) . ' --fromk8s=1';
+    }
+
+    /**
+     * @param list<mixed> $argv
+     */
+    private static function argvContainsScriptPhp(array $argv): bool
+    {
+        foreach ($argv as $part) {
+            if (is_string($part) && str_contains($part, 'script.php')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<mixed> $argv
+     */
+    private static function argvHasFromK8s(array $argv): bool
+    {
+        foreach ($argv as $part) {
+            if (!is_string($part)) {
+                continue;
+            }
+            if ($part === '--fromk8s' || str_starts_with($part, '--fromk8s=')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
