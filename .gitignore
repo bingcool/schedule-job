@@ -9,7 +9,7 @@ swag.php
 /vendor
 /*Service
 App/.env
-App/Storage/Logs/
+App/Storage
 .DS_Store
 
 .phpunit.cache
