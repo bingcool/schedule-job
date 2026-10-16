@@ -588,8 +588,8 @@ Admin 不读这些变量。集群内跑 Agent 时，凭证相关项可全部留�
 | `K8S_LOG_TAIL_LINES` | `50` | 写入执行记录的 Pod 日志尾部行数；完整日志留在集群 |
 | `K8S_REQUIRE_TIMEOUT` | `1` | `1` 时拒绝 `timeout=0` 的 K8s 任务 |
 | `K8S_API_TIMEOUT` | `15` | 单次 Kubernetes HTTP 调用超时 |
-| `CRON_K8S_WORKER_LIFE_TIME` | `86400` | K8s Worker 进程寿命（秒）；到期 reboot 会等在跑的协程结束 |
-| `CRON_K8S_MAX_CONCURRENCY` | `1000` | 本节点同时等待中的 Job 数上限（≈ 占用协程数） |
+| `CRON_K8S_WORKER_LIFE_TIME` | `3600` | K8s Worker 进程寿命（秒）；到期 reboot 会等在跑的协程结束 |
+| `CRON_K8S_MAX_CONCURRENCY` | `50` | 本节点同时等待中的 Job 数上限（≈ 占用协程数） |
 
 完整注释见 `App/.env.example`。
 
@@ -871,4 +871,4 @@ A: 确认 `schedule-k8s-task-cron` 已随 `php cron.php start App` 拉起；`K8S
 ### License
 
 MIT  
-Copyright (c) 2017-2026 zengbing huang
+Copyright (c) 2026-2026 zengbing huang

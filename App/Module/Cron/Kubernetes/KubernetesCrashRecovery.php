@@ -280,7 +280,7 @@ final class KubernetesCrashRecovery
      */
     private function decision(int $from, int $status, string $failureReason, string $message): array
     {
-        if ($from === ExecutionStatus::CANCEL_REQUESTED) {
+        if ($from === ExecutionStatus::CANCEL_REQUESTED && $status !== ExecutionStatus::SUCCESS) {
             $status = ExecutionStatus::CANCELLED;
             $failureReason = FailureReason::CANCELLED;
         }

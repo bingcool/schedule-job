@@ -222,6 +222,12 @@
         this.query.taskId = val ? String(val) : '';
         this.query.page = 1;
         this.refreshView();
+      },
+      timePreset: function (val) {
+        if (this._presetSyncing) return;
+        this.applyTimePreset(val);
+        this.query.page = 1;
+        this.refreshView();
       }
     },
     methods: {
@@ -249,10 +255,10 @@
         }
         return '';
       },
-      onTimePresetChange: function () {
-        this.applyTimePreset(this.timePreset);
-        this.query.page = 1;
-        this.refreshView();
+      onTimePresetChange: function (preset) {
+        if (preset && preset !== this.timePreset) {
+          this.timePreset = preset;
+        }
       },
       onViewModeChange: function () {
         this.refreshView();
@@ -393,7 +399,15 @@
       search: function () {
         this.syncStartEndFromRange();
         if (!this.validateTimeRange()) return;
-        this.timePreset = this.matchTimePreset();
+        var nextPreset = this.matchTimePreset();
+        if (nextPreset !== this.timePreset) {
+          this._presetSyncing = true;
+          this.timePreset = nextPreset;
+          var self = this;
+          this.$nextTick(function () {
+            self._presetSyncing = false;
+          });
+        }
         this.query.page = 1;
         this.refreshView();
       },

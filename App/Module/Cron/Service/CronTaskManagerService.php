@@ -294,6 +294,7 @@ class CronTaskManagerService
         if ($userId > 0) {
             $entityData['created_by'] = $userId;
         }
+        $this->assertNodeAssignable((int) ($entityData['node_id'] ?? 0));
 
         $task = $this->taskRepository->insert($entityData);
 
@@ -335,6 +336,9 @@ class CronTaskManagerService
         $newName = (string)($entityData['cron_name'] ?? $entityData['name'] ?? '');
         if ($newName !== '' && $this->nameExists($newName, $id)) {
             throw CronTaskException::throw('任务名称必须唯一', -1);
+        }
+        if (array_key_exists('node_id', $entityData)) {
+            $this->assertNodeAssignable((int) $entityData['node_id']);
         }
 
         $beforeSnapshot = $this->snapshotTaskForOperationLog($task);
@@ -1026,7 +1030,10 @@ class CronTaskManagerService
                     );
                     $from = (int) ($attrs['status'] ?? 0);
                     if ($dto->getStatus() !== null) {
-                        $executionService->transition($id, $from, (int) $dto->getStatus(), $row);
+                        $moved = $executionService->transition($id, $from, (int) $dto->getStatus(), $row);
+                        if (!$moved) {
+                            $executionService->persistUnappliedReport($id, $message, $row);
+                        }
                     } else {
                         $this->taskLogRepository->updateWhileRunningOrCancel($id, $row);
                     }
@@ -1588,7 +1595,9 @@ class CronTaskManagerService
     public function duplicateTask(TaskIdDto $dto): CronTaskRowDto
     {
         $task = $this->requireTask($dto->getId());
+        $this->assertTaskManageAllowed($task);
         $attrs = $task->getAttributes();
+        $this->assertNodeAssignable((int) ($attrs['node_id'] ?? 0));
         if ((int) ($attrs['exec_type'] ?? 0) === CronTaskPayloadDto::EXEC_TYPE_SHELL) {
             $deny = ShellCommandGuard::denyReason((string) ($attrs['command'] ?? ''));
             if ($deny !== null) {
@@ -1989,11 +1998,40 @@ class CronTaskManagerService
         if ($this->staffUserService->isSuperUser($userId)) {
             return;
         }
+        $this->assertTaskVisible((int) ($task->id ?? 0));
         if ($this->staffUserService->canManageCronTask($userId, (int) ($task->created_by ?? 0))) {
             return;
         }
 
         throw CronTaskException::throw('无权限操作', -1);
+    }
+
+    /**
+     * 任务绑定的节点必须存在且未软删；非超管还必须落在自己的授权分组内。
+     */
+    protected function assertNodeAssignable(int $nodeId): void
+    {
+        if ($nodeId <= 0) {
+            throw CronTaskException::throw('请选择节点', -1);
+        }
+        $node = $this->nodeRepository->findById($nodeId);
+        if (!$node) {
+            throw CronTaskException::throw('节点不存在', -1);
+        }
+        $userId = $this->currentUserId();
+        if ($userId > 0 && $this->staffUserService->isSuperUser($userId)) {
+            return;
+        }
+        $groupId = (int) ($node->group_id ?? 0);
+        if ($groupId <= 0) {
+            throw CronTaskException::throw('节点未分组，无法绑定', -1);
+        }
+        $allowed = $this->staffUserService->viewerAuthorizedNodeGroupIds();
+        if ($allowed === null || in_array($groupId, $allowed, true)) {
+            return;
+        }
+
+        throw CronTaskException::throw('无权使用该节点', -1);
     }
 
     protected function assertSuperViewer(): void
@@ -2166,7 +2204,7 @@ class CronTaskManagerService
         if ($groupIds === []) {
             return [];
         }
-        $nodeIds = [];
+
         return $this->nodeRepository->listIdsByGroupIds($groupIds);
     }
 

@@ -367,6 +367,48 @@ class ExecutionService
     }
 
     /**
+     * 状态迁移被拒绝或 CAS 落空时，补上本次上报的正文和结果字段，不改 status。
+     *
+     * 重新读取当前行再合并 message，避免覆盖 Recovery 刚刚写入的收尾说明。
+     * duration / exit_code / http_status 只在原值为空时补写。
+     *
+     * @param array<string, mixed> $row
+     */
+    public function persistUnappliedReport(int $id, string $message, array $row): void
+    {
+        if ($id <= 0) {
+            return;
+        }
+        $existing = $this->findById($id);
+        if ($existing === null) {
+            return;
+        }
+
+        $tail = [];
+        $merged = $this->mergeMessage((string) ($existing['message'] ?? ''), $message);
+        if ($merged !== (string) ($existing['message'] ?? '')) {
+            $tail['message'] = $merged;
+        }
+        $pid = (int) ($row['pid'] ?? 0);
+        if ($pid > 0 && (int) ($existing['pid'] ?? 0) <= 0) {
+            $tail['pid'] = $pid;
+        }
+        foreach (['duration_ms', 'exit_code', 'http_status'] as $field) {
+            if (!array_key_exists($field, $row) || $row[$field] === null || $row[$field] === '') {
+                continue;
+            }
+            $current = $existing[$field] ?? null;
+            if ($current === null || $current === '') {
+                $tail[$field] = $row[$field];
+            }
+        }
+        if ($tail === []) {
+            return;
+        }
+        $this->logRepository->updateById($id, $tail);
+    }
+
+    /**
      * 按读取时的 Lease 快照收尾。CAS 失败不得 terminate。
      *
      * @param array<string, mixed> $row
@@ -412,7 +454,10 @@ class ExecutionService
                 $deleteJobName = (string) ($k8s['job_name'] ?? '');
             }
         }
-        if ($from === ExecutionStatus::CANCEL_REQUESTED) {
+        if ($from === ExecutionStatus::CANCEL_REQUESTED && $to === ExecutionStatus::SUCCESS) {
+            $reason = '';
+            $message .= '；取消请求到达时任务已成功完成，保留 SUCCESS';
+        } elseif ($from === ExecutionStatus::CANCEL_REQUESTED) {
             $to = ExecutionStatus::CANCELLED;
             $reason = FailureReason::CANCELLED;
         }
@@ -421,7 +466,7 @@ class ExecutionService
             'message' => $this->mergeMessage((string) ($row['message'] ?? ''), $message),
             'lease_until' => null,
         ];
-        if ($reason !== '') {
+        if ($reason !== '' || $to === ExecutionStatus::SUCCESS) {
             $extra['failure_reason'] = $reason;
         }
         $ok = $this->recoverTransition($id, $from, $to, $oldOwner, $oldLeaseUntil, $recoveryNow, $extra);
@@ -456,7 +501,9 @@ class ExecutionService
         string $recoveryNow,
         array $extra,
     ): bool {
-        if ($id <= 0 || !$this->isLegalTransition($fromStatus, $toStatus)) {
+        $keepObservedSuccess = $fromStatus === ExecutionStatus::CANCEL_REQUESTED
+            && $toStatus === ExecutionStatus::SUCCESS;
+        if ($id <= 0 || (!$this->isLegalTransition($fromStatus, $toStatus) && !$keepObservedSuccess)) {
             return false;
         }
         $data = $extra;
@@ -613,7 +660,11 @@ class ExecutionService
             return;
         }
 
-        if ($from === ExecutionStatus::CANCEL_REQUESTED && in_array($to, [ExecutionStatus::SUCCESS, ExecutionStatus::FAILED], true)) {
+        if ($from === ExecutionStatus::CANCEL_REQUESTED && in_array($to, [
+            ExecutionStatus::SUCCESS,
+            ExecutionStatus::FAILED,
+            ExecutionStatus::TIMEOUT,
+        ], true)) {
             $to = ExecutionStatus::CANCELLED;
             $row['failure_reason'] = FailureReason::CANCELLED;
         }
