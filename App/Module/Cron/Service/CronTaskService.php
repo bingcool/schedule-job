@@ -6,8 +6,10 @@ use Swoolefy\Core\Schedule\ScheduleEvent;
 use Swoolefy\Worker\Cron\CronNodeLiveness;
 use Swoolefy\Worker\Cron\CronProcess;
 use Swoolefy\Worker\Dto\CronUrlTaskMetaDtoWorker;
+use App\Module\Cron\NodeLivenessStatus;
 use App\Module\Cron\Repository\CronAgentNodeRepository;
 use App\Module\Cron\Repository\CronTaskRepository;
+use App\Module\Cron\RobotAlertType;
 
 /**
  * Cron Worker 侧任务拉取与运行日志写入。
@@ -375,7 +377,22 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
         $now = date('Y-m-d H:i:s');
         $node = $this->nodeRepository->findById($id);
         if ($node) {
+            $prevHeartbeat = (string) ($node->last_heartbeat_at ?? '');
+            $prevLiveness = (int) ($node->liveness_status ?? NodeLivenessStatus::UNKNOWN);
+            $computedWasOffline = CronNodeLiveness::status(
+                time(),
+                CronNodeLiveness::parseHeartbeatAt($prevHeartbeat !== '' ? $prevHeartbeat : null),
+                CronNodeLiveness::normalizeInterval((int) ($node->heartbeat_interval ?? 0)),
+            ) === CronNodeLiveness::STATUS_OFFLINE;
             $this->nodeRepository->updateHeartbeatFields($node, $now, $interval);
+            if ($prevLiveness !== NodeLivenessStatus::ONLINE) {
+                $marked = $this->nodeRepository->casMarkOnline($id);
+                if (($marked === true || (int) $marked === 1)
+                    && ($computedWasOffline || $prevLiveness === NodeLivenessStatus::OFFLINE)
+                ) {
+                    AlertDispatcher::dispatchNodeLiveness($id, RobotAlertType::NODE_ONLINE, $now);
+                }
+            }
 
             return;
         }
@@ -391,6 +408,10 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
             'last_heartbeat_at' => $now,
             'heartbeat_interval' => $interval,
         ]);
+        $marked = $this->nodeRepository->casMarkOnline($id);
+        if ($marked === true || (int) $marked === 1) {
+            AlertDispatcher::dispatchNodeLiveness($id, RobotAlertType::NODE_ONLINE, $now);
+        }
     }
 
     /**

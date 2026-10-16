@@ -7,13 +7,16 @@ namespace App\Module\Cron\Controller;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Interface\CronRobotApiInterface;
 
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CreateRobotDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\RobotAlertLogsQueryDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\RobotIdDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\SwitchRobotStatusDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\UpdateRobotDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotAlertLogsQueryRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotCreateRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotIdRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotStatusRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotUpdateRequest;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotAlertLogsResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotListResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotRowResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotTestResponse;
@@ -35,6 +38,25 @@ class CronRobotController extends BController implements CronRobotApiInterface
     public function listRobots(): CronRobotListResponse
     {
         return new CronRobotListResponse($this->cronRobotService->listRobots());
+    }
+
+    /**
+     * Route: GET /api/v1/robots/alert-logs
+     */
+    #[ApiOperation('分页查询机器人告警投递记录')]
+    public function listAlertLogs(CronRobotAlertLogsQueryRequest $request): CronRobotAlertLogsResponse
+    {
+        $query = (new RobotAlertLogsQueryDto())
+            ->setPage($request->getPage())
+            ->setPageSize($request->getPageSize())
+            ->setRobotId($request->getRobotId())
+            ->setAlertType($request->getAlertType())
+            ->setStatus($request->getStatus())
+            ->setNodeId($request->getNodeId())
+            ->setStartTime($request->getStartTime())
+            ->setEndTime($request->getEndTime());
+
+        return new CronRobotAlertLogsResponse($this->cronRobotService->listAlertLogs($query));
     }
 
     /**

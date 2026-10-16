@@ -13,6 +13,7 @@ use App\Model\BaseModel;
  * @property string api_key Agent 拉取任务鉴权密钥
  * @property string|null last_heartbeat_at 最近一次 Agent 心跳
  * @property int heartbeat_interval 该节点心跳间隔（秒）
+ * @property int liveness_status 存活边沿：0-未知 1-在线 2-失联
  * @property string created_at 创建时间
  * @property string updated_at 修改时间
  * @property string|null deleted_at 删除时间

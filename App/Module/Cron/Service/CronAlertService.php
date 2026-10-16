@@ -9,6 +9,7 @@ use App\Module\Cron\Repository\CronAgentNodeRepository;
 use App\Module\Cron\Entity\CronRobotEntity;
 use App\Module\Cron\Repository\CronRobotAlertLogRepository;
 use App\Module\Cron\FailureReason;
+use App\Module\Cron\NodeLivenessStatus;
 use App\Module\Cron\Robot\RobotAlertMessage;
 use App\Module\Cron\Robot\RobotConfig;
 use App\Module\Cron\Robot\RobotSendResult;
@@ -16,6 +17,7 @@ use App\Module\Cron\Robot\RobotStrategyFactory;
 use App\Module\Cron\Robot\RobotWebhookMask;
 use App\Module\Cron\RobotAlertDeliveryStatus;
 use App\Module\Cron\RobotAlertType;
+use Swoolefy\Worker\Cron\CronNodeLiveness;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 
 /**
@@ -71,12 +73,12 @@ class CronAlertService
 
         $robot = CronRobotEntity::findRowIncludingDeleted($robotId);
         if ($robot === null || $this->isDeleted($robot)) {
-            $this->insertLog($execution, $robotId, 0, $status, RobotAlertDeliveryStatus::SKIPPED, self::SKIP_NOT_FOUND, 0, '机器人不存在或已删除');
+            $this->insertExecutionLog($execution, $robotId, 0, $status, RobotAlertDeliveryStatus::SKIPPED, self::SKIP_NOT_FOUND, 0, '机器人不存在或已删除');
 
             return;
         }
         if ((int) ($robot['status'] ?? 0) !== 1) {
-            $this->insertLog(
+            $this->insertExecutionLog(
                 $execution,
                 $robotId,
                 (int) ($robot['platform'] ?? 0),
@@ -99,7 +101,7 @@ class CronAlertService
         $message = $this->buildMessage($execution, $binding);
         $result = $this->deliver($config, $message);
         $error = RobotWebhookMask::sanitizeError($result->error, $config->webhookUrl, $config->secret);
-        $this->insertLog(
+        $this->insertExecutionLog(
             $execution,
             $robotId,
             $config->platform,
@@ -109,6 +111,86 @@ class CronAlertService
             $result->httpStatus,
             $error,
         );
+    }
+
+    /**
+     * 心跳边沿：节点从失联恢复或首次上线。CAS 成功后再调用。
+     */
+    public function sendNodeOnline(int $nodeId, string $lastHeartbeatAt): void
+    {
+        $this->sendNodeLiveness($nodeId, RobotAlertType::NODE_ONLINE, $lastHeartbeatAt);
+    }
+
+    /**
+     * 扫描边沿：节点从在线变为失联。CAS 成功后再调用。
+     */
+    public function sendNodeOffline(int $nodeId, string $lastHeartbeatAt): void
+    {
+        $this->sendNodeLiveness($nodeId, RobotAlertType::NODE_OFFLINE, $lastHeartbeatAt);
+    }
+
+    /**
+     * Admin 定时扫描：心跳已过期则 CAS 后推失联告警。
+     * 当前心跳仍在线但 liveness_status 未同步的，静默标为在线（不推送）。
+     * 从未心跳过的节点界面也是 offline，但不发失联（谈不上掉线）。
+     */
+    public function scanOfflineNodes(): void
+    {
+        $now = time();
+        foreach ($this->nodeRepository->listLivenessScanRows() as $node) {
+            $nodeId = (int) ($node->id ?? 0);
+            if ($nodeId <= 0) {
+                continue;
+            }
+            $interval = CronNodeLiveness::normalizeInterval((int) ($node->heartbeat_interval ?? 0));
+            $lastHeartbeatAt = $this->heartbeatAtString($node->last_heartbeat_at ?? null);
+            $computed = CronNodeLiveness::status(
+                $now,
+                CronNodeLiveness::parseHeartbeatAt($lastHeartbeatAt !== '' ? $lastHeartbeatAt : null),
+                $interval,
+            );
+            $liveness = (int) ($node->liveness_status ?? NodeLivenessStatus::UNKNOWN);
+            if ($computed === CronNodeLiveness::STATUS_ONLINE) {
+                if ($liveness !== NodeLivenessStatus::ONLINE) {
+                    $this->nodeRepository->casMarkOnline($nodeId);
+                }
+                continue;
+            }
+            if ($lastHeartbeatAt === '') {
+                continue;
+            }
+            $dedupKey = $this->nodeDedupKey($nodeId, RobotAlertType::NODE_OFFLINE, $lastHeartbeatAt);
+            if ($liveness === NodeLivenessStatus::OFFLINE) {
+                if ($this->alertLogRepository->existsByDedupKey($dedupKey)) {
+                    continue;
+                }
+            } else {
+                $cutoff = date('Y-m-d H:i:s', $now - CronNodeLiveness::staleAfterSeconds($interval));
+                if (!$this->affected($this->nodeRepository->casMarkOfflineIfStale($nodeId, $cutoff))) {
+                    continue;
+                }
+            }
+            try {
+                $this->sendNodeOffline($nodeId, $lastHeartbeatAt);
+            } catch (\Throwable $e) {
+                AlertDispatcher::logError($e);
+            }
+        }
+    }
+
+    /**
+     * 硬删除早于保留天数的 cron_robot_alert_log。默认保留 7 天。
+     *
+     * @return int 实际删除行数
+     */
+    public function purgeExpiredAlertLogs(int $days = 7): int
+    {
+        if ($days <= 0) {
+            return 0;
+        }
+        $cutoff = date('Y-m-d H:i:s', strtotime('-' . $days . ' days'));
+
+        return $this->alertLogRepository->deleteCreatedBefore($cutoff);
     }
 
     /**
@@ -209,6 +291,100 @@ class CronAlertService
                 ? (int) $execution['http_status'] : null,
             triggerType: (int) ($execution['trigger_type'] ?? 0),
             command: $command,
+            alertType: $status === ExecutionStatus::TIMEOUT ? RobotAlertType::TIMEOUT : RobotAlertType::FAILED,
+        );
+    }
+
+    private function sendNodeLiveness(int $nodeId, int $alertType, string $lastHeartbeatAt): void
+    {
+        if ($nodeId <= 0 || !RobotAlertType::isNodeLiveness($alertType)) {
+            return;
+        }
+        $binding = $this->resolveBinding($nodeId);
+        $robotId = $binding['robot_id'];
+        if ($robotId <= 0) {
+            return;
+        }
+        $dedupKey = $this->nodeDedupKey($nodeId, $alertType, $lastHeartbeatAt);
+        $robot = CronRobotEntity::findRowIncludingDeleted($robotId);
+        if ($robot === null || $this->isDeleted($robot)) {
+            $this->insertAlertRow($dedupKey, 0, $nodeId, $robotId, 0, $alertType, RobotAlertDeliveryStatus::SKIPPED, self::SKIP_NOT_FOUND, 0, '机器人不存在或已删除');
+
+            return;
+        }
+        if ((int) ($robot['status'] ?? 0) !== 1) {
+            $this->insertAlertRow(
+                $dedupKey,
+                0,
+                $nodeId,
+                $robotId,
+                (int) ($robot['platform'] ?? 0),
+                $alertType,
+                RobotAlertDeliveryStatus::SKIPPED,
+                self::SKIP_DISABLED,
+                0,
+                '机器人已禁用',
+            );
+
+            return;
+        }
+
+        $config = new RobotConfig(
+            $robotId,
+            (int) ($robot['platform'] ?? 0),
+            (string) ($robot['webhook_url'] ?? ''),
+            (string) ($robot['secret'] ?? ''),
+        );
+        $message = $this->buildNodeLivenessMessage($nodeId, $alertType, $lastHeartbeatAt, $binding);
+        try {
+            $result = $this->deliver($config, $message);
+        } catch (\Throwable $e) {
+            $result = RobotSendResult::fail(0, $e->getMessage());
+        }
+        $error = RobotWebhookMask::sanitizeError($result->error, $config->webhookUrl, $config->secret);
+        $this->insertAlertRow(
+            $dedupKey,
+            0,
+            $nodeId,
+            $robotId,
+            $config->platform,
+            $alertType,
+            $result->ok ? RobotAlertDeliveryStatus::SUCCESS : RobotAlertDeliveryStatus::FAILED,
+            '',
+            $result->httpStatus,
+            $error,
+        );
+    }
+
+    /**
+     * @param array{robot_id: int, group_id: int, group_name: string, node_name: string} $binding
+     */
+    private function buildNodeLivenessMessage(int $nodeId, int $alertType, string $lastHeartbeatAt, array $binding): RobotAlertMessage
+    {
+        $status = $alertType === RobotAlertType::NODE_ONLINE ? 'ONLINE' : 'OFFLINE';
+
+        return new RobotAlertMessage(
+            isTest: false,
+            executionId: 0,
+            cronId: 0,
+            execBatchId: '',
+            taskName: '',
+            nodeId: $nodeId,
+            nodeName: $binding['node_name'],
+            nodeGroupId: $binding['group_id'],
+            nodeGroupName: $binding['group_name'],
+            status: $status,
+            failureReason: '',
+            scheduledAt: '',
+            startedAt: $lastHeartbeatAt,
+            finishedAt: date('Y-m-d H:i:s'),
+            durationMs: 0,
+            exitCode: null,
+            httpStatus: null,
+            triggerType: 0,
+            command: '',
+            alertType: $alertType,
+            lastHeartbeatAt: $lastHeartbeatAt,
         );
     }
 
@@ -228,7 +404,7 @@ class CronAlertService
     /**
      * @param array<string, mixed> $execution
      */
-    private function insertLog(
+    private function insertExecutionLog(
         array $execution,
         int $robotId,
         int $platform,
@@ -238,21 +414,78 @@ class CronAlertService
         int $httpStatus,
         string $errorMessage,
     ): void {
-        $now = date('Y-m-d H:i:s');
-        $row = [
-            'execution_id' => (int) ($execution['id'] ?? 0),
-            'cron_id' => (int) ($execution['cron_id'] ?? 0),
-            'exec_batch_id' => (string) ($execution['exec_batch_id'] ?? ''),
+        $executionId = (int) ($execution['id'] ?? 0);
+        $alertType = $execStatus === ExecutionStatus::TIMEOUT ? RobotAlertType::TIMEOUT : RobotAlertType::FAILED;
+        $this->insertAlertRow(
+            'e:' . $executionId,
+            $executionId,
+            (int) ($execution['node_id'] ?? 0),
+            $robotId,
+            $platform,
+            $alertType,
+            $deliveryStatus,
+            $skipReason,
+            $httpStatus,
+            $errorMessage,
+            (int) ($execution['cron_id'] ?? 0),
+            (string) ($execution['exec_batch_id'] ?? ''),
+        );
+    }
+
+    private function insertAlertRow(
+        string $dedupKey,
+        int $executionId,
+        int $nodeId,
+        int $robotId,
+        int $platform,
+        int $alertType,
+        int $deliveryStatus,
+        string $skipReason,
+        int $httpStatus,
+        string $errorMessage,
+        int $cronId = 0,
+        string $execBatchId = '',
+    ): void {
+        if ($dedupKey === '') {
+            return;
+        }
+        $this->alertLogRepository->insertIgnoringDuplicateKey([
+            'dedup_key' => $dedupKey,
+            'execution_id' => $executionId,
+            'cron_id' => $cronId,
+            'node_id' => $nodeId,
+            'exec_batch_id' => $execBatchId,
             'robot_id' => $robotId,
             'platform' => $platform,
-            'alert_type' => $execStatus === ExecutionStatus::TIMEOUT ? RobotAlertType::TIMEOUT : RobotAlertType::FAILED,
+            'alert_type' => $alertType,
             'status' => $deliveryStatus,
             'skip_reason' => $skipReason,
             'http_status' => $httpStatus,
             'error_message' => $errorMessage,
-            'sent_at' => $now,
-        ];
-        $this->alertLogRepository->insertIgnoringDuplicateKey($row);
+            'sent_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function nodeDedupKey(int $nodeId, int $alertType, string $lastHeartbeatAt): string
+    {
+        $hb = CronNodeLiveness::parseHeartbeatAt($lastHeartbeatAt !== '' ? $lastHeartbeatAt : null) ?? time();
+
+        return 'n:' . $nodeId . ':' . $alertType . ':' . $hb;
+    }
+
+    private function heartbeatAtString(mixed $value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+        $text = trim((string) $value);
+
+        return $text === '0000-00-00 00:00:00' ? '' : $text;
+    }
+
+    private function affected(mixed $n): bool
+    {
+        return $n === true || (int) $n === 1;
     }
 
     /**

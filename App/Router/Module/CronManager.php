@@ -105,6 +105,9 @@ Route::group([
         'dispatch_route' => [CronTaskManagerController::class, 'deleteNodeGroup'],
     ]);
 
+    Route::get('/robots/alert-logs', [
+        'dispatch_route' => [CronRobotController::class, 'listAlertLogs'],
+    ]);
     Route::get('/robots', [
         'dispatch_route' => [CronRobotController::class, 'listRobots'],
     ]);

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Service;
 
+use App\Module\Cron\RobotAlertType;
 use Swoolefy\Core\Log\LogManager;
 use Swoolefy\Worker\Cron\ExecutionStatus;
 
 /**
- * Execution 终态 CAS 成功后的告警旁路。失败不得影响状态机。
+ * Execution 终态 CAS / 节点存活边沿 CAS 成功后的告警旁路。失败不得影响状态机。
  */
 final class AlertDispatcher
 {
@@ -21,9 +22,35 @@ final class AlertDispatcher
             return;
         }
 
-        $run = static function () use ($logId): void {
+        self::runSafely(static function () use ($logId): void {
+            (new CronAlertService())->send($logId);
+        });
+    }
+
+    public static function dispatchNodeLiveness(int $nodeId, int $alertType, string $lastHeartbeatAt): void
+    {
+        if ($nodeId <= 0 || !RobotAlertType::isNodeLiveness($alertType)) {
+            return;
+        }
+
+        self::runSafely(static function () use ($nodeId, $alertType, $lastHeartbeatAt): void {
+            $svc = new CronAlertService();
+            if ($alertType === RobotAlertType::NODE_ONLINE) {
+                $svc->sendNodeOnline($nodeId, $lastHeartbeatAt);
+            } else {
+                $svc->sendNodeOffline($nodeId, $lastHeartbeatAt);
+            }
+        });
+    }
+
+    /**
+     * @param callable():void $run
+     */
+    private static function runSafely(callable $run): void
+    {
+        $wrapped = static function () use ($run): void {
             try {
-                (new CronAlertService())->send($logId);
+                $run();
             } catch (\Throwable $e) {
                 self::logError($e);
             }
@@ -31,17 +58,17 @@ final class AlertDispatcher
 
         if (\Swoole\Coroutine::getCid() >= 0) {
             try {
-                goApp($run);
+                goApp($wrapped);
                 return;
             } catch (\Throwable $e) {
                 self::logError($e);
             }
         }
 
-        $run();
+        $wrapped();
     }
 
-    private static function logError(\Throwable $e): void
+    public static function logError(\Throwable $e): void
     {
         $msg = '[cron-alert] ' . $e->getMessage();
         try {

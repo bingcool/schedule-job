@@ -116,6 +116,8 @@ Cron Agent 部署在**实际需要跑定时任务的机器**上，负责本机�
 
 - 全局配置企微 / 钉钉 / 飞书群机器人，节点组绑定其中一个（或不绑定）
 - 任务执行 `FAILED` / `TIMEOUT`（非取消）时旁路推送，不改 Execution 状态机
+- 节点失联、重新上线（含首次启动）时向该节点所属组绑定的机器人推送
+- 投递结果写入 `cron_robot_alert_log`，管理后台「机器人告警 → 警告记录」可查；保留 7 天
 - 发送时读取节点组**当前**绑定；Webhook 明文落库、API 脱敏；写操作仅超级管理员
 
 ---
@@ -203,13 +205,13 @@ composer install
 
 | 包 | 分支       |
 |---|----------|
-| `bingcool/swoolefy` | `~6.3.4` |
-| `bingcool/library` | `^6.0.1` |
+| `bingcool/swoolefy` | `~6.3.9` |
+| `bingcool/library` | `^6.0.4` |
 
 若安装或升级报错，请一次性指定两个包：
 
 ```bash
-composer require bingcool/swoolefy:~6.3.4 bingcool/library:^6.0.1
+composer require bingcool/swoolefy:~6.3.9 bingcool/library:^6.0.4
 ```
 
 ### 2. 配置环境变量
@@ -394,7 +396,7 @@ HTTP 服务默认暴露（可在 `App/Config/health.php` 调整）：
 | 操作记录 | `#/tasks/operation-logs` | 任务变更审计 |
 | 执行记录 | `#/executions` | 按任务 / 状态 / 批次筛选 |
 | Cron Nodes | `#/nodes` | 节点与分组管理 |
-| 机器人告警 | `#/robots` | 企微 / 钉钉 / 飞书群机器人，节点组绑定后失败/超时告警 |
+| 机器人告警 | `#/robots` | 企微 / 钉钉 / 飞书群机器人，节点组绑定后失败/超时/节点上下线告警 |
 | Runtime | `#/runtime` | Worker 运行时概览 |
 | 用户 / 角色 / 菜单 | `#/users` 等 | RBAC 管理 |
 
@@ -700,13 +702,14 @@ K8S_TOKEN=<上一步 token>
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET/POST/PUT/DELETE | `/nodes` | 节点 CRUD |
-| GET/POST/PUT/DELETE | `/node-groups` | 节点分组 CRUD（PUT 可选 `robotId`） |
+| GET/POST/PUT/DELETE | `/node-groups` | 节点分组 CRUD（PUT 可选 `robotId`；删除时若组内仍有节点或关联任务则拒绝） |
 
 ### 机器人告警
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/robots` | 列表（Webhook 脱敏） |
+| GET | `/robots/alert-logs` | 告警投递记录（任务失败/超时、节点失联/上线） |
 | GET | `/robots/detail` | 详情（脱敏） |
 | POST | `/robots` | 创建（超管） |
 | PUT | `/robots` | 更新（超管；空 webhook/secret 表示不改） |
@@ -758,7 +761,7 @@ K8S_TOKEN=<上一步 token>
 | `cron_agent_node` | Agent 节点（含 `api_key`、心跳） |
 | `cron_agent_node_group` | 节点分组（含 `robot_id`） |
 | `cron_robot` | 群机器人（企微/钉钉/飞书 Webhook） |
-| `cron_robot_alert_log` | 告警投递记录（每条 Execution 最多一行） |
+| `cron_robot_alert_log` | 告警投递记录（任务告警按 execution 去重；节点上下线按边沿去重） |
 | `cron_task_run_request` | 手动执行请求队列 |
 | `cron_task_log` | 执行记录 |
 | `cron_scheduled_task_record` | 调度点抢占（同一 cron_id + 时间点只有一个赢家） |
@@ -770,7 +773,7 @@ K8S_TOKEN=<上一步 token>
 | `staff_user_role` | 用户-角色 |
 | `staff_user_relate_node_group` | 用户-节点组 |
 
-迁移脚本：`migrations/cron.sql`（新库）、`migrations/upgrade_kubernetes_exec_type.sql`（已有库补 `exec_type=3` / `k8s_spec`）、`migrations/robot_alert.sql`（已有库升级告警）。
+迁移脚本：`migrations/cron.sql`（新库）、`migrations/upgrade_kubernetes_exec_type.sql`（已有库补 `exec_type=3` / `k8s_spec`）。
 
 ---
 

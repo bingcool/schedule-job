@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Cron\Repository;
 
 use App\Module\Cron\Entity\CronAgentNodeEntity;
+use App\Module\Cron\NodeLivenessStatus;
 use App\Module\Common\Repository\Concerns\HydratesEntityRows;
 use Swoolefy\Library\Db\Raw;
 
@@ -244,5 +245,52 @@ class CronAgentNodeRepository
         $node->last_heartbeat_at = $lastHeartbeatAt;
         $node->heartbeat_interval = $heartbeatInterval;
         $this->save($node);
+    }
+
+    /**
+     * Admin 扫描失联：未软删节点的心跳与边沿状态。
+     *
+     * @return list<CronAgentNodeEntity>
+     */
+    public function listLivenessScanRows(): array
+    {
+        return $this->selectRowsToEntities(
+            CronAgentNodeEntity::query()
+                ->field(['id', 'group_id', 'node_name', 'last_heartbeat_at', 'heartbeat_interval', 'liveness_status'])
+                ->select(),
+            CronAgentNodeEntity::class,
+        );
+    }
+
+    /**
+     * 标记为在线。已是在线则 affected=0。
+     */
+    public function casMarkOnline(int $id): int
+    {
+        if ($id <= 0) {
+            return 0;
+        }
+
+        return (int) CronAgentNodeEntity::query()
+            ->where('id', $id)
+            ->where('liveness_status', '<>', NodeLivenessStatus::ONLINE)
+            ->update(['liveness_status' => NodeLivenessStatus::ONLINE]);
+    }
+
+    /**
+     * 心跳早于 cutoff（已过期）且尚未标为失联时转入失联。
+     * 未知(0)与在线(1)都可转入，避免与心跳时间字符串对不齐导致 CAS 失败。
+     */
+    public function casMarkOfflineIfStale(int $id, string $heartbeatCutoff): int
+    {
+        if ($id <= 0 || $heartbeatCutoff === '') {
+            return 0;
+        }
+
+        return (int) CronAgentNodeEntity::query()
+            ->where('id', $id)
+            ->whereIn('liveness_status', [NodeLivenessStatus::UNKNOWN, NodeLivenessStatus::ONLINE])
+            ->where('last_heartbeat_at', '<', $heartbeatCutoff)
+            ->update(['liveness_status' => NodeLivenessStatus::OFFLINE]);
     }
 }

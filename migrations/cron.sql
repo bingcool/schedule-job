@@ -76,6 +76,7 @@ CREATE TABLE `cron_agent_node` (
     `remark` varchar(256) NOT NULL DEFAULT '' COMMENT '备注',
     `last_heartbeat_at` datetime DEFAULT NULL COMMENT '最近一次 Agent 心跳时间',
     `heartbeat_interval` int unsigned NOT NULL DEFAULT '15' COMMENT '该节点心跳间隔（秒）；Ack 时由 Worker 写入，Admin 按节点自身间隔判定存活',
+    `liveness_status` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '存活边沿：0-未知 1-在线 2-失联；用于上线/失联告警去重',
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     `deleted_at` datetime DEFAULT NULL COMMENT '删除时间',
@@ -167,12 +168,14 @@ CREATE TABLE `cron_task_operation_log` (
 
 CREATE TABLE `cron_robot_alert_log` (
     `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `execution_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task_log.id',
-    `cron_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task.id',
+    `dedup_key` varchar(64) NOT NULL DEFAULT '' COMMENT '投递去重键：e:{execution_id} 或 n:{node_id}:{alert_type}:{heartbeat_unix}',
+    `execution_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task_log.id；节点存活告警为 0',
+    `cron_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT 'cron_task.id；节点存活告警为 0',
+    `node_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT '节点ID；任务告警为执行节点，存活告警为该节点',
     `exec_batch_id` varchar(64) NOT NULL DEFAULT '' COMMENT '执行批次，与 cron_task_log.exec_batch_id 一致',
     `robot_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT '发送时使用的机器人',
     `platform` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '发送时平台快照：1-wecom 2-dingtalk 3-feishu',
-    `alert_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-FAILED 2-TIMEOUT',
+    `alert_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-FAILED 2-TIMEOUT 3-节点失联 4-节点上线',
     `status` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-发送成功 2-发送失败 3-跳过（机器人禁用/已删）',
     `skip_reason` varchar(32) NOT NULL DEFAULT '' COMMENT '跳过原因：robot_disabled/robot_not_found；成功或失败为空',
     `http_status` smallint NOT NULL DEFAULT 0 COMMENT 'Webhook HTTP 状态码，未发出为 0',
@@ -181,9 +184,10 @@ CREATE TABLE `cron_robot_alert_log` (
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
     `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_execution_id` (`execution_id`),
+    UNIQUE KEY `uk_dedup_key` (`dedup_key`),
     KEY `idx_robot_created` (`robot_id`, `created_at`),
     KEY `idx_cron_created` (`cron_id`, `created_at`),
+    KEY `idx_node_created` (`node_id`, `created_at`),
     KEY `idx_status_created` (`status`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Cron机器人告警投递记录';
 

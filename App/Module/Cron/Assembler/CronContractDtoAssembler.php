@@ -6,12 +6,14 @@ namespace App\Module\Cron\Assembler;
 
 use App\Module\Cron\Mapper\CronAgentNodeGroupRowMapper;
 use App\Module\Cron\Mapper\CronAgentNodeRowMapper;
+use App\Module\Cron\Mapper\CronRobotAlertLogRowMapper;
 use App\Module\Cron\Mapper\CronRobotRowMapper;
 use App\Module\Cron\Mapper\CronTaskLogRowMapper;
 use App\Module\Cron\Mapper\CronTaskOperationLogRowMapper;
 use App\Module\Cron\Mapper\CronTaskRowMapper;
 use App\Module\Cron\Mapper\CronTaskStatsResultMapper;
 use App\Module\Cron\Mapper\ExecutionDetailMapper;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotAlertLogRowDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotRowDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronAgentNodeGroupRowDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronTaskManager\CronAgentNodeRowDto;
@@ -30,6 +32,14 @@ final class CronContractDtoAssembler
     public static function robotRowFromEntityRow(array $row): CronRobotRowDto
     {
         return CronRobotRowMapper::fromEntityRow($row);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    public static function robotAlertLogRowFromEntityRow(array $row): CronRobotAlertLogRowDto
+    {
+        return CronRobotAlertLogRowMapper::fromEntityRow($row);
     }
 
     /**

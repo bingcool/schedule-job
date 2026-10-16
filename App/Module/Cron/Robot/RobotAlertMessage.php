@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Module\Cron\Robot;
 
+use App\Module\Cron\RobotAlertType;
+
 /**
  * Strategy 只消费本对象，禁止再查 cron_task / log。
  */
@@ -29,6 +31,8 @@ final class RobotAlertMessage
         public readonly ?int $httpStatus,
         public readonly int $triggerType,
         public readonly string $command,
+        public readonly int $alertType = 0,
+        public readonly string $lastHeartbeatAt = '',
     ) {
     }
 
@@ -64,12 +68,31 @@ final class RobotAlertMessage
 
     public function alertTitle(): string
     {
+        if ($this->alertType === RobotAlertType::NODE_OFFLINE) {
+            return 'Cron 节点失联';
+        }
+        if ($this->alertType === RobotAlertType::NODE_ONLINE) {
+            return 'Cron 节点上线';
+        }
+
         return 'Cron 任务告警 · ' . $this->statusLabel();
     }
 
     public function statusLabel(): string
     {
+        if ($this->alertType === RobotAlertType::NODE_OFFLINE) {
+            return 'OFFLINE';
+        }
+        if ($this->alertType === RobotAlertType::NODE_ONLINE) {
+            return 'ONLINE';
+        }
+
         return $this->status !== '' ? $this->status : 'UNKNOWN';
+    }
+
+    public function isNodeLiveness(): bool
+    {
+        return RobotAlertType::isNodeLiveness($this->alertType);
     }
 
     /**
@@ -79,6 +102,9 @@ final class RobotAlertMessage
     {
         if ($this->isTest) {
             return $this->testText();
+        }
+        if ($this->isNodeLiveness()) {
+            return implode("\n", $this->nodeLivenessLines(false));
         }
 
         $lines = [
@@ -118,6 +144,9 @@ final class RobotAlertMessage
     {
         if ($this->isTest) {
             return $this->testText();
+        }
+        if ($this->isNodeLiveness()) {
+            return implode("\n", $this->nodeLivenessLines(true, $wecomColor));
         }
 
         $status = $this->statusLabel();
@@ -176,6 +205,19 @@ final class RobotAlertMessage
                 ],
             ];
         }
+        if ($this->isNodeLiveness()) {
+            $rows = [];
+            foreach ($this->nodeLivenessFields() as [$label, $value]) {
+                $rows[] = $this->feishuLine($label, $value);
+            }
+
+            return [
+                'zh_cn' => [
+                    'title' => $this->alertTitle(),
+                    'content' => $rows,
+                ],
+            ];
+        }
 
         $rows = [
             $this->feishuLine('状态', $this->statusLabel()),
@@ -209,6 +251,56 @@ final class RobotAlertMessage
                 'content' => $rows,
             ],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function nodeLivenessLines(bool $markdown, bool $wecomColor = false): array
+    {
+        $status = $this->statusLabel();
+        if ($markdown) {
+            if ($wecomColor) {
+                $color = $this->alertType === RobotAlertType::NODE_ONLINE ? 'info' : 'warning';
+                $statusCell = '<font color="' . $color . '">' . $status . '</font>';
+            } else {
+                $statusCell = '**' . $status . '**';
+            }
+            $lines = [
+                '## ' . $this->alertTitle(),
+                '',
+            ];
+            foreach ($this->nodeLivenessFields() as $i => [$label, $value]) {
+                $cell = $i === 0 ? $statusCell : $value;
+                $lines[] = '> ' . $label . '：' . $cell;
+            }
+
+            return $lines;
+        }
+
+        $lines = [$this->alertTitle()];
+        foreach ($this->nodeLivenessFields() as [$label, $value]) {
+            $lines[] = $label . '：' . $value;
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @return list<array{0: string, 1: string}>
+     */
+    private function nodeLivenessFields(): array
+    {
+        $fields = [
+            ['状态', $this->statusLabel()],
+            ['节点', $this->dash($this->nodeName) . ' (#' . $this->nodeId . ')'],
+        ];
+        if ($this->nodeGroupName !== '') {
+            $fields[] = ['节点组', $this->nodeGroupName];
+        }
+        $fields[] = ['最近心跳', $this->dash($this->lastHeartbeatAt)];
+
+        return $fields;
     }
 
     /**

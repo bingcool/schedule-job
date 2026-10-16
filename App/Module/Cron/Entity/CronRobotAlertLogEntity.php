@@ -8,8 +8,10 @@ use App\Model\BaseModel;
 
 /**
  * @property int $id
+ * @property string $dedup_key
  * @property int $execution_id
  * @property int $cron_id
+ * @property int $node_id
  * @property string $exec_batch_id
  * @property int $robot_id
  * @property int $platform

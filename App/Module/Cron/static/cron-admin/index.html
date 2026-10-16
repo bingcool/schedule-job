@@ -1218,6 +1218,10 @@
 
 <script type="text/x-template" id="tpl-robots">
   <div>
+    <div class="nodes-page-tabs">
+    <el-tabs v-model="activeTab" class="nodes-tabs" @tab-click="onTabClick">
+      <el-tab-pane name="robots">
+        <span slot="label" class="cron-tab-label">机器人配置</span>
     <div class="page-head">
       <div></div>
       <div class="actions">
@@ -1226,7 +1230,7 @@
       </div>
     </div>
     <div class="panel">
-      <p class="section-desc" style="margin-top:0">配置企微 / 钉钉 / 飞书群机器人。节点组绑定后，组内任务失败或超时（非取消）会向<strong>当时</strong>绑定的机器人发告警。Webhook 与密钥仅超级管理员可写。</p>
+      <p class="section-desc" style="margin-top:0">配置企微 / 钉钉 / 飞书群机器人。节点组绑定后，组内任务失败/超时、节点失联/上线会向<strong>当时</strong>绑定的机器人发告警。Webhook 与密钥仅超级管理员可写。</p>
       <el-table :data="items" v-loading="loading">
         <el-table-column prop="id" label="ID" width="64"></el-table-column>
         <el-table-column prop="name" label="名称" min-width="140" show-overflow-tooltip></el-table-column>
@@ -1261,6 +1265,78 @@
           </template>
         </el-table-column>
       </el-table>
+    </div>
+      </el-tab-pane>
+      <el-tab-pane name="logs">
+        <span slot="label" class="cron-tab-label">警告记录</span>
+        <div class="panel">
+          <el-form :inline="true" size="small" @submit.native.prevent="searchLogs">
+            <el-form-item label="机器人">
+              <el-select v-model="logQuery.robotId" clearable filterable placeholder="全部" style="width:180px">
+                <el-option v-for="r in items" :key="'al-'+r.id" :value="r.id" :label="r.name"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="类型">
+              <el-select v-model="logQuery.alertType" clearable placeholder="全部" style="width:130px">
+                <el-option :value="1" label="任务失败"></el-option>
+                <el-option :value="2" label="任务超时"></el-option>
+                <el-option :value="3" label="节点失联"></el-option>
+                <el-option :value="4" label="节点上线"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="投递状态">
+              <el-select v-model="logQuery.status" clearable placeholder="全部" style="width:120px">
+                <el-option :value="1" label="发送成功"></el-option>
+                <el-option :value="2" label="发送失败"></el-option>
+                <el-option :value="3" label="已跳过"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="时间">
+              <el-date-picker
+                v-model="logQuery.timeRange"
+                type="datetimerange"
+                value-format="yyyy-MM-dd HH:mm:ss"
+                format="yyyy-MM-dd HH:mm:ss"
+                clearable
+                range-separator="→"
+                start-placeholder="开始时间"
+                end-placeholder="结束时间">
+              </el-date-picker>
+            </el-form-item>
+            <el-form-item><el-button type="primary" @click="searchLogs">查询</el-button></el-form-item>
+          </el-form>
+          <el-table :data="logItems" v-loading="logLoading" empty-text="暂无警告记录">
+            <el-table-column prop="sentAt" label="投递时间" width="170">
+              <template slot-scope="s">{{ s.row.sentAt || s.row.createdAt || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="类型" width="110">
+              <template slot-scope="s"><span class="status-pill" :class="alertTypeClass(s.row)">{{ s.row.alertTypeName || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column prop="robotName" label="机器人" min-width="120" show-overflow-tooltip>
+              <template slot-scope="s">{{ s.row.robotName || ('#' + s.row.robotId) }}</template>
+            </el-table-column>
+            <el-table-column label="平台" width="90">
+              <template slot-scope="s">{{ platformLabel(s.row.platform) }}</template>
+            </el-table-column>
+            <el-table-column label="节点" min-width="130" show-overflow-tooltip>
+              <template slot-scope="s">{{ s.row.nodeName ? s.row.nodeName + ' (#' + s.row.nodeId + ')' : (s.row.nodeId ? ('#' + s.row.nodeId) : '-') }}</template>
+            </el-table-column>
+            <el-table-column label="任务" min-width="140" show-overflow-tooltip>
+              <template slot-scope="s">{{ s.row.taskName || (s.row.cronId ? ('#' + s.row.cronId) : '-') }}</template>
+            </el-table-column>
+            <el-table-column label="投递状态" width="110">
+              <template slot-scope="s">
+                <span class="status-mark" :class="deliveryStatusClass(s.row)">{{ s.row.statusName || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="说明" min-width="180" show-overflow-tooltip>
+              <template slot-scope="s">{{ s.row.errorMessage || '-' }}</template>
+            </el-table-column>
+          </el-table>
+          <el-pagination style="margin-top:12px" background layout="total, prev, pager, next" :total="logTotal" :page-size="logQuery.pageSize" :current-page.sync="logQuery.page" @current-change="loadLogs"></el-pagination>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
     </div>
     <el-dialog :title="form.id ? '编辑机器人' : '新增机器人'" :visible.sync="dlg" width="560px">
       <el-form label-width="110px" size="small">
@@ -1739,7 +1815,7 @@
 <script defer src="/cron-admin/assets/js/task-operation-logs.js?v=cancel-op-1"></script>
 <script defer src="/cron-admin/assets/js/executions.js?v=exec-trend-pagesize-1"></script>
 <script defer src="/cron-admin/assets/js/nodes.js?v=robot-alert-2"></script>
-<script defer src="/cron-admin/assets/js/robots.js?v=2"></script>
+<script defer src="/cron-admin/assets/js/robots.js?v=alert-logs-1"></script>
 <script defer src="/cron-admin/assets/js/runtime.js"></script>
 <script defer src="/cron-admin/assets/js/login.js?v=login-email-1"></script>
 <script defer src="/cron-admin/assets/js/users.js?v=reset-pwd-gen-1"></script>

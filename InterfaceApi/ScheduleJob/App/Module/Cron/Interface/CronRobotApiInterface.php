@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace InterfaceApi\ScheduleJob\App\Module\Cron\Interface;
 
+use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotAlertLogsQueryRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotCreateRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotIdRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotStatusRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotUpdateRequest;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotAlertLogsResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotListResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotRowResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotTestResponse;
@@ -33,6 +35,15 @@ interface CronRobotApiInterface
     #[ApiOperation('机器人列表')]
     #[Route(method: 'GET', path: '/robots')]
     public function listRobots(): CronRobotListResponse;
+
+    /**
+     * 分页查询机器人告警投递记录
+     * @param CronRobotAlertLogsQueryRequest $request 请求参数（字段见 Request DTO 上 ApiProperty）
+     * @return CronRobotAlertLogsResponse 响应 data（字段见 Response / 嵌套 DTO 上 ApiProperty）
+     */
+    #[ApiOperation('分页查询机器人告警投递记录')]
+    #[Route(method: 'GET', path: '/robots/alert-logs')]
+    public function listAlertLogs(CronRobotAlertLogsQueryRequest $request): CronRobotAlertLogsResponse;
 
     /**
      * 机器人详情（脱敏）

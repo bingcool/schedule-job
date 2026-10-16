@@ -1,8 +1,8 @@
 # schedule-job 节点组机器人告警技术方案
 
-> 版本：v5（对照现有代码修订；SQL 以本文第 5 节为准）  
+> 版本：v6（对照现有代码修订；SQL 以本文第 5 节 + 第 15 节为准）  
 > 状态：已落地实现  
-> 目标：节点组任务执行 `FAILED` / `TIMEOUT` 时，向该组绑定的企微 / 钉钉 / 飞书群机器人发告警。  
+> 目标：节点组任务执行 `FAILED` / `TIMEOUT`，以及节点失联 / 上线时，向该组绑定的企微 / 钉钉 / 飞书群机器人发告警。  
 > 原则：**不改 Execution 状态机；不引入 MQ；告警是旁路；SQL 与现有 `cron_*` 表风格对齐。**
 
 ---
@@ -35,7 +35,7 @@ v3 方向正确：Robot 全局资源、NodeGroup 只存 `robot_id`、CAS 保证�
 
 ## 1. 产品范围
 
-当节点组内任务执行终态为 **FAILED** 或 **TIMEOUT**（且非取消）时，向该节点组绑定的群机器人发一条告警。
+当节点组内任务执行终态为 **FAILED** 或 **TIMEOUT**（且非取消）时，或组内节点 **失联 / 上线** 时，向该节点组绑定的群机器人发一条告警。
 
 支持平台：企业微信、钉钉、飞书。每个节点组最多绑定 **一个** 机器人；一个机器人可被多个节点组复用。
 
@@ -194,7 +194,7 @@ CREATE TABLE `cron_robot_alert_log` (
     `exec_batch_id` varchar(64) NOT NULL DEFAULT '' COMMENT '执行批次，与 cron_task_log.exec_batch_id 一致',
     `robot_id` bigint unsigned NOT NULL DEFAULT 0 COMMENT '发送时使用的机器人',
     `platform` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '发送时平台快照：1-wecom 2-dingtalk 3-feishu',
-    `alert_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-FAILED 2-TIMEOUT',
+    `alert_type` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-FAILED 2-TIMEOUT 3-节点失联 4-节点上线',
     `status` tinyint unsigned NOT NULL DEFAULT '0' COMMENT '1-发送成功 2-发送失败 3-跳过（机器人禁用/已删）',
     `skip_reason` varchar(32) NOT NULL DEFAULT '' COMMENT '跳过原因：robot_disabled/robot_not_found；成功或失败为空',
     `http_status` smallint NOT NULL DEFAULT 0 COMMENT 'Webhook HTTP 状态码，未发出为 0',
@@ -328,7 +328,7 @@ PUT /api/v1/node-groups     // body 增加可选 robotId
 
 ```text
 MQ / 独立 Alert Worker
-告警聚合、降噪、升级、恢复通知
+告警聚合、降噪、升级
 一节点组多机器人
 alert_log 重试 / pending 队列
 Prometheus 指标
@@ -375,10 +375,24 @@ CronRobotRepository
 1. Robot 全局；NodeGroup 只存一个 `robot_id`。  
 2. **不**在 `cron_task_log` 快照 `robot_id`；发送时读节点组当前绑定。  
 3. 状态机不依赖 Robot；告警在 CAS 之后协程旁路。  
-4. CAS 负责「最多触发一次」；`uk_execution_id` 负责「最多一行投递记录」。  
+4. CAS 负责「最多触发一次」；任务告警用 `dedup_key=e:{execution_id}`，节点存活用 `cron_agent_node.liveness_status` 边沿 + `dedup_key=n:{node_id}:{type}:{hb}`。  
 5. 投递结果与 Execution.status 独立。  
 6. Webhook 必须有连接/请求超时。  
 7. Strategy 不查库。  
 8. 不引入 MQ / Repository / 任务操作审计表。  
 9. 写 webhook 与绑定节点组：超级管理员。  
-10. SQL 以第 5 节为准：新增列必须 `COMMENT`；索引按该节 DDL，不额外补注释。
+10. SQL 以第 5 节 + 第 15 节为准：新增列必须 `COMMENT`；索引按该节 DDL，不额外补注释。
+
+---
+
+## 15. 节点失联 / 上线告警
+
+任务告警仍走 Execution CAS。节点自己掉线时 Agent **无法自报**，因此：
+
+- **上线**：Worker / Agent 心跳 `ackNodeHeartbeat`。若此前心跳已过期（或 `liveness_status=失联`），CAS `liveness_status → 在线` 成功后旁路推「节点上线」（含该节点首次心跳）。
+- **失联**：Admin 进程每 15s 扫描。心跳超过 `CronNodeLiveness` 阈值且当前边沿为在线时，CAS `→ 失联` 成功后推「节点失联」。
+- 机器人解析与任务告警相同：`node → group.robot_id`，打到**该节点所属组**绑定的机器人；`robot_id=0` / 无分组不发送、不写 log。
+- `liveness_status`：`0` 未知（升级后已在线的节点首次心跳只静默同步，避免全员误报上线）、`1` 在线、`2` 失联。
+- `cron_robot_alert_log` 去重键为 `uk_dedup_key`：任务 `e:{execution_id}`，节点 `n:{node_id}:{alert_type}:{heartbeat_unix}`。表结构见 `migrations/cron.sql`。
+
+节点组删除：组内仍有未软删节点，或这些节点上仍有未软删任务时拒绝。

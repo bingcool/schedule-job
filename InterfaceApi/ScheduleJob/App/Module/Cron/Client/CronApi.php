@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace InterfaceApi\ScheduleJob\App\Module\Cron\Client;
 
+use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotAlertLogsQueryRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotCreateRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotIdRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronRobot\CronRobotStatusRequest;
@@ -34,6 +35,7 @@ use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronTaskManager\TaskLogsQue
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronTaskManager\TaskLogsTrendRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronTaskManager\TaskOperationLogsQueryRequest;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Request\CronTaskManager\TaskTransferOwnerRequest;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotAlertLogsResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotListResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotRowResponse;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotTestResponse;
@@ -528,6 +530,19 @@ class CronApi extends BaseClientApi
         $response = $this->requestWithConnectRetry('GET', $this->uri('/api/v1/robots'), $options);
         $result = $this->parseResponseByHeaders($response);
         return CovertProperty::toCovertDeepProperty($result, CronRobotListResponse::class);
+    }
+
+    /**
+     * 分页查询机器人告警投递记录
+     */
+    public function listAlertLogs(CronRobotAlertLogsQueryRequest $request, array $options = []): CronRobotAlertLogsResponse
+    {
+        $requestDefaults = [];
+        $requestDefaults['query'] = $request->toDeepArray();
+        $options = $this->mergeClientOptions($requestDefaults, $options);
+        $response = $this->requestWithConnectRetry('GET', $this->uri('/api/v1/robots/alert-logs'), $options);
+        $result = $this->parseResponseByHeaders($response);
+        return CovertProperty::toCovertDeepProperty($result, CronRobotAlertLogsResponse::class);
     }
 
     /**

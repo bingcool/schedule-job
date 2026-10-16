@@ -177,7 +177,7 @@
       },
       removeGroup: async function (row) {
         try {
-          await common.confirmDelete(this, '确认删除分组 ' + row.groupName + '？');
+          await common.confirmDelete(this, '确认删除分组 ' + row.groupName + '？分组下若仍有节点或关联任务将无法删除。');
           await common.api('/node-groups', { method: 'DELETE', body: { id: row.id } });
           this.$message.success('已删除');
           this.loadGroups();

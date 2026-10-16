@@ -27,6 +27,7 @@ class Event extends EventHandler
         if (!SystemEnv::isWorkerService()) {
             // 创建一个定时器处理进程清理执行日志
             ProcessManager::getInstance()->addProcess('tick-purge-task-log', \App\Process\PurgeExpiredTaskLogs::class);
+            ProcessManager::getInstance()->addProcess('tick-node-liveness-alert', \App\Process\ScanNodeLivenessAlerts::class);
         }
     }
 

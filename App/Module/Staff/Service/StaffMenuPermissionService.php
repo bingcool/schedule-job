@@ -55,6 +55,7 @@ class StaffMenuPermissionService
         '/api/v1/nodes' => '/nodes',
         '/api/v1/node-groups/detail' => '/nodes',
         '/api/v1/node-groups' => ['/nodes', '/tasks', '/users'],
+        '/api/v1/robots/alert-logs' => '/robots',
         '/api/v1/robots/detail' => '/robots',
         '/api/v1/robots/status' => '/robots',
         '/api/v1/robots/test' => '/robots',

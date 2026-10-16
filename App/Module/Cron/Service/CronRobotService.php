@@ -7,13 +7,18 @@ namespace App\Module\Cron\Service;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CreateRobotDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotRowDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\CronRobotTestResultDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\RobotAlertLogsQueryDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\RobotIdDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\SwitchRobotStatusDto;
 use InterfaceApi\ScheduleJob\App\Module\Cron\Dto\CronRobot\UpdateRobotDto;
+use InterfaceApi\ScheduleJob\App\Module\Cron\Response\CronRobot\CronRobotAlertLogsPageResult;
 use App\Module\Cron\Assembler\CronContractDtoAssembler;
 use App\Module\Cron\Entity\CronRobotEntity;
 use App\Module\Cron\Repository\CronAgentNodeGroupRepository;
+use App\Module\Cron\Repository\CronAgentNodeRepository;
+use App\Module\Cron\Repository\CronRobotAlertLogRepository;
 use App\Module\Cron\Repository\CronRobotRepository;
+use App\Module\Cron\Repository\CronTaskRepository;
 use App\Module\Cron\Exception\CronTaskException;
 use App\Module\Cron\Robot\RobotAlertMessage;
 use App\Module\Cron\Robot\RobotConfig;
@@ -42,6 +47,18 @@ class CronRobotService
         get => $this->nodeGroupRepository ??= new CronAgentNodeGroupRepository();
     }
 
+    private CronRobotAlertLogRepository $alertLogRepository {
+        get => $this->alertLogRepository ??= new CronRobotAlertLogRepository();
+    }
+
+    private CronAgentNodeRepository $nodeRepository {
+        get => $this->nodeRepository ??= new CronAgentNodeRepository();
+    }
+
+    private CronTaskRepository $taskRepository {
+        get => $this->taskRepository ??= new CronTaskRepository();
+    }
+
     /**
      * @return list<CronRobotRowDto>
      */
@@ -53,6 +70,26 @@ class CronRobotService
         }
 
         return $list;
+    }
+
+    public function listAlertLogs(RobotAlertLogsQueryDto $query): CronRobotAlertLogsPageResult
+    {
+        $scopedNodeIds = $this->viewerScopedNodeIds();
+        $pageResult = new CronRobotAlertLogsPageResult();
+        if ($scopedNodeIds !== null && $scopedNodeIds === []) {
+            $pageResult->setTotal(0);
+
+            return $pageResult;
+        }
+        $total = $this->alertLogRepository->countByQuery($query, $scopedNodeIds);
+        $rows = $this->alertLogRepository->listRowsByQuery($query, $scopedNodeIds);
+        $rows = $this->attachAlertLogNames($rows);
+        foreach ($rows as $row) {
+            $pageResult->addListItem(CronContractDtoAssembler::robotAlertLogRowFromEntityRow($row));
+        }
+        $pageResult->setTotal($total);
+
+        return $pageResult;
     }
 
     public function getRobot(RobotIdDto $dto): CronRobotRowDto
@@ -287,6 +324,79 @@ class CronRobotService
         unset($row['webhook_url'], $row['secret'], $row['config_json']);
 
         return CronContractDtoAssembler::robotRowFromEntityRow($row);
+    }
+
+    /**
+     * @return list<int>|null null = 超管不过滤
+     */
+    private function viewerScopedNodeIds(): ?array
+    {
+        $groupIds = $this->staffUserService->viewerAuthorizedNodeGroupIds();
+        if ($groupIds === null) {
+            return null;
+        }
+        if ($groupIds === []) {
+            return [];
+        }
+
+        return $this->nodeRepository->listIdsByGroupIds($groupIds);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function attachAlertLogNames(array $rows): array
+    {
+        if ($rows === []) {
+            return $rows;
+        }
+        $robotIds = [];
+        $nodeIds = [];
+        $cronIds = [];
+        foreach ($rows as $row) {
+            $robotId = (int) ($row['robot_id'] ?? 0);
+            if ($robotId > 0) {
+                $robotIds[$robotId] = $robotId;
+            }
+            $nodeId = (int) ($row['node_id'] ?? 0);
+            if ($nodeId > 0) {
+                $nodeIds[$nodeId] = $nodeId;
+            }
+            $cronId = (int) ($row['cron_id'] ?? 0);
+            if ($cronId > 0) {
+                $cronIds[$cronId] = $cronId;
+            }
+        }
+        $robotNames = [];
+        foreach ($this->robotRepository->listRowsByIds(array_values($robotIds)) as $robot) {
+            $id = (int) ($robot->id ?? 0);
+            if ($id > 0) {
+                $robotNames[$id] = (string) ($robot->name ?? '');
+            }
+        }
+        $nodeNames = [];
+        foreach ($this->nodeRepository->listMetaRowsByIds(array_values($nodeIds)) as $node) {
+            $id = (int) ($node->id ?? 0);
+            if ($id > 0) {
+                $nodeNames[$id] = (string) ($node->node_name ?? '');
+            }
+        }
+        $taskNames = [];
+        foreach ($this->taskRepository->mapMetaByCronIds(array_values($cronIds)) as $cronId => $meta) {
+            $taskNames[$cronId] = (string) ($meta['task_name'] ?? '');
+        }
+        foreach ($rows as &$row) {
+            $robotId = (int) ($row['robot_id'] ?? 0);
+            $nodeId = (int) ($row['node_id'] ?? 0);
+            $cronId = (int) ($row['cron_id'] ?? 0);
+            $row['robot_name'] = $robotNames[$robotId] ?? '';
+            $row['node_name'] = $nodeNames[$nodeId] ?? '';
+            $row['task_name'] = $taskNames[$cronId] ?? '';
+        }
+        unset($row);
+
+        return $rows;
     }
 
     private function currentUserId(): int

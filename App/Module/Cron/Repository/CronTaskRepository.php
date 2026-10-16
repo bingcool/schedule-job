@@ -148,6 +148,18 @@ class CronTaskRepository
 
     /**
      * @param list<int> $nodeIds
+     */
+    public function countByNodeIds(array $nodeIds): int
+    {
+        if ($nodeIds === []) {
+            return 0;
+        }
+
+        return (int) CronTaskEntity::query()->whereIn('node_id', $nodeIds)->count();
+    }
+
+    /**
+     * @param list<int> $nodeIds
      * @return array<int, int>
      */
     public function countGroupedByNodeIds(array $nodeIds): array

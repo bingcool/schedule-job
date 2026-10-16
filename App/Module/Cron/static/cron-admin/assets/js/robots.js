@@ -9,25 +9,63 @@
     return { id: 0, name: '', platform: 1, webhookUrl: '', secret: '' };
   }
 
+  function emptyLogQuery() {
+    return {
+      page: 1,
+      pageSize: 20,
+      robotId: '',
+      alertType: '',
+      status: '',
+      startTime: '',
+      endTime: '',
+      timeRange: []
+    };
+  }
+
   window.CronAdminRobots = {
     template: '#tpl-robots',
     data: function () {
       return {
+        activeTab: 'robots',
         items: [],
         loading: false,
         dlg: false,
         saving: false,
         testingId: 0,
         form: emptyForm(),
-        isSuper: common.isViewerSuper()
+        isSuper: common.isViewerSuper(),
+        logItems: [],
+        logTotal: 0,
+        logLoading: false,
+        logLoaded: false,
+        logQuery: emptyLogQuery()
       };
     },
     created: function () {
+      if (this.$route.query && this.$route.query.tab === 'logs') {
+        this.activeTab = 'logs';
+      }
       this.load();
+      if (this.activeTab === 'logs') {
+        this.loadLogs();
+      }
     },
     methods: {
       platformLabel: function (platform) {
         return PLATFORM_LABELS[Number(platform)] || '未知';
+      },
+      alertTypeClass: function (row) {
+        var t = Number(row && row.alertType);
+        if (t === 4) return 'status-online';
+        if (t === 3) return 'status-offline';
+        if (t === 2) return 'status-timeout';
+        return 'status-failed';
+      },
+      deliveryStatusClass: function (row) {
+        var s = Number(row && row.status);
+        if (s === 1) return 'status-success';
+        if (s === 3) return 'status-cancelled';
+        return 'status-failed';
       },
       goNodeGroups: function () {
         if (!common.isViewerSuper()) {
@@ -35,6 +73,12 @@
           return;
         }
         this.$router.push({ path: '/nodes', query: { tab: 'groups' } });
+      },
+      onTabClick: function (tab) {
+        var name = (tab && tab.name) ? tab.name : this.activeTab;
+        if (name === 'logs') {
+          this.loadLogs();
+        }
       },
       load: async function () {
         this.loading = true;
@@ -46,6 +90,43 @@
         } finally {
           this.loading = false;
         }
+      },
+      syncLogTimeRange: function () {
+        var range = this.logQuery.timeRange || [];
+        if (range.length === 2) {
+          this.logQuery.startTime = range[0];
+          this.logQuery.endTime = range[1];
+        } else {
+          this.logQuery.startTime = '';
+          this.logQuery.endTime = '';
+        }
+      },
+      loadLogs: async function () {
+        this.syncLogTimeRange();
+        this.logLoading = true;
+        try {
+          var qs = new URLSearchParams();
+          var q = this.logQuery;
+          qs.set('page', String(q.page || 1));
+          qs.set('pageSize', String(q.pageSize || 20));
+          if (q.robotId !== '' && q.robotId !== null) qs.set('robotId', q.robotId);
+          if (q.alertType !== '' && q.alertType !== null) qs.set('alertType', q.alertType);
+          if (q.status !== '' && q.status !== null) qs.set('status', q.status);
+          if (q.startTime) qs.set('startTime', q.startTime);
+          if (q.endTime) qs.set('endTime', q.endTime);
+          var d = await common.api('/robots/alert-logs?' + qs.toString());
+          this.logItems = common.extractListRows(d);
+          this.logTotal = common.extractListTotal(d, this.logItems);
+          this.logLoaded = true;
+        } catch (e) {
+          common.toastErr(this, e);
+        } finally {
+          this.logLoading = false;
+        }
+      },
+      searchLogs: function () {
+        this.logQuery.page = 1;
+        this.loadLogs();
       },
       open: function (row) {
         if (!this.isSuper) {

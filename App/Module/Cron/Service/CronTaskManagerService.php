@@ -1816,6 +1816,19 @@ class CronTaskManagerService
         return $this->nodeRepository->countByGroupId($groupId);
     }
 
+    protected function countActiveTasksInGroup(int $groupId): int
+    {
+        if ($groupId <= 0) {
+            return 0;
+        }
+        $nodeIds = $this->nodeRepository->listIdsByGroupIds([$groupId]);
+        if ($nodeIds === []) {
+            return 0;
+        }
+
+        return $this->taskRepository->countByNodeIds($nodeIds);
+    }
+
     /**
      * @param list<int> $groupIds
      * @return array<int, int>
@@ -2350,13 +2363,16 @@ class CronTaskManagerService
     }
 
     /**
-     * 删除节点分组。分组下仍有未软删节点时拒绝。
+     * 删除节点分组。分组下仍有未软删节点或仍有关联任务时拒绝。
      */
     public function deleteNodeGroup(NodeGroupIdDto $dto): int
     {
         $id = $dto->getId();
         $group = $this->requireNodeGroup($id);
-        self::assertGroupDeletable($this->countActiveNodesInGroup($id));
+        self::assertGroupDeletable(
+            $this->countActiveNodesInGroup($id),
+            $this->countActiveTasksInGroup($id),
+        );
 
         return $this->nodeGroupRepository->delete($group);
     }
@@ -2422,10 +2438,13 @@ class CronTaskManagerService
     }
 
     /**
-     * 分组下仍有节点时拒绝删除。
+     * 分组下仍有关联任务或节点时拒绝删除。
      */
-    public static function assertGroupDeletable(int $nodeCount): void
+    public static function assertGroupDeletable(int $nodeCount, int $taskCount = 0): void
     {
+        if ($taskCount > 0) {
+            throw CronTaskException::throw('分组下仍有关联任务，无法删除', -1);
+        }
         if ($nodeCount > 0) {
             throw CronTaskException::throw('分组下仍有节点，无法删除', -1);
         }
