@@ -236,11 +236,8 @@ class StaffRoleService
         if ($role->isSuperRole() || StaffRoleCode::isSystem((string) $role->code)) {
             throw StaffException::throw('系统角色不能删除', -1);
         }
-        $userCount = $this->countUsersByRoleIds([(int) $role->id])[(int) $role->id] ?? 0;
-        if ($userCount > 0) {
-            throw StaffException::throw('角色已被 ' . $userCount . ' 个用户关联使用，无法删除', -1);
-        }
 
+        $this->userRoleRepository->deleteByRoleId((int) $role->id);
         $this->rolePageRepository->deleteByRoleId((int) $role->id);
         $this->rolePermissionRepository->deleteByRoleId((int) $role->id);
         // SoftDelete：写入 deleted_at，列表 / loadById / loadByCode 自动排除

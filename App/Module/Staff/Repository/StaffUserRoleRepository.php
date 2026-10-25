@@ -19,6 +19,14 @@ class StaffUserRoleRepository
             ->delete();
     }
 
+    public function deleteByRoleId(int $roleId): int
+    {
+        return (int) StaffUserRoleEntity::query()
+            ->where('app_id', StaffApp::appId())
+            ->where('role_id', $roleId)
+            ->delete();
+    }
+
     public function countByApp(): int
     {
         return (int) StaffUserRoleEntity::query()->where('app_id', StaffApp::appId())->count();

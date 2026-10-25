@@ -1642,7 +1642,11 @@
           <template slot-scope="s">
             <el-button type="text" size="small" @click="$router.push('/roles/edit/' + s.row.id)">编辑</el-button>
             <el-button type="text" size="small" :disabled="!!s.row.isSuperRole" @click="openPages(s.row)">菜单权限</el-button>
-            <el-button type="text" size="small" style="color:#f56c6c" :disabled="s.row.isSuperRole || s.row.userCount > 0" @click="remove(s.row)">删除</el-button>
+            <el-tooltip :content="deleteHint(s.row)" placement="top" :disabled="!deleteBlocked(s.row)">
+              <span>
+                <el-button type="text" size="small" style="color:#f56c6c" :disabled="deleteBlocked(s.row)" @click="remove(s.row)">删除</el-button>
+              </span>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -1807,7 +1811,7 @@
 <script defer src="/cron-admin/assets/vendor/vue.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/vue-router.min.js"></script>
 <script defer src="/cron-admin/assets/vendor/element-ui/index.js"></script>
-<script defer src="/cron-admin/assets/js/common.js?v=temp-login-hint-1"></script>
+<script defer src="/cron-admin/assets/js/common.js?v=role-delete-unbind-1"></script>
 <script defer src="/cron-admin/assets/js/dashboard.js?v=dash-trend-view-1"></script>
 <script defer src="/cron-admin/assets/js/tasks.js?v=task-owner-transfer-2"></script>
 <script defer src="/cron-admin/assets/js/editor.js?v=k8s-timeout-hours-1"></script>
@@ -1820,7 +1824,7 @@
 <script defer src="/cron-admin/assets/js/login.js?v=login-email-1"></script>
 <script defer src="/cron-admin/assets/js/users.js?v=reset-pwd-gen-1"></script>
 <script defer src="/cron-admin/assets/js/user-editor.js?v=admin-account-lock-1"></script>
-<script defer src="/cron-admin/assets/js/roles.js?v=pages-dlg-2"></script>
+<script defer src="/cron-admin/assets/js/roles.js?v=role-delete-unbind-1"></script>
 <script defer src="/cron-admin/assets/js/role-editor.js?v=basic-only-3"></script>
 <script defer src="/cron-admin/assets/vendor/sortable.min.js"></script>
 <script defer src="/cron-admin/assets/js/menus.js?v=menu-sort-1"></script>

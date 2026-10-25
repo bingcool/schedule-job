@@ -130,18 +130,19 @@
           this.pageSaving = false;
         }
       },
+      deleteBlocked: function (row) {
+        return !!(row.isSuperRole || row.isSystemRole);
+      },
+      deleteHint: function (row) {
+        return this.deleteBlocked(row) ? '系统内置角色不可删除' : '';
+      },
       remove: async function (row) {
-        if (row.isSuperRole || row.isSystemRole || row.code === 'super_admin' || row.code === 'editer_task_group') {
-          this.$message.warning('系统角色不能删除');
-          return;
-        }
-        var used = Number(row.userCount || 0);
-        if (used > 0) {
-          this.$message.warning('角色已被 ' + used + ' 个用户关联使用，无法删除');
+        if (this.deleteBlocked(row)) {
+          this.$message.warning(this.deleteHint(row));
           return;
         }
         try {
-          await common.confirmRoleDelete(this, row.name);
+          await common.confirmRoleDelete(this, row.name, Number(row.userCount || 0));
           await common.api('/roles?id=' + encodeURIComponent(row.id), {
             method: 'DELETE',
             body: { id: Number(row.id) }

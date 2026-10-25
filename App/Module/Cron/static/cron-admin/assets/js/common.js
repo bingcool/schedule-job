@@ -267,11 +267,16 @@
     });
   }
 
-  function confirmRoleDelete(vm, name) {
+  function confirmRoleDelete(vm, name, userCount) {
     var label = '「' + String(name == null ? '' : name) + '」';
+    var used = Number(userCount || 0);
+    var first = '确认删除角色' + label + '？删除后不可恢复。';
+    if (used > 0) {
+      first = '角色' + label + '已关联 ' + used + ' 个用户，删除后这些用户将失去该角色。确认删除？删除后不可恢复。';
+    }
     return confirmDialog(
       vm,
-      '确认删除角色' + label + '？删除后不可恢复。',
+      first,
       'warning',
       '删除角色'
     ).then(function () {
