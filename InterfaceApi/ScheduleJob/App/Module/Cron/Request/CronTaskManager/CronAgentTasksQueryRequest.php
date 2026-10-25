@@ -21,6 +21,8 @@ class CronAgentTasksQueryRequest extends BaseRequest
     protected string $apiKey = '';
 
     #[ApiProperty(description: '执行类型：1 shell，2 http；省略则返回全部')]
+    #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $execType = null;
 
     public function getNodeId(): int

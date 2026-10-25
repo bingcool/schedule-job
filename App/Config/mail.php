@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * 重置密码通知邮件配置，全部从 .env 读取。

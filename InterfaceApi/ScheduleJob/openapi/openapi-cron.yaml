@@ -20,6 +20,8 @@ paths:
                 nodeId:
                   type: integer
                   description: '节点 ID'
+              required:
+                - nodeId
       responses:
         200:
           description: success
@@ -103,19 +105,27 @@ paths:
                   description: '进程 PID'
                 status:
                   type: integer
+                  nullable: true
                   description: '结构化执行状态 0-6；缺省不从 message 猜测'
                 triggerType:
                   type: integer
+                  nullable: true
                   description: '触发类型：1-scheduler 2-run_once'
                 durationMs:
                   type: integer
+                  nullable: true
                   description: 执行耗时毫秒
                 exitCode:
                   type: integer
+                  nullable: true
                   description: 'Shell 退出码'
                 httpStatus:
                   type: integer
+                  nullable: true
                   description: 'HTTP 状态码'
+              required:
+                - cronId
+                - message
       responses:
         200:
           description: success
@@ -176,14 +186,14 @@ paths:
         -
           name: nodeId
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '节点 ID'
         -
           name: apiKey
           in: query
-          required: false
+          required: true
           schema:
             type: string
           description: '节点 API Key'
@@ -387,6 +397,8 @@ paths:
                 id:
                   type: integer
                   description: cron_task_log.id
+              required:
+                - id
       responses:
         200:
           description: success
@@ -448,7 +460,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '分组 ID'
@@ -576,6 +588,8 @@ paths:
                   type: string
                   nullable: true
                   description: 备注
+              required:
+                - groupName
       responses:
         200:
           description: success
@@ -659,7 +673,11 @@ paths:
                   description: 备注
                 robotId:
                   type: integer
+                  nullable: true
                   description: '绑定的机器人 ID；0=不告警；省略则不改'
+              required:
+                - id
+                - groupName
       responses:
         200:
           description: success
@@ -729,7 +747,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '分组 ID'
@@ -802,7 +820,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '节点 ID'
@@ -936,6 +954,10 @@ paths:
                   type: string
                   nullable: true
                   description: 备注
+              required:
+                - nodeName
+                - nodeIp
+                - groupId
       responses:
         200:
           description: success
@@ -1028,6 +1050,9 @@ paths:
                   type: string
                   nullable: true
                   description: 备注
+              required:
+                - id
+                - groupId
       responses:
         200:
           description: success
@@ -1100,7 +1125,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '节点 ID'
@@ -1176,7 +1201,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '机器人 ID'
@@ -1310,6 +1335,10 @@ paths:
                   type: string
                   nullable: true
                   description: 签名密钥，可空
+              required:
+                - name
+                - platform
+                - webhookUrl
       responses:
         200:
           description: success
@@ -1398,6 +1427,10 @@ paths:
                   type: string
                   nullable: true
                   description: 签名密钥；空表示不改
+              required:
+                - id
+                - name
+                - platform
       responses:
         200:
           description: success
@@ -1457,6 +1490,62 @@ paths:
                   - msg
                   - trace_id
                   - data
+  /api/v1/robots/alert-logs:
+    get:
+      tags:
+        - 'Cron 模块 API（任务、节点、机器人、Agent）'
+      summary: 分页查询机器人告警投递记录
+      operationId: getCronApiInterfaceListAlertLogs
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  msg:
+                    type: string
+                    example: success
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      list: { type: array, items: { type: object, properties: { id: { type: integer, description: '投递记录 ID' }, robotId: { type: integer, description: '机器人 ID' }, robotName: { type: string, description: 机器人名称 }, platform: { type: integer, description: '平台：1-企微 2-钉钉 3-飞书' }, alertType: { type: integer, description: '告警类型：1-任务失败 2-任务超时 3-节点失联 4-节点上线' }, alertTypeName: { type: string, description: 告警类型名称 }, status: { type: integer, description: '投递状态：1-成功 2-失败 3-跳过' }, statusName: { type: string, description: 投递状态名称 }, skipReason: { type: string, description: 跳过原因码 }, httpStatus: { type: integer, description: 'Webhook HTTP 状态码' }, errorMessage: { type: string, description: 失败/跳过说明 }, sentAt: { type: string, description: 'Webhook 调用结束时间' }, cronId: { type: integer, description: '任务 ID；节点存活告警为 0' }, taskName: { type: string, description: 任务名称 }, executionId: { type: integer, description: '执行记录 ID；节点存活告警为 0' }, nodeId: { type: integer, description: '节点 ID' }, nodeName: { type: string, description: 节点名称 }, execBatchId: { type: string, description: 执行批次 }, createdAt: { type: string, description: 记录创建时间 } } } }
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
+        400:
+          description: 'validation failed'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: -1
+                  msg:
+                    type: string
+                    example: 'validation failed'
+                  trace_id:
+                    type: string
+                    example: ''
+                  data:
+                    nullable: true
+                required:
+                  - code
+                  - msg
+                  - trace_id
+                  - data
   /api/v1/robots/detail:
     get:
       tags:
@@ -1467,7 +1556,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '机器人 ID'
@@ -1549,6 +1638,9 @@ paths:
                 status:
                   type: integer
                   description: '0-禁用 1-启用'
+              required:
+                - id
+                - status
       responses:
         200:
           description: success
@@ -1624,6 +1716,8 @@ paths:
                 id:
                   type: integer
                   description: '机器人 ID'
+              required:
+                - id
       responses:
         200:
           description: success
@@ -1742,7 +1836,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '任务 ID'
@@ -1911,12 +2005,24 @@ paths:
                 cronBetween:
                   type: array
                   items:
-                    type: string
+                    type: object
+                    properties:
+                      start: { type: string, description: 时间段开始 }
+                      end: { type: string, description: 时间段结束 }
+                    required:
+                      - start
+                      - end
                   description: 允许执行时间段列表
                 cronSkip:
                   type: array
                   items:
-                    type: string
+                    type: object
+                    properties:
+                      start: { type: string, description: 时间段开始 }
+                      end: { type: string, description: 时间段结束 }
+                    required:
+                      - start
+                      - end
                   description: 需跳过的时间段列表
                 httpBody:
                   type: array
@@ -1936,6 +2042,11 @@ paths:
                     nullable: true
                   nullable: true
                   description: 'exec_type=3 的 Kubernetes 配置：namespace/deployment/container/command/args'
+              required:
+                - name
+                - expression
+                - execType
+                - nodeId
       responses:
         200:
           description: success
@@ -2046,6 +2157,7 @@ paths:
                   description: 描述
                 nodeId:
                   type: integer
+                  nullable: true
                   description: '节点 ID'
                 execType:
                   type: integer
@@ -2078,14 +2190,24 @@ paths:
                 cronBetween:
                   type: array
                   items:
-                    type: string
-                  nullable: true
+                    type: object
+                    properties:
+                      start: { type: string, description: 时间段开始 }
+                      end: { type: string, description: 时间段结束 }
+                    required:
+                      - start
+                      - end
                   description: 允许执行时间段列表
                 cronSkip:
                   type: array
                   items:
-                    type: string
-                  nullable: true
+                    type: object
+                    properties:
+                      start: { type: string, description: 时间段开始 }
+                      end: { type: string, description: 时间段结束 }
+                    required:
+                      - start
+                      - end
                   description: 需跳过的时间段列表
                 httpBody:
                   type: array
@@ -2105,6 +2227,8 @@ paths:
                     nullable: true
                   nullable: true
                   description: 'exec_type=3 的 Kubernetes 配置：namespace/deployment/container/command/args'
+              required:
+                - id
       responses:
         200:
           description: success
@@ -2203,6 +2327,9 @@ paths:
                 status:
                   type: integer
                   description: '目标状态：0 禁用，1 启用'
+              required:
+                - ids
+                - status
       responses:
         200:
           description: success
@@ -2319,7 +2446,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '任务 ID'
@@ -2416,6 +2543,8 @@ paths:
                 id:
                   type: integer
                   description: '任务 ID'
+              required:
+                - id
       responses:
         200:
           description: success
@@ -2506,11 +2635,12 @@ paths:
           required: false
           schema:
             type: integer
+            nullable: true
           description: '日志行 ID（优先定位单条执行记录）'
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '任务 ID'
@@ -2611,6 +2741,8 @@ paths:
                 expression:
                   type: string
                   description: 'Cron 表达式：纯数字秒级 Interval，或五段 Linux Cron'
+              required:
+                - expression
       responses:
         200:
           description: success
@@ -2732,6 +2864,7 @@ paths:
           required: false
           schema:
             type: integer
+            nullable: true
           description: 任务主键ID，不传则返回全部任务日志
         -
           name: execBatchId
@@ -2747,6 +2880,7 @@ paths:
           required: false
           schema:
             type: integer
+            nullable: true
           description: '执行类型：1=shell, 2=http, 3=kubernetes'
         -
           name: triggerType
@@ -2754,6 +2888,7 @@ paths:
           required: false
           schema:
             type: integer
+            nullable: true
           description: '触发类型：1=定时, 2=手动执行'
         -
           name: taskName
@@ -2960,6 +3095,9 @@ paths:
                 userId:
                   type: integer
                   description: '新的权限所属人 staff_user.id'
+              required:
+                - id
+                - userId
       responses:
         200:
           description: success
@@ -3053,6 +3191,8 @@ paths:
                 id:
                   type: integer
                   description: '任务 ID'
+              required:
+                - id
       responses:
         200:
           description: success
@@ -3115,7 +3255,7 @@ paths:
         -
           name: taskId
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '任务 ID（cron 任务主键）'
@@ -3217,6 +3357,9 @@ paths:
                 status:
                   type: integer
                   description: '状态：0 禁用，1 启用'
+              required:
+                - id
+                - status
       responses:
         200:
           description: success

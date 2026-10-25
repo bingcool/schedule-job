@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * K8s 探针路由（无鉴权 / 无限流）。

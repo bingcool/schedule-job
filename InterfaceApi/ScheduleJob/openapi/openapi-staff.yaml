@@ -23,6 +23,9 @@ paths:
                 password:
                   type: string
                   description: 密码
+              required:
+                - account
+                - password
       responses:
         200:
           description: success
@@ -162,6 +165,10 @@ paths:
                 newPasswordConfirm:
                   type: string
                   description: 确认新密码
+              required:
+                - oldPassword
+                - newPassword
+                - newPasswordConfirm
       responses:
         200:
           description: success
@@ -228,6 +235,8 @@ paths:
                 userName:
                   type: string
                   description: 用户名称
+              required:
+                - userName
       responses:
         200:
           description: success
@@ -295,7 +304,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '菜单 ID'
@@ -437,6 +446,10 @@ paths:
                 status:
                   type: integer
                   description: 状态：1=启用，0=禁用
+              required:
+                - name
+                - code
+                - uri
       responses:
         200:
           description: success
@@ -533,6 +546,11 @@ paths:
                 status:
                   type: integer
                   description: 状态：1=启用，0=禁用
+              required:
+                - id
+                - name
+                - code
+                - uri
       responses:
         200:
           description: success
@@ -603,7 +621,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '菜单 ID'
@@ -686,8 +704,11 @@ paths:
                 ids:
                   type: array
                   items:
-                    type: integer
+                    type: string
                   description: '同级菜单 ID，按展示顺序排列'
+              required:
+                - parentId
+                - ids
       responses:
         200:
           description: success
@@ -757,6 +778,9 @@ paths:
                 status:
                   type: integer
                   description: 状态：1=启用，0=禁用
+              required:
+                - id
+                - status
       responses:
         200:
           description: success
@@ -817,7 +841,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '角色 ID'
@@ -970,6 +994,9 @@ paths:
                   items:
                     type: integer
                   description: '任务接口权限 ID 列表（type=2）'
+              required:
+                - name
+                - code
       responses:
         200:
           description: success
@@ -1080,6 +1107,10 @@ paths:
                   items:
                     type: integer
                   description: '任务接口权限 ID 列表（type=2）'
+              required:
+                - id
+                - name
+                - code
       responses:
         200:
           description: success
@@ -1155,7 +1186,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '角色 ID'
@@ -1301,6 +1332,8 @@ paths:
                   items:
                     type: integer
                   description: '菜单页面 ID 列表'
+              required:
+                - id
       responses:
         200:
           description: success
@@ -1444,6 +1477,9 @@ paths:
                 status:
                   type: integer
                   description: 状态：1=启用，0=禁用
+              required:
+                - id
+                - status
       responses:
         200:
           description: success
@@ -1504,7 +1540,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '用户 ID'
@@ -1650,6 +1686,10 @@ paths:
                   items:
                     type: integer
                   description: '授权节点组 ID 列表，空表示不限制'
+              required:
+                - account
+                - userName
+                - password
       responses:
         200:
           description: success
@@ -1748,6 +1788,10 @@ paths:
                   items:
                     type: integer
                   description: '授权节点组 ID 列表'
+              required:
+                - id
+                - account
+                - userName
       responses:
         200:
           description: success
@@ -1818,7 +1862,7 @@ paths:
         -
           name: nodeGroupId
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '节点分组 ID'
@@ -1882,7 +1926,7 @@ paths:
         -
           name: id
           in: query
-          required: false
+          required: true
           schema:
             type: integer
           description: '用户 ID'
@@ -1962,6 +2006,8 @@ paths:
                 userId:
                   type: integer
                   description: '目标用户 ID'
+              required:
+                - userId
       responses:
         200:
           description: success
@@ -2035,6 +2081,8 @@ paths:
                   items:
                     type: integer
                   description: '授权节点组 ID 列表'
+              required:
+                - id
       responses:
         200:
           description: success
@@ -2114,6 +2162,9 @@ paths:
                 password:
                   type: string
                   description: 已生成的临时重置密码
+              required:
+                - id
+                - password
       responses:
         200:
           description: success
@@ -2187,6 +2238,8 @@ paths:
                   items:
                     type: integer
                   description: '角色 ID 列表'
+              required:
+                - id
       responses:
         200:
           description: success
@@ -2266,6 +2319,9 @@ paths:
                 status:
                   type: integer
                   description: 状态：1=启用，0=禁用
+              required:
+                - id
+                - status
       responses:
         200:
           description: success

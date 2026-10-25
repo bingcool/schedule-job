@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Auth / JWT 配置模版。

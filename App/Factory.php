@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace App;
 use Swoolefy\Core\Application;
 use Swoolefy\Core\Dto\ContainerObjectDto;

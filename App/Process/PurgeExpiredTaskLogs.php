@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace App\Process;
 
 use App\Module\Cron\Service\CronTaskManagerService;

@@ -698,10 +698,10 @@ final class OpenApiDocGenerator
     private function schemaFromProperty(ReflectionProperty $property, array $seen): array
     {
         if ($property->getAttributes(IntToString::class) !== []) {
-            return ['type' => 'string'];
+            return $this->applyNullableFlag(['type' => 'string'], $property->getType());
         }
         if ($property->getAttributes(StringToInt::class) !== []) {
-            return ['type' => 'integer'];
+            return $this->applyNullableFlag(['type' => 'integer'], $property->getType());
         }
 
         $validation = $this->validationRule($property);

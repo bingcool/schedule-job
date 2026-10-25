@@ -30,26 +30,33 @@ class CronAgentReportRequest extends BaseRequest
     protected ?string $execBatchId = null;
 
     #[ApiProperty(description: '进程 PID')]
+    #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $pid = null;
 
     #[ApiProperty(description: '结构化执行状态 0-6；缺省不从 message 猜测')]
     #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $status = null;
 
     #[ApiProperty(description: '触发类型：1-scheduler 2-run_once')]
     #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $triggerType = null;
 
     #[ApiProperty(description: '执行耗时毫秒')]
     #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $durationMs = null;
 
     #[ApiProperty(description: 'Shell 退出码')]
     #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $exitCode = null;
 
     #[ApiProperty(description: 'HTTP 状态码')]
     #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $httpStatus = null;
 
     public function getCronId(): int

@@ -43,21 +43,31 @@ class CronTaskCreateRequest extends BaseRequest
     protected ?string $description = null;
 
     #[ApiProperty(description: '状态：0 禁用，1 启用')]
+    #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $status = null;
 
     #[ApiProperty(description: '是否阻塞重叠执行：0 否，1 是')]
+    #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $withBlockLapping = null;
 
     #[ApiProperty(description: '失败后重试次数（不含首次；0=不重试）')]
+    #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $retry = null;
 
     #[ApiProperty(description: 'Shell 执行超时秒数，0=不限制')]
+    #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $timeout = null;
 
     #[ApiProperty(description: 'HTTP 方法')]
     protected ?string $httpMethod = null;
 
     #[ApiProperty(description: 'HTTP 超时（秒）')]
+    #[StringToInt]
+    #[ValidationRule(rule: 'int')]
     protected ?int $httpRequestTimeOut = null;
 
     /**

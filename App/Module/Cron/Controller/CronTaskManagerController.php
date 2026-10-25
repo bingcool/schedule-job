@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Module\Cron\Controller;
 
@@ -548,6 +549,7 @@ class CronTaskManagerController extends BController implements CronTaskManagerAp
     #[ApiOperation("查询定时任务详情")]
     public function getTask(CronTaskIdRequest $request): CronTaskRowResponse
     {
+        var_dump($request->getId());
         return new CronTaskRowResponse($this->cronTaskManagerService->getTask(TaskIdDto::of($request->getId())));
     }
 

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Auth 组件注册模板（create 时复制到 Config/component/auth.php）
