@@ -3,6 +3,7 @@ namespace App;
 use Swoolefy\Core\Application;
 use Swoolefy\Core\Dto\ContainerObjectDto;
 use Swoolefy\Library\Db\Mysql;
+use Swoolefy\Library\Mail\MailerManager;
 use Swoolefy\Support\Auth\JwtAuthGuard;
 
 
@@ -30,6 +31,15 @@ class Factory
         }
 
         return $guard;
+    }
+
+    /**
+     * 当前协程的邮件发送入口。
+     */
+    public static function getMailer(): MailerManager
+    {
+        $mailer = self::app()->get('mail');
+        return $mailer;
     }
 
     private static function app(): object

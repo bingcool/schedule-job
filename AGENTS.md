@@ -15,7 +15,7 @@
 
 - 语言/运行时：PHP `>= 8.4` + Swoole 扩展（`>= 6.1`，可用 swoole-cli 替代原生 php）
 - 数据库：MySQL `5.7+ / 8.x`
-- 依赖：`bingcool/swoolefy ~6.3.10`、`bingcool/library ^6.0.4`、`phpmailer/phpmailer ~7.1.0`
+- 依赖：`bingcool/swoolefy ~6.3.10`、`bingcool/library ^6.0.4`
 - 鉴权：JWT（HS256）；前端为内置静态 SPA（Vue 2），位于 `App/Module/Cron/static/cron-admin`
 
 ## 常用命令
