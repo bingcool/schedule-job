@@ -46,8 +46,6 @@ define('WORKER_START_SCRIPT_FILE', str_contains($_SERVER['SCRIPT_FILENAME'], $_S
 define('WORKER_SERVICE_NAME', makeServerName($appName));
 define('WORKER_PID_FILE_ROOT', '/tmp/schedule-job/log/' . WORKER_SERVICE_NAME);
 define('WORKER_CTL_LOG_FILE', WORKER_PID_FILE_ROOT . '/ctl.log');
-define('CLI_TO_WORKER_PIPE', WORKER_PID_FILE_ROOT . '/cli.pipe');
-define('WORKER_TO_CLI_PIPE', WORKER_PID_FILE_ROOT . '/ctl.pipe');
 define('SERVER_START_LOG_JSON_FILE', WORKER_PID_FILE_ROOT . '/start.json');
 
 include dirname(SRC_DIR_ROOT) . '/swoolefy';
