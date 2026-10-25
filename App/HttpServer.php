@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 /**
  * +----------------------------------------------------------------------
  * | swoolefy framework bases on swoole extension development, we can use it easily!
@@ -9,11 +8,11 @@ declare(strict_types=1);
  * | @see https://github.com/bingcool/swoolefy
  * +----------------------------------------------------------------------
  */
+declare(strict_types=1);
 
 namespace App;
 
 use Swoole\Http\Server;
-use Swoolefy\Core\Swfy;
 
 class HttpServer extends \Swoolefy\Http\HttpAppServer
 {

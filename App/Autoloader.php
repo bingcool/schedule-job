@@ -1,15 +1,5 @@
 <?php
 /**
- * +----------------------------------------------------------------------
- * | swoolefy framework bases on swoole extension development, we can use it easily!
- * +----------------------------------------------------------------------
- * | Licensed ( https://opensource.org/licenses/MIT )
- * +----------------------------------------------------------------------
- * | @see https://github.com/bingcool/swoolefy
- * +----------------------------------------------------------------------
- */
-
-/**
  * 应用命名空间自动加载模板（create 时复制到 APP_PATH/Autoloader.php，并替换 "App"）。
  *
  * 类名：\{AppName}\Autoloader（与业务根命名空间一致，避免多应用全局 class Autoloader 冲突）
@@ -18,6 +8,9 @@
  *
  * 注意：本文件仅作模板；占位符 App 在复制到应用目录时替换为真实应用名。
  */
+
+declare(strict_types=1);
+
 namespace App;
 
 if (!class_exists(__NAMESPACE__ . '\\Autoloader', false)) {

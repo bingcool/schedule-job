@@ -20,8 +20,8 @@
   "prefer-stable": true,
   "require": {
     "php": "^8.4",
-    "bingcool/swoolefy": "~6.3.11",
-    "bingcool/library": "^6.0.5"
+    "bingcool/swoolefy": "~6.3.12",
+    "bingcool/library": "^6.0.6"
   },
   "require-dev": {
     "kwn/php-rdkafka-stubs": "dev-master",
