@@ -353,11 +353,11 @@ class CronTaskService implements \Swoolefy\Worker\Cron\CronTaskInterface
         }
         $node = (new CronAgentNodeRepository())->findById($nodeId);
         if (!$node) {
-            throw new \InvalidArgumentException('节点不存在或凭证无效');
+            throw new \InvalidArgumentException('节点不存在或apiKey凭证无效,请检查CRON_NODE_API_KEY配置和agent_node表的apiKey字段');
         }
         $storedApiKey = $node->api_key ?? '';
         if ($storedApiKey === '' || !hash_equals($storedApiKey, $apiKey)) {
-            throw new \InvalidArgumentException('节点不存在或凭证无效');
+            throw new \InvalidArgumentException('节点不存在或apiKey凭证无效,请检查CRON_NODE_API_KEY配置和agent_node表的apiKey字段');
         }
     }
 
